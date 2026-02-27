@@ -94,11 +94,11 @@ export default async function ClientReportsPage({
                 </div>
               )}
 
-              {/* Coming Soon Notice */}
+              {/* Auto-report note */}
               <div className="border border-[#0A0A0A]/5 bg-[#F3F3EF] px-4 py-3">
                 <p className="font-mono text-xs text-[#0A0A0A]/40">
-                  Coming soon: Auto-generated weekly status reports will appear
-                  here.
+                  Status reports are sent daily via email. Check your inbox for
+                  the latest update.
                 </p>
               </div>
             </div>
