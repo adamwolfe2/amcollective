@@ -10,7 +10,7 @@ import {
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { eq, and, gte, desc, sql } from "drizzle-orm";
 import { formatCents } from "@/lib/stripe/format";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -81,19 +81,65 @@ export default async function ProjectDetailPage({
 
   if (!project) notFound();
 
-  // Fetch Vercel deployments if project has vercelProjectId
-  const deploysResult = project.vercelProjectId
-    ? await vercelConnector.getDeployments(project.vercelProjectId, 5)
-    : null;
+  // Fetch Vercel data if project has vercelProjectId
+  const hasVercel = !!project.vercelProjectId;
+  const [deploysResult, detailResult, domainsResult, envCountResult] =
+    await Promise.all([
+      hasVercel
+        ? vercelConnector.getDeployments(project.vercelProjectId!, 5)
+        : Promise.resolve(null),
+      hasVercel
+        ? vercelConnector.getProjectDetail(project.vercelProjectId!)
+        : Promise.resolve(null),
+      hasVercel
+        ? vercelConnector.getProjectDomains(project.vercelProjectId!)
+        : Promise.resolve(null),
+      hasVercel
+        ? vercelConnector.getProjectEnvVarCount(project.vercelProjectId!)
+        : Promise.resolve(null),
+    ]);
+
   const deploys =
     deploysResult?.success && deploysResult.data ? deploysResult.data : [];
+  const vercelDetail =
+    detailResult?.success && detailResult.data ? detailResult.data : null;
+  const domains =
+    domainsResult?.success && domainsResult.data ? domainsResult.data : [];
+  const envVarCount =
+    envCountResult?.success && envCountResult.data != null
+      ? envCountResult.data
+      : null;
 
-  // Fetch cost data for this project
+  // Fetch PostHog snapshot if project has posthogProjectId
+  const hasPosthog = !!project.posthogProjectId && !!project.posthogApiKey;
+  const posthogSnapshot = hasPosthog
+    ? await db
+        .select()
+        .from(schema.posthogSnapshots)
+        .where(eq(schema.posthogSnapshots.projectId, id))
+        .orderBy(desc(schema.posthogSnapshots.snapshotDate))
+        .limit(1)
+        .then((rows) => rows[0] ?? null)
+    : null;
+
+  // Fetch cost data
   const projectCosts = await getProjectCosts(id);
   const totalProjectCost = projectCosts.reduce(
     (sum, c) => sum + Number(c.total),
     0
   );
+
+  // Extract typed analytics data from jsonb
+  const analyticsTopPages = posthogSnapshot?.topPages
+    ? (posthogSnapshot.topPages as Array<{ date: string; count: number }>)
+    : [];
+  const analyticsTopEvents = posthogSnapshot?.topEvents
+    ? (posthogSnapshot.topEvents as Array<{ event: string; count: number }>)
+    : [];
+
+  // Build tab list dynamically
+  const tabTriggerClass =
+    "rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-[#0A0A0A] data-[state=active]:text-white px-4 py-2";
 
   return (
     <div>
@@ -133,8 +179,12 @@ export default async function ProjectDetailPage({
         </span>
       </div>
 
-      {/* Info cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+      {/* Info cards — 5 columns if Vercel detail, 4 otherwise */}
+      <div
+        className={`grid grid-cols-1 md:grid-cols-2 ${
+          vercelDetail ? "lg:grid-cols-5" : "lg:grid-cols-4"
+        } gap-4 mb-8`}
+      >
         <div className="border border-[#0A0A0A]/10 bg-white p-5">
           <p className="font-mono text-xs uppercase text-[#0A0A0A]/40 mb-1">
             GitHub
@@ -201,41 +251,86 @@ export default async function ProjectDetailPage({
             </div>
           ) : (
             <span className="font-mono text-sm text-[#0A0A0A]/30">
-              {project.vercelProjectId ? "No deploys" : "Not linked"}
+              {hasVercel ? "No deploys" : "Not linked"}
             </span>
           )}
         </div>
+
+        {/* Vercel Detail card */}
+        {vercelDetail && (
+          <div className="border border-[#0A0A0A]/10 bg-white p-5">
+            <p className="font-mono text-xs uppercase text-[#0A0A0A]/40 mb-1">
+              Vercel
+            </p>
+            <div className="space-y-1">
+              <p className="font-mono text-sm">
+                {vercelDetail.framework ?? "Unknown"}
+              </p>
+              <p className="font-mono text-xs text-[#0A0A0A]/40">
+                Node {vercelDetail.nodeVersion}
+              </p>
+              {envVarCount !== null && (
+                <p className="font-mono text-xs text-[#0A0A0A]/40">
+                  {envVarCount} env vars
+                </p>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Domains section */}
+      {domains.length > 0 && (
+        <div className="mb-8">
+          <h2 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 mb-3">
+            Domains
+          </h2>
+          <div className="flex flex-wrap gap-2">
+            {domains.map((d) => (
+              <div
+                key={d.name}
+                className="inline-flex items-center gap-2 border border-[#0A0A0A]/10 bg-white px-3 py-1.5"
+              >
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    d.verified ? "bg-emerald-500" : "bg-amber-500"
+                  }`}
+                />
+                <span className="font-mono text-sm">{d.name}</span>
+                <Badge
+                  variant="outline"
+                  className="rounded-none text-[9px] uppercase font-mono tracking-wider"
+                >
+                  {d.verified ? "Verified" : "Pending"}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <Separator className="bg-[#0A0A0A]/10 mb-6" />
 
       {/* Tabs */}
       <Tabs defaultValue="team">
         <TabsList className="rounded-none bg-transparent border border-[#0A0A0A]/20 p-0 h-auto">
-          <TabsTrigger
-            value="team"
-            className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-[#0A0A0A] data-[state=active]:text-white px-4 py-2"
-          >
+          <TabsTrigger value="team" className={tabTriggerClass}>
             Team ({stats.teamCount})
           </TabsTrigger>
-          <TabsTrigger
-            value="clients"
-            className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-[#0A0A0A] data-[state=active]:text-white px-4 py-2"
-          >
+          <TabsTrigger value="clients" className={tabTriggerClass}>
             Clients ({stats.clientCount})
           </TabsTrigger>
-          <TabsTrigger
-            value="deploys"
-            className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-[#0A0A0A] data-[state=active]:text-white px-4 py-2"
-          >
+          <TabsTrigger value="deploys" className={tabTriggerClass}>
             Deploys ({deploys.length})
           </TabsTrigger>
-          <TabsTrigger
-            value="costs"
-            className="rounded-none font-mono text-xs uppercase tracking-wider data-[state=active]:bg-[#0A0A0A] data-[state=active]:text-white px-4 py-2"
-          >
+          <TabsTrigger value="costs" className={tabTriggerClass}>
             Costs
           </TabsTrigger>
+          {hasPosthog && (
+            <TabsTrigger value="analytics" className={tabTriggerClass}>
+              Analytics
+            </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Team tab */}
@@ -358,7 +453,7 @@ export default async function ProjectDetailPage({
 
         {/* Deploys tab */}
         <TabsContent value="deploys" className="mt-4">
-          {!project.vercelProjectId ? (
+          {!hasVercel ? (
             <div className="border border-dashed border-[#0A0A0A]/20 p-8 text-center">
               <p className="font-serif text-[#0A0A0A]/40">
                 No Vercel project linked.
@@ -472,6 +567,141 @@ export default async function ProjectDetailPage({
             </div>
           )}
         </TabsContent>
+
+        {/* Analytics tab (only if PostHog configured) */}
+        {hasPosthog && (
+          <TabsContent value="analytics" className="mt-4">
+            {posthogSnapshot ? (
+              <div className="space-y-6">
+                {/* User metrics */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="border border-[#0A0A0A]/10 bg-white p-5">
+                    <p className="font-mono text-xs uppercase text-[#0A0A0A]/40 mb-1">
+                      DAU
+                    </p>
+                    <span className="text-2xl font-mono font-bold">
+                      {posthogSnapshot.dau ?? 0}
+                    </span>
+                  </div>
+                  <div className="border border-[#0A0A0A]/10 bg-white p-5">
+                    <p className="font-mono text-xs uppercase text-[#0A0A0A]/40 mb-1">
+                      WAU
+                    </p>
+                    <span className="text-2xl font-mono font-bold">
+                      {posthogSnapshot.wau ?? 0}
+                    </span>
+                  </div>
+                  <div className="border border-[#0A0A0A]/10 bg-white p-5">
+                    <p className="font-mono text-xs uppercase text-[#0A0A0A]/40 mb-1">
+                      MAU
+                    </p>
+                    <span className="text-2xl font-mono font-bold">
+                      {posthogSnapshot.mau ?? 0}
+                    </span>
+                  </div>
+                  <div className="border border-[#0A0A0A]/10 bg-white p-5">
+                    <p className="font-mono text-xs uppercase text-[#0A0A0A]/40 mb-1">
+                      Signups (30d)
+                    </p>
+                    <span className="text-2xl font-mono font-bold">
+                      {posthogSnapshot.signupCount ?? 0}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Top Pages */}
+                {analyticsTopPages.length > 0 && (
+                  <div>
+                    <h3 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 mb-3">
+                      Top Pages
+                    </h3>
+                    <div className="border border-[#0A0A0A]/20">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-[#0A0A0A]/10 hover:bg-transparent">
+                            <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40">
+                              Page
+                            </TableHead>
+                            <TableHead className="text-right font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40">
+                              Views
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {analyticsTopPages.map((page, i) => (
+                            <TableRow
+                              key={i}
+                              className="border-[#0A0A0A]/10"
+                            >
+                              <TableCell className="font-mono text-sm text-[#0A0A0A]/60 truncate max-w-xs">
+                                {page.date}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {page.count}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Top Events */}
+                {analyticsTopEvents.length > 0 && (
+                  <div>
+                    <h3 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 mb-3">
+                      Top Events
+                    </h3>
+                    <div className="border border-[#0A0A0A]/20">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-[#0A0A0A]/10 hover:bg-transparent">
+                            <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40">
+                              Event
+                            </TableHead>
+                            <TableHead className="text-right font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40">
+                              Count
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {analyticsTopEvents.map((evt, i) => (
+                            <TableRow
+                              key={i}
+                              className="border-[#0A0A0A]/10"
+                            >
+                              <TableCell className="font-mono text-sm">
+                                {evt.event}
+                              </TableCell>
+                              <TableCell className="text-right font-mono text-sm">
+                                {evt.count}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </div>
+                )}
+
+                <p className="font-mono text-xs text-[#0A0A0A]/30">
+                  Snapshot from{" "}
+                  {posthogSnapshot.snapshotDate
+                    ? format(posthogSnapshot.snapshotDate, "MMM d, yyyy")
+                    : "N/A"}
+                </p>
+              </div>
+            ) : (
+              <div className="border border-dashed border-[#0A0A0A]/20 p-8 text-center">
+                <p className="font-serif text-[#0A0A0A]/40">
+                  No analytics snapshots yet. The sync job runs daily at 2 AM
+                  PT.
+                </p>
+              </div>
+            )}
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

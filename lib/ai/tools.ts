@@ -18,6 +18,14 @@ import { searchSimilar } from "./embeddings";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc, sql, count } from "drizzle-orm";
+import {
+  VERCEL_TOOL_DEFINITIONS,
+  executeVercelTool,
+} from "@/lib/mcp/vercel";
+import {
+  POSTHOG_TOOL_DEFINITIONS,
+  executePosthogTool,
+} from "@/lib/mcp/posthog";
 
 // ─── Tool Definitions ────────────────────────────────────────────────────────
 
@@ -126,6 +134,8 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  ...VERCEL_TOOL_DEFINITIONS,
+  ...POSTHOG_TOOL_DEFINITIONS,
 ];
 
 // ─── Tool Executor ───────────────────────────────────────────────────────────
@@ -259,8 +269,17 @@ export async function executeTool(
         });
       }
 
-      default:
+      default: {
+        // Check Vercel tools
+        if (name.startsWith("list_vercel_") || name.startsWith("get_vercel_") || name.startsWith("redeploy_vercel_") || name.startsWith("check_vercel_")) {
+          return executeVercelTool(name, input);
+        }
+        // Check PostHog tools
+        if (name.startsWith("get_posthog_")) {
+          return executePosthogTool(name, input);
+        }
         return JSON.stringify({ error: `Unknown tool: ${name}` });
+      }
     }
   } catch (error) {
     return JSON.stringify({ error: `Tool ${name} failed: ${error instanceof Error ? error.message : "unknown"}` });

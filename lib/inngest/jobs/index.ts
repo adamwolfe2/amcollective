@@ -12,3 +12,5 @@ export { clientHealthCheck } from "./client-health-check";
 export { weeklyCostAnalysis } from "./cost-analysis";
 export { syncStripeFull } from "./sync-stripe-full";
 export { checkOverdueInvoices } from "./check-overdue-invoices";
+export { syncVercelFull } from "./sync-vercel-full";
+export { syncPosthogAnalytics } from "./sync-posthog-analytics";

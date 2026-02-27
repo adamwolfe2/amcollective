@@ -80,6 +80,57 @@ export const apiUsage = pgTable(
   ]
 );
 
+// ─── Snapshot Tables ────────────────────────────────────────────────────────
+
+export const vercelProjectSnapshots = pgTable(
+  "vercel_project_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id").references(() => portfolioProjects.id, {
+      onDelete: "cascade",
+    }),
+    vercelProjectId: varchar("vercel_project_id", { length: 255 }).notNull(),
+    framework: varchar("framework", { length: 100 }),
+    envVarCount: integer("env_var_count"),
+    domains: jsonb("domains"),
+    latestDeployState: varchar("latest_deploy_state", { length: 50 }),
+    latestDeployAt: timestamp("latest_deploy_at", { mode: "date" }),
+    bandwidthBytes: integer("bandwidth_bytes"),
+    functionInvocations: integer("function_invocations"),
+    buildMinutes: integer("build_minutes"),
+    edgeRequests: integer("edge_requests"),
+    snapshotDate: date("snapshot_date", { mode: "date" }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("vercel_snapshots_project_id_idx").on(table.projectId),
+    index("vercel_snapshots_date_idx").on(table.snapshotDate),
+  ]
+);
+
+export const posthogSnapshots = pgTable(
+  "posthog_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    projectId: uuid("project_id")
+      .notNull()
+      .references(() => portfolioProjects.id, { onDelete: "cascade" }),
+    dau: integer("dau"),
+    wau: integer("wau"),
+    mau: integer("mau"),
+    totalPageviews: integer("total_pageviews"),
+    topPages: jsonb("top_pages"),
+    topEvents: jsonb("top_events"),
+    signupCount: integer("signup_count"),
+    snapshotDate: date("snapshot_date", { mode: "date" }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("posthog_snapshots_project_id_idx").on(table.projectId),
+    index("posthog_snapshots_date_idx").on(table.snapshotDate),
+  ]
+);
+
 // ─── Relations ──────────────────────────────────────────────────────────────
 
 export const toolAccountsRelations = relations(toolAccounts, ({ many }) => ({
@@ -103,3 +154,23 @@ export const apiUsageRelations = relations(apiUsage, ({ one }) => ({
     references: [portfolioProjects.id],
   }),
 }));
+
+export const vercelProjectSnapshotsRelations = relations(
+  vercelProjectSnapshots,
+  ({ one }) => ({
+    project: one(portfolioProjects, {
+      fields: [vercelProjectSnapshots.projectId],
+      references: [portfolioProjects.id],
+    }),
+  })
+);
+
+export const posthogSnapshotsRelations = relations(
+  posthogSnapshots,
+  ({ one }) => ({
+    project: one(portfolioProjects, {
+      fields: [posthogSnapshots.projectId],
+      references: [portfolioProjects.id],
+    }),
+  })
+);

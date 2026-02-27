@@ -5,7 +5,7 @@
  * VERCEL_API_TOKEN and VERCEL_TEAM_ID must be set in env.
  */
 
-import { cached, safeCall, type ConnectorResult } from "./base";
+import { cached, safeCall, invalidateCache, type ConnectorResult } from "./base";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -32,6 +32,32 @@ export interface VercelUsage {
   functionInvocations: number;
   bandwidthBytes: number;
   buildMinutes: number;
+}
+
+export interface VercelProjectDetail {
+  id: string;
+  name: string;
+  framework: string | null;
+  nodeVersion: string;
+  buildCommand: string | null;
+  outputDirectory: string | null;
+  rootDirectory: string | null;
+  updatedAt: number;
+  createdAt: number;
+}
+
+export interface VercelDomain {
+  name: string;
+  verified: boolean;
+  redirect: string | null;
+  redirectStatusCode: number | null;
+  gitBranch: string | null;
+}
+
+export interface VercelBuildLogEntry {
+  type: string;
+  created: number;
+  text: string;
 }
 
 // ─── Internals ───────────────────────────────────────────────────────────────
@@ -133,4 +159,110 @@ export async function getRecentDeployments(
       return res.deployments;
     })
   );
+}
+
+/**
+ * Get detailed project information including framework, node version, build settings.
+ */
+export async function getProjectDetail(
+  projectId: string
+): Promise<ConnectorResult<VercelProjectDetail>> {
+  return safeCall(() =>
+    cached(`vercel:project-detail:${projectId}`, () =>
+      vercelFetch<VercelProjectDetail>(`/v13/projects/${projectId}`)
+    )
+  );
+}
+
+/**
+ * Get domains for a project with verified status.
+ */
+export async function getProjectDomains(
+  projectId: string
+): Promise<ConnectorResult<VercelDomain[]>> {
+  return safeCall(() =>
+    cached(`vercel:domains:${projectId}`, async () => {
+      const res = await vercelFetch<{ domains: VercelDomain[] }>(
+        `/v9/projects/${projectId}/domains`
+      );
+      return res.domains;
+    })
+  );
+}
+
+/**
+ * Get count of environment variables for a project (never exposes values).
+ */
+export async function getProjectEnvVarCount(
+  projectId: string
+): Promise<ConnectorResult<number>> {
+  return safeCall(() =>
+    cached(`vercel:env-count:${projectId}`, async () => {
+      const res = await vercelFetch<{ envs: unknown[] }>(
+        `/v9/projects/${projectId}/env`
+      );
+      return res.envs.length;
+    })
+  );
+}
+
+/**
+ * Get build logs from a deployment (last 100 lines).
+ */
+export async function getBuildLogs(
+  deploymentId: string
+): Promise<ConnectorResult<VercelBuildLogEntry[]>> {
+  return safeCall(() =>
+    cached(`vercel:build-logs:${deploymentId}`, async () => {
+      const events = await vercelFetch<VercelBuildLogEntry[]>(
+        `/v2/deployments/${deploymentId}/events`
+      );
+      return events.slice(-100);
+    })
+  );
+}
+
+/**
+ * Trigger a redeployment for a project (uses latest deployment as source).
+ */
+export async function redeployProject(
+  projectId: string
+): Promise<ConnectorResult<VercelDeployment>> {
+  const token = process.env.VERCEL_API_TOKEN;
+  if (!token) {
+    return { success: false, error: "VERCEL_API_TOKEN is not set", fetchedAt: new Date() };
+  }
+
+  // Get the latest deployment to use as source
+  const deploys = await getDeployments(projectId, 1);
+  if (!deploys.success || !deploys.data?.length) {
+    return { success: false, error: "No deployments found to redeploy", fetchedAt: new Date() };
+  }
+
+  const latestDeploy = deploys.data[0];
+  const sep = "?";
+  const url = `${VERCEL_API}/v13/deployments${sep}${teamParam()}`;
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: getHeaders(),
+      body: JSON.stringify({
+        name: latestDeploy.name,
+        deploymentId: latestDeploy.uid,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      throw new Error(`Vercel API ${res.status}: ${body.slice(0, 200)}`);
+    }
+    const deployment = (await res.json()) as VercelDeployment;
+    // Invalidate deploy caches
+    invalidateCache(`vercel:deploys:${projectId}`);
+    invalidateCache("vercel:recent-deploys");
+    return { success: true, data: deployment, fetchedAt: new Date() };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Redeploy failed";
+    return { success: false, error: message, fetchedAt: new Date() };
+  }
 }

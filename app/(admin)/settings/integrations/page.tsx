@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { db } from "@/lib/db";
+import * as schema from "@/lib/db/schema";
+import { Badge } from "@/components/ui/badge";
 
 const TABS = [
   { label: "General", href: "/settings" },
@@ -23,7 +26,7 @@ function getIntegrations(): Integration[] {
     {
       name: "Vercel",
       description: "Deployment management, build logs, and cost tracking for all hosted projects.",
-      connected: !!process.env.VERCEL_ACCESS_TOKEN,
+      connected: !!process.env.VERCEL_API_TOKEN,
     },
     {
       name: "Clerk",
@@ -58,9 +61,23 @@ function getIntegrations(): Integration[] {
   ];
 }
 
-export default function IntegrationsPage() {
+export default async function IntegrationsPage() {
   const integrations = getIntegrations();
   const connectedCount = integrations.filter((i) => i.connected).length;
+
+  // Get per-project PostHog config status
+  const projects = await db
+    .select({
+      id: schema.portfolioProjects.id,
+      name: schema.portfolioProjects.name,
+      posthogProjectId: schema.portfolioProjects.posthogProjectId,
+      posthogApiKey: schema.portfolioProjects.posthogApiKey,
+    })
+    .from(schema.portfolioProjects);
+
+  const posthogConfigured = projects.filter(
+    (p) => p.posthogProjectId && p.posthogApiKey
+  );
 
   return (
     <div>
@@ -105,7 +122,7 @@ export default function IntegrationsPage() {
       </div>
 
       {/* Integration Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-10">
         {integrations.map((integration) => (
           <div
             key={integration.name}
@@ -137,6 +154,51 @@ export default function IntegrationsPage() {
             </p>
           </div>
         ))}
+      </div>
+
+      {/* PostHog Per-Project Config */}
+      <div>
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="font-serif text-lg font-bold text-[#0A0A0A]">
+            PostHog — Per-Project Configuration
+          </h2>
+          <span className="px-2 py-0.5 text-xs font-mono border border-[#0A0A0A]">
+            {posthogConfigured.length}/{projects.length}
+          </span>
+        </div>
+        <p className="font-serif text-sm text-[#0A0A0A]/50 mb-4">
+          Each project can have its own PostHog project ID and API key for
+          multi-product analytics. Configure via the project detail page.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          {projects.map((project) => {
+            const isConfigured = !!project.posthogProjectId && !!project.posthogApiKey;
+            return (
+              <Link
+                key={project.id}
+                href={`/projects/${project.id}`}
+                className="border border-[#0A0A0A]/10 bg-white p-4 flex items-center justify-between hover:border-[#0A0A0A]/30 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isConfigured ? "bg-emerald-500" : "bg-[#0A0A0A]/20"
+                    }`}
+                  />
+                  <span className="font-serif text-sm font-medium">
+                    {project.name}
+                  </span>
+                </div>
+                <Badge
+                  variant="outline"
+                  className="rounded-none text-[9px] uppercase font-mono tracking-wider"
+                >
+                  {isConfigured ? "Configured" : "Not set up"}
+                </Badge>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

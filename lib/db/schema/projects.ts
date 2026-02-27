@@ -38,6 +38,8 @@ export const portfolioProjects = pgTable(
     slug: varchar("slug", { length: 255 }).notNull(),
     domain: varchar("domain", { length: 255 }),
     vercelProjectId: varchar("vercel_project_id", { length: 255 }),
+    posthogProjectId: varchar("posthog_project_id", { length: 255 }),
+    posthogApiKey: varchar("posthog_api_key", { length: 255 }),
     githubRepo: varchar("github_repo", { length: 255 }),
     status: projectStatusEnum("status").default("active").notNull(),
     healthScore: integer("health_score"),
