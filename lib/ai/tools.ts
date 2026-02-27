@@ -17,7 +17,7 @@ import * as vercelConnector from "@/lib/connectors/vercel";
 import { searchSimilar } from "./embeddings";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, desc, sql, count, and } from "drizzle-orm";
+import { eq, desc, sql, count, and, lte, gte, ilike, or } from "drizzle-orm";
 import {
   VERCEL_TOOL_DEFINITIONS,
   executeVercelTool,
@@ -235,6 +235,114 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
       type: "object" as const,
       properties: {
         limit: { type: "number", description: "Max results (default 10)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_leads",
+    description: "Get leads from the CRM pipeline. Filter by stage, value, or follow-up status. Use when asked about sales pipeline, prospects, or follow-ups.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        stage: { type: "string", enum: ["awareness", "interest", "consideration", "intent", "closed_won", "closed_lost", "nurture", "all"], default: "all" },
+        overdueFollowUps: { type: "boolean", description: "Only show leads with overdue follow-ups" },
+        limit: { type: "number", default: 10 },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "create_lead",
+    description: "Create a new lead in the CRM. Use when Adam mentions a new prospect or contact.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        contactName: { type: "string" },
+        companyName: { type: "string" },
+        email: { type: "string" },
+        estimatedValue: { type: "number", description: "Dollar amount" },
+        stage: { type: "string", enum: ["awareness", "interest", "consideration", "intent"], default: "interest" },
+        notes: { type: "string" },
+        companyTag: { type: "string", default: "am_collective" },
+      },
+      required: ["contactName"],
+    },
+  },
+  {
+    name: "get_tasks",
+    description: "Get team tasks. Filter by status, assignee, or project.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        status: { type: "string", enum: ["backlog", "todo", "in_progress", "in_review", "done", "cancelled", "all"], default: "all" },
+        limit: { type: "number", default: 10 },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_contracts",
+    description: "Get contracts. Filter by status to find active, pending signature, or draft contracts.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        status: { type: "string", enum: ["draft", "sent", "viewed", "signed", "countersigned", "active", "expired", "terminated", "all"], default: "all" },
+        limit: { type: "number", default: 10 },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_forecast",
+    description: "Get revenue forecast data including monthly recurring revenue, weighted pipeline, contracted value.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "get_voice_briefing",
+    description: "Get a comprehensive voice-ready business briefing. Includes MRR, cash, invoices, pipeline, tasks, contracts, alerts, and natural language summary.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "get_audit_logs",
+    description: "Search audit logs. Filter by action, entity type, or actor type. Use for compliance inquiries.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        action: { type: "string", description: "Filter by action name" },
+        entityType: { type: "string", description: "Filter by entity type" },
+        actorType: { type: "string", enum: ["user", "system", "agent"] },
+        limit: { type: "number", default: 20 },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_analytics",
+    description: "Get cross-domain business analytics: revenue trend, lead funnel, task velocity, cost breakdown.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "get_knowledge_articles",
+    description: "Search the knowledge base for SOPs, notes, and briefs. Filter by type or search by keyword.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        search: { type: "string", description: "Search keyword for title or content" },
+        docType: { type: "string", enum: ["sop", "note", "brief", "all"], default: "all" },
+        limit: { type: "number", default: 10 },
       },
       required: [],
     },
@@ -542,6 +650,263 @@ export async function executeTool(
           .orderBy(desc(schema.sentEmails.createdAt))
           .limit(seLimit);
         return JSON.stringify(seResults);
+      }
+
+      case "get_leads": {
+        const leadConditions = [eq(schema.leads.isArchived, false)];
+        const leadStage = input.stage as string | undefined;
+        if (leadStage && leadStage !== "all") {
+          leadConditions.push(eq(schema.leads.stage, leadStage as (typeof schema.leadStageEnum.enumValues)[number]));
+        }
+        if (input.overdueFollowUps) {
+          leadConditions.push(lte(schema.leads.nextFollowUpAt, new Date()));
+        }
+        const leadRows = await db.select().from(schema.leads)
+          .where(and(...leadConditions))
+          .orderBy(desc(schema.leads.updatedAt))
+          .limit((input.limit as number) || 10);
+        return JSON.stringify(leadRows);
+      }
+
+      case "create_lead": {
+        const [newLead] = await db.insert(schema.leads).values({
+          contactName: input.contactName as string,
+          companyName: (input.companyName as string) ?? null,
+          email: (input.email as string) ?? null,
+          stage: ((input.stage as string) ?? "interest") as (typeof schema.leadStageEnum.enumValues)[number],
+          notes: (input.notes as string) ?? null,
+          companyTag: ((input.companyTag as string) ?? "am_collective") as (typeof schema.companyTagEnum.enumValues)[number],
+          estimatedValue: input.estimatedValue ? Math.round(Number(input.estimatedValue) * 100) : null,
+        }).returning();
+        return JSON.stringify({ created: true, leadId: newLead.id, lead: newLead });
+      }
+
+      case "get_tasks": {
+        const taskConditions = [eq(schema.tasks.isArchived, false)];
+        const taskStatusFilter = (input.status as string) || "all";
+        if (taskStatusFilter !== "all") {
+          taskConditions.push(eq(schema.tasks.status, taskStatusFilter as (typeof schema.taskStatusEnum.enumValues)[number]));
+        }
+
+        const taskRows = await db.select({
+          task: schema.tasks,
+          assigneeName: schema.teamMembers.name,
+          projectName: schema.portfolioProjects.name,
+        }).from(schema.tasks)
+          .leftJoin(schema.teamMembers, eq(schema.tasks.assigneeId, schema.teamMembers.id))
+          .leftJoin(schema.portfolioProjects, eq(schema.tasks.projectId, schema.portfolioProjects.id))
+          .where(and(...taskConditions))
+          .orderBy(desc(schema.tasks.createdAt))
+          .limit(Number(input.limit) || 10);
+
+        return JSON.stringify(taskRows.map(r => ({
+          id: r.task.id,
+          title: r.task.title,
+          status: r.task.status,
+          priority: r.task.priority,
+          assignee: r.assigneeName,
+          project: r.projectName,
+          dueDate: r.task.dueDate,
+          createdAt: r.task.createdAt,
+        })));
+      }
+
+      case "get_contracts": {
+        let contractQuery = db.select({
+          contract: schema.contracts,
+          clientName: schema.clients.name,
+          clientCompany: schema.clients.companyName,
+        }).from(schema.contracts)
+          .leftJoin(schema.clients, eq(schema.contracts.clientId, schema.clients.id))
+          .orderBy(desc(schema.contracts.createdAt))
+          .limit(Number(input.limit) || 10);
+
+        const statusFilter = (input.status as string) || "all";
+        if (statusFilter !== "all") {
+          contractQuery = contractQuery.where(
+            eq(schema.contracts.status, statusFilter as (typeof schema.contractStatusEnum.enumValues)[number])
+          ) as typeof contractQuery;
+        }
+
+        const contractRows = await contractQuery;
+        return JSON.stringify(contractRows.map(r => ({
+          id: r.contract.id,
+          contractNumber: r.contract.contractNumber,
+          title: r.contract.title,
+          status: r.contract.status,
+          clientName: r.clientName,
+          clientCompany: r.clientCompany,
+          totalValue: r.contract.totalValue ? r.contract.totalValue / 100 : null,
+          signedAt: r.contract.signedAt,
+          createdAt: r.contract.createdAt,
+        })));
+      }
+
+      case "get_forecast": {
+        const recurringForecast = await db.select({ amount: schema.recurringInvoices.total, interval: schema.recurringInvoices.interval })
+          .from(schema.recurringInvoices).where(eq(schema.recurringInvoices.status, "active"));
+        let mrForecast = 0;
+        for (const r of recurringForecast) {
+          const amt = r.amount ?? 0;
+          if (r.interval === "monthly") mrForecast += amt;
+          else if (r.interval === "quarterly") mrForecast += amt / 3;
+          else if (r.interval === "annual") mrForecast += amt / 12;
+          else if (r.interval === "weekly") mrForecast += amt * 4.33;
+          else if (r.interval === "biweekly") mrForecast += amt * 2.17;
+        }
+        const activeCtr = await db.select({ totalValue: schema.contracts.totalValue })
+          .from(schema.contracts).where(eq(schema.contracts.status, "active"));
+        return JSON.stringify({
+          monthlyRecurring: Math.round(mrForecast) / 100,
+          contractedRevenue: activeCtr.reduce((s, c) => s + (c.totalValue ?? 0), 0) / 100,
+          activeContracts: activeCtr.length,
+        });
+      }
+
+      case "get_voice_briefing": {
+        const [mrrRes] = await db.select({
+          total: sql<number>`COALESCE(SUM(${schema.subscriptions.amount}), 0)`,
+        }).from(schema.subscriptions).where(eq(schema.subscriptions.status, "active"));
+        const vMrr = Number(mrrRes?.total ?? 0) / 100;
+
+        const mercAccts = await db.select().from(schema.mercuryAccounts);
+        const vCash = mercAccts.reduce((s, a) => s + Number(a.balance), 0) / 100;
+
+        const [overdueResult] = await db.select({
+          count: count(),
+          total: sql<number>`COALESCE(SUM(${schema.invoices.amount}), 0)`,
+        }).from(schema.invoices).where(eq(schema.invoices.status, "overdue"));
+
+        const [pipelineResult] = await db.select({
+          count: count(),
+          totalValue: sql<number>`COALESCE(SUM(${schema.leads.estimatedValue}), 0)`,
+        }).from(schema.leads).where(and(eq(schema.leads.isArchived, false), sql`${schema.leads.stage} NOT IN ('closed_won', 'closed_lost')`));
+
+        const [taskResult] = await db.select({ count: count() }).from(schema.tasks)
+          .where(and(eq(schema.tasks.isArchived, false), lte(schema.tasks.dueDate, new Date()), sql`${schema.tasks.status} NOT IN ('done', 'cancelled')`));
+
+        const [alertResult] = await db.select({ count: count() }).from(schema.alerts).where(eq(schema.alerts.isResolved, false));
+
+        const briefLines = [
+          `MRR is $${vMrr.toLocaleString()}, cash position is $${vCash.toLocaleString()}.`,
+          overdueResult?.count ? `${overdueResult.count} overdue invoice${overdueResult.count > 1 ? "s" : ""} totaling $${(Number(overdueResult.total) / 100).toLocaleString()}.` : "",
+          pipelineResult?.count ? `${pipelineResult.count} active leads worth $${(Number(pipelineResult.totalValue) / 100).toLocaleString()}.` : "",
+          taskResult?.count ? `${taskResult.count} overdue task${taskResult.count > 1 ? "s" : ""}.` : "",
+          alertResult?.count ? `${alertResult.count} unresolved alert${alertResult.count > 1 ? "s" : ""}.` : "",
+        ].filter(Boolean);
+
+        return JSON.stringify({
+          mrr: vMrr,
+          cash: vCash,
+          overdueInvoices: overdueResult?.count ?? 0,
+          activeLeads: pipelineResult?.count ?? 0,
+          overdueTasks: taskResult?.count ?? 0,
+          unresolvedAlerts: alertResult?.count ?? 0,
+          briefing: briefLines.join(" "),
+        });
+      }
+
+      case "get_audit_logs": {
+        const alConditions = [];
+        if (input.action) alConditions.push(ilike(schema.auditLogs.action, `%${input.action}%`));
+        if (input.entityType) alConditions.push(eq(schema.auditLogs.entityType, input.entityType as string));
+        if (input.actorType) alConditions.push(eq(schema.auditLogs.actorType, input.actorType as "user" | "system" | "agent"));
+
+        const alLogs = await db.select().from(schema.auditLogs)
+          .where(alConditions.length > 0 ? and(...alConditions) : undefined)
+          .orderBy(desc(schema.auditLogs.createdAt))
+          .limit(Number(input.limit) || 20);
+
+        return JSON.stringify(alLogs.map(l => ({
+          action: l.action,
+          entityType: l.entityType,
+          entityId: l.entityId,
+          actorType: l.actorType,
+          actorId: l.actorId,
+          createdAt: l.createdAt,
+        })));
+      }
+
+      case "get_analytics": {
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        const fourWeeksAgo = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
+
+        const [revTrend, leadCounts, completedTasks, costTotals] = await Promise.all([
+          db.select({
+            date: schema.dailyMetricsSnapshots.date,
+            mrr: schema.dailyMetricsSnapshots.mrr,
+            activeClients: schema.dailyMetricsSnapshots.activeClients,
+          }).from(schema.dailyMetricsSnapshots)
+            .where(gte(schema.dailyMetricsSnapshots.date, thirtyDaysAgo))
+            .orderBy(desc(schema.dailyMetricsSnapshots.date)).limit(30),
+
+          db.select({ stage: schema.leads.stage, count: count() })
+            .from(schema.leads).where(eq(schema.leads.isArchived, false))
+            .groupBy(schema.leads.stage),
+
+          db.select({ count: count() }).from(schema.tasks)
+            .where(and(eq(schema.tasks.status, "done"), gte(schema.tasks.completedAt, fourWeeksAgo))),
+
+          db.select({
+            tool: schema.toolAccounts.name,
+            total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`,
+          }).from(schema.toolAccounts)
+            .leftJoin(schema.toolCosts, eq(schema.toolCosts.toolAccountId, schema.toolAccounts.id))
+            .groupBy(schema.toolAccounts.name),
+        ]);
+
+        return JSON.stringify({
+          revenueTrend: revTrend.map(r => ({ date: r.date.toISOString().split("T")[0], mrr: r.mrr / 100, clients: r.activeClients })),
+          leadsByStage: leadCounts,
+          tasksCompleted4w: completedTasks[0]?.count ?? 0,
+          costByTool: costTotals.map(c => ({ tool: c.tool, total: c.total / 100 })),
+        });
+      }
+
+      case "get_knowledge_articles": {
+        const kaConditions = [
+          or(
+            eq(schema.documents.docType, "sop"),
+            eq(schema.documents.docType, "note"),
+            eq(schema.documents.docType, "brief")
+          ),
+        ];
+        const kaDocType = (input.docType as string) || "all";
+        if (kaDocType !== "all") {
+          kaConditions.push(eq(schema.documents.docType, kaDocType as "sop" | "note" | "brief"));
+        }
+        if (input.search) {
+          kaConditions.push(
+            or(
+              ilike(schema.documents.title, `%${input.search}%`),
+              ilike(schema.documents.content, `%${input.search}%`)
+            )
+          );
+        }
+        const kaArticles = await db.select().from(schema.documents)
+          .where(and(...kaConditions))
+          .orderBy(desc(schema.documents.updatedAt))
+          .limit(Number(input.limit) || 10);
+
+        const kaDocIds = kaArticles.map((a) => a.id);
+        const kaTags = kaDocIds.length > 0
+          ? await db.select().from(schema.documentTags)
+              .where(sql`${schema.documentTags.documentId} IN (${sql.join(kaDocIds.map((id) => sql`${id}`), sql`,`)})`)
+          : [];
+        const kaTagMap = new Map<string, string[]>();
+        for (const t of kaTags) {
+          if (!kaTagMap.has(t.documentId)) kaTagMap.set(t.documentId, []);
+          kaTagMap.get(t.documentId)!.push(t.tag);
+        }
+
+        return JSON.stringify(kaArticles.map((a) => ({
+          id: a.id,
+          title: a.title,
+          docType: a.docType,
+          tags: kaTagMap.get(a.id) ?? [],
+          contentPreview: (a.content ?? "").slice(0, 200),
+          updatedAt: a.updatedAt,
+        })));
       }
 
       case "get_status_summary": {

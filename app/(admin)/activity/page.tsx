@@ -1,6 +1,8 @@
 import { formatDistanceToNow } from "date-fns";
 import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { Badge } from "@/components/ui/badge";
+import { LiveActivityFeed } from "./live-activity-feed";
+import { OnlineUsers } from "./online-users";
 
 const ACTION_COLORS: Record<string, string> = {
   create: "bg-emerald-500 text-white border-transparent",
@@ -25,7 +27,18 @@ export default async function ActivityPage() {
         </p>
       </div>
 
-      {/* Activity Feed */}
+      {/* Online Users */}
+      <OnlineUsers />
+
+      {/* Live Activity Stream */}
+      <div className="mb-8">
+        <h2 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 mb-3">
+          Live Stream
+        </h2>
+        <LiveActivityFeed />
+      </div>
+
+      {/* Static Activity Feed */}
       {activity.length === 0 ? (
         <div className="border border-[#0A0A0A]/10 py-16 text-center">
           <p className="text-[#0A0A0A]/40 font-serif">

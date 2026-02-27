@@ -13,7 +13,15 @@ import { getRocks } from "@/lib/db/repositories/rocks";
 import { getUnreadCount } from "@/lib/db/repositories/messages";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { sql, eq } from "drizzle-orm";
+import { sql, eq, and, lte, notInArray } from "drizzle-orm";
+
+export interface FollowUpLead {
+  id: string;
+  contactName: string;
+  companyName: string | null;
+  stage: string;
+  nextFollowUpAt: Date | string | null;
+}
 
 export interface BriefingData {
   mrr: number | null;
@@ -24,10 +32,11 @@ export interface BriefingData {
   atRiskRocks: number;
   overdueInvoices: number;
   overdueAmount: number;
+  overdueFollowUps: FollowUpLead[];
 }
 
 export async function gatherBriefingData(): Promise<BriefingData> {
-  const [mrrResult, deploysResult, unresolvedAlerts, unreadMessages, rocks, overdueResult] =
+  const [mrrResult, deploysResult, unresolvedAlerts, unreadMessages, rocks, overdueResult, followUps] =
     await Promise.all([
       stripeConnector.getMRR(),
       vercelConnector.getRecentDeployments(20),
@@ -41,6 +50,24 @@ export async function gatherBriefingData(): Promise<BriefingData> {
         })
         .from(schema.invoices)
         .where(eq(schema.invoices.status, "overdue")),
+      db
+        .select({
+          id: schema.leads.id,
+          contactName: schema.leads.contactName,
+          companyName: schema.leads.companyName,
+          stage: schema.leads.stage,
+          nextFollowUpAt: schema.leads.nextFollowUpAt,
+        })
+        .from(schema.leads)
+        .where(
+          and(
+            eq(schema.leads.isArchived, false),
+            lte(schema.leads.nextFollowUpAt, new Date()),
+            notInArray(schema.leads.stage, ["closed_won", "closed_lost"])
+          )
+        )
+        .orderBy(schema.leads.nextFollowUpAt)
+        .limit(5),
     ]);
 
   const mrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) : null;
@@ -57,6 +84,7 @@ export async function gatherBriefingData(): Promise<BriefingData> {
     atRiskRocks: rocks.length,
     overdueInvoices: overdueResult[0]?.count ?? 0,
     overdueAmount: overdueResult[0]?.total ?? 0,
+    overdueFollowUps: followUps,
   };
 }
 
@@ -74,6 +102,7 @@ Unresolved Alerts: ${data.unresolvedAlerts}
 Unread Messages: ${data.unreadMessages}
 At-Risk Rocks: ${data.atRiskRocks}
 Overdue Invoices: ${data.overdueInvoices} ($${(data.overdueAmount / 100).toFixed(2)})
+Pipeline Follow-ups Due: ${data.overdueFollowUps.length}${data.overdueFollowUps.length > 0 ? "\n" + data.overdueFollowUps.map((l) => `  - ${l.contactName}${l.companyName ? ` / ${l.companyName}` : ""} (${l.stage})`).join("\n") : ""}
 
 Rules:
 - 3-5 bullet points max
@@ -99,6 +128,7 @@ function formatFallbackBriefing(data: BriefingData): string {
   if (data.unresolvedAlerts > 0) lines.push(`${data.unresolvedAlerts} unresolved alert(s)`);
   if (data.atRiskRocks > 0) lines.push(`${data.atRiskRocks} rock(s) at risk`);
   if (data.overdueInvoices > 0) lines.push(`${data.overdueInvoices} overdue invoice(s): $${(data.overdueAmount / 100).toFixed(2)}`);
+  if (data.overdueFollowUps.length > 0) lines.push(`${data.overdueFollowUps.length} lead follow-up(s) due`);
   if (lines.length === 0) lines.push("All systems nominal. No issues detected.");
   return lines.join("\n");
 }

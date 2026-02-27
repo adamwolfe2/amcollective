@@ -31,6 +31,8 @@ export const WEBHOOK_EVENT_TYPES = [
   "project.status_changed",
   "survey.completed",
   "time.logged",
+  "lead.converted",
+  "contract.signed",
   "test.ping",
 ] as const;
 

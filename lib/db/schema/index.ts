@@ -18,3 +18,6 @@ export * from "./time-tracking";
 export * from "./insights";
 export * from "./email-drafts";
 export * from "./surveys";
+export * from "./leads";
+export * from "./contracts";
+export * from "./companies";

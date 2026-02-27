@@ -8,22 +8,28 @@ import {
   index,
   jsonb,
   date,
+  integer,
 } from "drizzle-orm/pg-core";
 import { pgEnum } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { portfolioProjects, teamMembers } from "./projects";
 import { clients } from "./crm";
+import { companyTagEnum } from "./costs";
 
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
 export const taskStatusEnum = pgEnum("task_status", [
+  "backlog",
   "todo",
   "in_progress",
+  "in_review",
   "done",
+  "cancelled",
 ]);
 
 export const taskPriorityEnum = pgEnum("task_priority", [
   "high",
+  "urgent",
   "medium",
   "low",
 ]);
@@ -74,13 +80,19 @@ export const tasks = pgTable(
     assigneeId: uuid("assignee_id").references(() => teamMembers.id, {
       onDelete: "set null",
     }),
+    createdById: varchar("created_by_id", { length: 255 }),
     projectId: uuid("project_id").references(() => portfolioProjects.id, {
       onDelete: "set null",
     }),
     clientId: uuid("client_id").references(() => clients.id, {
       onDelete: "set null",
     }),
+    companyTag: companyTagEnum("task_company_tag").default("am_collective"),
     source: taskSourceEnum("source").default("manual").notNull(),
+    labels: jsonb("labels").$type<string[]>(),
+    position: integer("position").notNull().default(0),
+    isArchived: boolean("is_archived").notNull().default(false),
+    completedAt: timestamp("completed_at", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -93,7 +105,27 @@ export const tasks = pgTable(
     index("tasks_client_id_idx").on(table.clientId),
     index("tasks_status_idx").on(table.status),
     index("tasks_priority_idx").on(table.priority),
+    index("tasks_due_date_idx").on(table.dueDate),
+    index("tasks_position_idx").on(table.position),
     index("tasks_created_at_idx").on(table.createdAt),
+  ]
+);
+
+export const taskComments = pgTable(
+  "task_comments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    authorId: varchar("author_id", { length: 255 }).notNull(),
+    authorName: varchar("author_name", { length: 255 }),
+    content: text("content").notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("task_comments_task_id_idx").on(table.taskId),
+    index("task_comments_created_at_idx").on(table.createdAt),
   ]
 );
 
@@ -155,7 +187,7 @@ export const alerts = pgTable(
 
 // ─── Relations ──────────────────────────────────────────────────────────────
 
-export const tasksRelations = relations(tasks, ({ one }) => ({
+export const tasksRelations = relations(tasks, ({ one, many }) => ({
   assignee: one(teamMembers, {
     fields: [tasks.assigneeId],
     references: [teamMembers.id],
@@ -167,6 +199,14 @@ export const tasksRelations = relations(tasks, ({ one }) => ({
   client: one(clients, {
     fields: [tasks.clientId],
     references: [clients.id],
+  }),
+  comments: many(taskComments),
+}));
+
+export const taskCommentsRelations = relations(taskComments, ({ one }) => ({
+  task: one(tasks, {
+    fields: [taskComments.taskId],
+    references: [tasks.id],
   }),
 }));
 

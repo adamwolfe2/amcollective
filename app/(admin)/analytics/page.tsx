@@ -12,6 +12,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SyncButton } from "./sync-button";
+import { AnalyticsCharts } from "./analytics-charts";
 
 async function getAnalyticsData() {
   // Get all projects
@@ -196,6 +197,14 @@ export default async function AnalyticsPage() {
           </p>
         </div>
       )}
+
+      {/* Cross-Domain Analytics */}
+      <div className="mb-8">
+        <h2 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 mb-3">
+          Business Analytics
+        </h2>
+        <AnalyticsCharts />
+      </div>
 
       {/* Configuration status */}
       <div>

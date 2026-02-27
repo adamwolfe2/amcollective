@@ -1,9 +1,12 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { neon } from "@neondatabase/serverless";
+import { db } from "@/lib/db";
+import * as schema from "@/lib/db/schema";
+import { count } from "drizzle-orm";
 
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const checks: Record<string, { status: string; latencyMs?: number }> = {};
   let overallStatus: "healthy" | "degraded" | "down" = "healthy";
 
@@ -14,7 +17,7 @@ export async function GET() {
     await sql`SELECT 1`;
     const latencyMs = Math.round(performance.now() - start);
     checks.database = { status: "ok", latencyMs };
-  } catch (error) {
+  } catch {
     checks.database = {
       status: "error",
       latencyMs: undefined,
@@ -50,7 +53,39 @@ export async function GET() {
     checks.redis = { status: "ok" };
   } else {
     checks.redis = { status: "not_configured" };
-    // Redis is optional — don't degrade
+  }
+
+  // Detailed mode: include table counts
+  const detailed = request.nextUrl.searchParams.get("detailed") === "true";
+  let counts = undefined;
+
+  if (detailed && checks.database.status === "ok") {
+    try {
+      const [clients, projects, invoices, leads, tasks, contracts, auditLogs, companies] =
+        await Promise.all([
+          db.select({ count: count() }).from(schema.clients),
+          db.select({ count: count() }).from(schema.portfolioProjects),
+          db.select({ count: count() }).from(schema.invoices),
+          db.select({ count: count() }).from(schema.leads),
+          db.select({ count: count() }).from(schema.tasks),
+          db.select({ count: count() }).from(schema.contracts),
+          db.select({ count: count() }).from(schema.auditLogs),
+          db.select({ count: count() }).from(schema.companies),
+        ]);
+
+      counts = {
+        clients: clients[0]?.count ?? 0,
+        projects: projects[0]?.count ?? 0,
+        invoices: invoices[0]?.count ?? 0,
+        leads: leads[0]?.count ?? 0,
+        tasks: tasks[0]?.count ?? 0,
+        contracts: contracts[0]?.count ?? 0,
+        auditLogs: auditLogs[0]?.count ?? 0,
+        companies: companies[0]?.count ?? 0,
+      };
+    } catch {
+      // Counts are best-effort
+    }
   }
 
   const statusCode = overallStatus === "down" ? 503 : 200;
@@ -61,6 +96,7 @@ export async function GET() {
       uptimeSeconds: Math.round(process.uptime()),
       timestamp: new Date().toISOString(),
       checks,
+      ...(counts ? { counts } : {}),
     },
     { status: statusCode }
   );

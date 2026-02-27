@@ -19,7 +19,7 @@ import * as vercelConnector from "@/lib/connectors/vercel";
 import { searchSimilar } from "./embeddings";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, desc, sql, count, and, gte, lte, isNotNull } from "drizzle-orm";
+import { eq, desc, sql, count, and, gte, lte, isNotNull, ilike, or } from "drizzle-orm";
 import * as mercuryConnector from "@/lib/connectors/mercury";
 import * as posthogConnector from "@/lib/connectors/posthog";
 import * as linearConnector from "@/lib/connectors/linear";
@@ -517,6 +517,416 @@ export const coreTools = {
         .orderBy(desc(schema.sentEmails.createdAt))
         .limit(seLimit ?? 10);
       return results;
+    },
+  }),
+
+  get_leads: tool({
+    description:
+      "Get leads from the CRM pipeline. Filter by stage, value, or follow-up status. Use when asked about sales pipeline, prospects, or follow-ups.",
+    inputSchema: z.object({
+      stage: z
+        .enum([
+          "awareness",
+          "interest",
+          "consideration",
+          "intent",
+          "closed_won",
+          "closed_lost",
+          "nurture",
+          "all",
+        ])
+        .optional()
+        .default("all"),
+      overdueFollowUps: z
+        .boolean()
+        .optional()
+        .describe("Only show leads with overdue follow-ups"),
+      limit: z.number().optional().default(10),
+    }),
+    execute: async ({ stage, overdueFollowUps, limit: lim }) => {
+      const conditions = [eq(schema.leads.isArchived, false)];
+      if (stage !== "all") {
+        conditions.push(
+          eq(
+            schema.leads.stage,
+            stage as (typeof schema.leadStageEnum.enumValues)[number]
+          )
+        );
+      }
+      if (overdueFollowUps) {
+        conditions.push(lte(schema.leads.nextFollowUpAt, new Date()));
+      }
+      return db
+        .select()
+        .from(schema.leads)
+        .where(and(...conditions))
+        .orderBy(desc(schema.leads.updatedAt))
+        .limit(lim);
+    },
+  }),
+
+  create_lead: tool({
+    description:
+      "Create a new lead in the CRM. Use when Adam mentions a new prospect or contact.",
+    inputSchema: z.object({
+      contactName: z.string(),
+      companyName: z.string().optional(),
+      email: z.string().optional(),
+      estimatedValue: z
+        .number()
+        .optional()
+        .describe("Dollar amount (will be converted to cents)"),
+      stage: z
+        .enum(["awareness", "interest", "consideration", "intent"])
+        .optional()
+        .default("interest"),
+      notes: z.string().optional(),
+      companyTag: z.string().optional().default("am_collective"),
+    }),
+    execute: async (params) => {
+      const [lead] = await db
+        .insert(schema.leads)
+        .values({
+          contactName: params.contactName,
+          companyName: params.companyName ?? null,
+          email: params.email ?? null,
+          stage: params.stage,
+          notes: params.notes ?? null,
+          companyTag:
+            (params.companyTag as (typeof schema.companyTagEnum.enumValues)[number]) ??
+            "am_collective",
+          estimatedValue: params.estimatedValue
+            ? Math.round(params.estimatedValue * 100)
+            : null,
+        })
+        .returning();
+      return { created: true, leadId: lead.id, lead };
+    },
+  }),
+
+  get_tasks: tool({
+    description:
+      "Get team tasks. Filter by status, assignee, or project. Use when asked about tasks, to-dos, or what the team is working on.",
+    inputSchema: z.object({
+      status: z
+        .enum(["backlog", "todo", "in_progress", "in_review", "done", "cancelled", "all"])
+        .optional()
+        .default("all"),
+      limit: z.number().optional().default(10),
+    }),
+    execute: async (params) => {
+      const conditions = [eq(schema.tasks.isArchived, false)];
+      if (params.status && params.status !== "all") {
+        conditions.push(
+          eq(schema.tasks.status, params.status as (typeof schema.taskStatusEnum.enumValues)[number])
+        );
+      }
+
+      const rows = await db
+        .select({
+          task: schema.tasks,
+          assigneeName: schema.teamMembers.name,
+          projectName: schema.portfolioProjects.name,
+        })
+        .from(schema.tasks)
+        .leftJoin(schema.teamMembers, eq(schema.tasks.assigneeId, schema.teamMembers.id))
+        .leftJoin(schema.portfolioProjects, eq(schema.tasks.projectId, schema.portfolioProjects.id))
+        .where(and(...conditions))
+        .orderBy(desc(schema.tasks.createdAt))
+        .limit(params.limit);
+
+      return rows.map((r) => ({
+        id: r.task.id,
+        title: r.task.title,
+        status: r.task.status,
+        priority: r.task.priority,
+        assignee: r.assigneeName,
+        project: r.projectName,
+        dueDate: r.task.dueDate,
+        createdAt: r.task.createdAt,
+      }));
+    },
+  }),
+
+  get_contracts: tool({
+    description:
+      "Get contracts. Filter by status to find active, pending signature, or draft contracts.",
+    inputSchema: z.object({
+      status: z
+        .enum([
+          "draft",
+          "sent",
+          "viewed",
+          "signed",
+          "countersigned",
+          "active",
+          "expired",
+          "terminated",
+          "all",
+        ])
+        .optional()
+        .default("all"),
+      limit: z.number().optional().default(10),
+    }),
+    execute: async (params) => {
+      let query = db
+        .select({
+          contract: schema.contracts,
+          clientName: schema.clients.name,
+          clientCompany: schema.clients.companyName,
+        })
+        .from(schema.contracts)
+        .leftJoin(
+          schema.clients,
+          eq(schema.contracts.clientId, schema.clients.id)
+        )
+        .orderBy(desc(schema.contracts.createdAt))
+        .limit(params.limit);
+
+      if (params.status && params.status !== "all") {
+        query = query.where(
+          eq(
+            schema.contracts.status,
+            params.status as (typeof schema.contractStatusEnum.enumValues)[number]
+          )
+        ) as typeof query;
+      }
+
+      const rows = await query;
+      return rows.map((r) => ({
+        id: r.contract.id,
+        contractNumber: r.contract.contractNumber,
+        title: r.contract.title,
+        status: r.contract.status,
+        clientName: r.clientName,
+        clientCompany: r.clientCompany,
+        totalValue: r.contract.totalValue
+          ? r.contract.totalValue / 100
+          : null,
+        startDate: r.contract.startDate,
+        endDate: r.contract.endDate,
+        signedAt: r.contract.signedAt,
+        createdAt: r.contract.createdAt,
+      }));
+    },
+  }),
+
+  get_forecast: tool({
+    description:
+      "Get revenue forecast data including monthly recurring revenue, weighted pipeline, contracted value, historical trends, and 6-month projections.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      // Recurring revenue
+      const recurringRows = await db
+        .select({
+          amount: schema.recurringInvoices.total,
+          interval: schema.recurringInvoices.interval,
+        })
+        .from(schema.recurringInvoices)
+        .where(eq(schema.recurringInvoices.status, "active"));
+
+      let monthlyRecurring = 0;
+      for (const row of recurringRows) {
+        const amount = row.amount ?? 0;
+        switch (row.interval) {
+          case "monthly": monthlyRecurring += amount; break;
+          case "quarterly": monthlyRecurring += amount / 3; break;
+          case "annual": monthlyRecurring += amount / 12; break;
+          case "weekly": monthlyRecurring += amount * 4.33; break;
+          case "biweekly": monthlyRecurring += amount * 2.17; break;
+        }
+      }
+
+      // Pipeline
+      const pipelineProbs: Record<string, number> = { awareness: 0.05, interest: 0.15, consideration: 0.3, intent: 0.6, nurture: 0.1 };
+      const pipelineLeads = await db.select({ stage: schema.leads.stage, estimatedValue: schema.leads.estimatedValue })
+        .from(schema.leads).where(and(eq(schema.leads.isArchived, false), sql`${schema.leads.stage} NOT IN ('closed_won','closed_lost')`));
+      let weightedPipeline = 0;
+      for (const l of pipelineLeads) { weightedPipeline += (l.estimatedValue ?? 0) * (pipelineProbs[l.stage] ?? 0.1); }
+
+      // Contracts
+      const activeContracts = await db.select({ totalValue: schema.contracts.totalValue })
+        .from(schema.contracts).where(eq(schema.contracts.status, "active"));
+      const contractedRevenue = activeContracts.reduce((s, c) => s + (c.totalValue ?? 0), 0);
+
+      return {
+        monthlyRecurring: Math.round(monthlyRecurring) / 100,
+        weightedPipeline: Math.round(weightedPipeline) / 100,
+        contractedRevenue: Math.round(contractedRevenue) / 100,
+        leadCount: pipelineLeads.length,
+        activeContractCount: activeContracts.length,
+      };
+    },
+  }),
+
+  get_voice_briefing: tool({
+    description:
+      "Get a comprehensive voice-ready business briefing in one call. Includes MRR, cash, invoices, pipeline, tasks, contracts, alerts, and a natural language summary. Optimized for text-to-speech.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      // Delegate to the voice briefing API
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000";
+      try {
+        const res = await fetch(`${baseUrl}/api/voice/briefing`, {
+          headers: { "Content-Type": "application/json" },
+        });
+        if (res.ok) return await res.json();
+        return { error: "Failed to fetch briefing" };
+      } catch {
+        // Direct DB fallback
+        const [mrrResult] = await db.select({
+          total: sql<number>`COALESCE(SUM(${schema.subscriptions.amount}), 0)`,
+        }).from(schema.subscriptions).where(eq(schema.subscriptions.status, "active"));
+        const mrr = Number(mrrResult?.total ?? 0) / 100;
+
+        const [overdueCount] = await db.select({ count: count() })
+          .from(schema.invoices).where(eq(schema.invoices.status, "overdue"));
+
+        const [pipelineCount] = await db.select({ count: count() })
+          .from(schema.leads).where(eq(schema.leads.isArchived, false));
+
+        return {
+          mrr,
+          overdueInvoices: overdueCount?.count ?? 0,
+          activeLeads: pipelineCount?.count ?? 0,
+          briefing: `MRR is $${mrr.toLocaleString()}. ${overdueCount?.count ?? 0} overdue invoices. ${pipelineCount?.count ?? 0} active leads.`,
+        };
+      }
+    },
+  }),
+
+  get_audit_logs: tool({
+    description:
+      "Search audit logs. Filter by action, entity type, actor type, or date range. Use for compliance inquiries.",
+    inputSchema: z.object({
+      action: z.string().optional().describe("Filter by action name (e.g. 'created', 'updated')"),
+      entityType: z.string().optional().describe("Filter by entity type (e.g. 'invoice', 'client')"),
+      actorType: z.enum(["user", "system", "agent"]).optional(),
+      limit: z.number().optional().default(20),
+    }),
+    execute: async ({ action, entityType, actorType, limit }) => {
+      const conditions = [];
+      if (action) conditions.push(ilike(schema.auditLogs.action, `%${action}%`));
+      if (entityType) conditions.push(eq(schema.auditLogs.entityType, entityType));
+      if (actorType) conditions.push(eq(schema.auditLogs.actorType, actorType));
+
+      const logs = await db.select().from(schema.auditLogs)
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(schema.auditLogs.createdAt))
+        .limit(limit ?? 20);
+
+      return logs.map(l => ({
+        action: l.action,
+        entityType: l.entityType,
+        entityId: l.entityId,
+        actorType: l.actorType,
+        actorId: l.actorId,
+        createdAt: l.createdAt,
+      }));
+    },
+  }),
+
+  get_analytics: tool({
+    description:
+      "Get cross-domain business analytics: revenue trend, lead funnel, task velocity, cost breakdown, client growth, invoice status.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      // Revenue trend (last 30 days)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const revTrend = await db.select({
+        date: schema.dailyMetricsSnapshots.date,
+        mrr: schema.dailyMetricsSnapshots.mrr,
+        activeClients: schema.dailyMetricsSnapshots.activeClients,
+      }).from(schema.dailyMetricsSnapshots)
+        .where(gte(schema.dailyMetricsSnapshots.date, thirtyDaysAgo))
+        .orderBy(desc(schema.dailyMetricsSnapshots.date))
+        .limit(30);
+
+      // Lead counts by stage
+      const leadCounts = await db.select({
+        stage: schema.leads.stage,
+        count: count(),
+      }).from(schema.leads)
+        .where(eq(schema.leads.isArchived, false))
+        .groupBy(schema.leads.stage);
+
+      // Task velocity (last 4 weeks)
+      const fourWeeksAgo = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000);
+      const [completedTasks] = await db.select({ count: count() })
+        .from(schema.tasks)
+        .where(and(eq(schema.tasks.status, "done"), gte(schema.tasks.completedAt, fourWeeksAgo)));
+
+      // Cost totals
+      const costTotals = await db.select({
+        tool: schema.toolAccounts.name,
+        total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`,
+      }).from(schema.toolAccounts)
+        .leftJoin(schema.toolCosts, eq(schema.toolCosts.toolAccountId, schema.toolAccounts.id))
+        .groupBy(schema.toolAccounts.name);
+
+      return {
+        revenueTrend: revTrend.map(r => ({ date: r.date.toISOString().split("T")[0], mrr: r.mrr / 100, clients: r.activeClients })),
+        leadsByStage: leadCounts,
+        tasksCompleted4w: completedTasks?.count ?? 0,
+        costByTool: costTotals.map(c => ({ tool: c.tool, total: c.total / 100 })),
+      };
+    },
+  }),
+
+  get_knowledge_articles: tool({
+    description:
+      "Search the knowledge base for SOPs, notes, and briefs. Filter by type or search by keyword.",
+    inputSchema: z.object({
+      search: z.string().optional().describe("Search keyword for title or content"),
+      docType: z.enum(["sop", "note", "brief", "all"]).optional().default("all").describe("Filter by document type"),
+      limit: z.number().optional().default(10),
+    }),
+    execute: async ({ search, docType, limit }) => {
+      const conditions = [
+        or(
+          eq(schema.documents.docType, "sop"),
+          eq(schema.documents.docType, "note"),
+          eq(schema.documents.docType, "brief")
+        ),
+      ];
+      if (docType && docType !== "all") {
+        conditions.push(eq(schema.documents.docType, docType));
+      }
+      if (search) {
+        conditions.push(
+          or(
+            ilike(schema.documents.title, `%${search}%`),
+            ilike(schema.documents.content, `%${search}%`)
+          )
+        );
+      }
+      const articles = await db
+        .select()
+        .from(schema.documents)
+        .where(and(...conditions))
+        .orderBy(desc(schema.documents.updatedAt))
+        .limit(limit ?? 10);
+
+      const docIds = articles.map((a) => a.id);
+      const tags = docIds.length > 0
+        ? await db.select().from(schema.documentTags)
+            .where(sql`${schema.documentTags.documentId} IN (${sql.join(docIds.map((id) => sql`${id}`), sql`,`)})`)
+        : [];
+      const tagMap = new Map<string, string[]>();
+      for (const t of tags) {
+        if (!tagMap.has(t.documentId)) tagMap.set(t.documentId, []);
+        tagMap.get(t.documentId)!.push(t.tag);
+      }
+
+      return articles.map((a) => ({
+        id: a.id,
+        title: a.title,
+        docType: a.docType,
+        tags: tagMap.get(a.id) ?? [],
+        contentPreview: (a.content ?? "").slice(0, 200),
+        updatedAt: a.updatedAt,
+      }));
     },
   }),
 

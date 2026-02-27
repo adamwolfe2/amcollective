@@ -27,27 +27,40 @@ import {
   Landmark,
   FileText,
   Search,
+  Crosshair,
+  FileCheck,
+  ListTodo,
+  LineChart,
+  BookOpen,
+  ShieldCheck,
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
+import { CompanySwitcher } from "@/components/company-switcher";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Leads", href: "/leads", icon: Crosshair },
   { label: "Clients", href: "/clients", icon: Users },
   { label: "Projects", href: "/projects", icon: FolderKanban },
+  { label: "Tasks", href: "/tasks", icon: ListTodo },
+  { label: "Contracts", href: "/contracts", icon: FileCheck },
   { label: "Invoices", href: "/invoices", icon: Receipt },
   { label: "Services", href: "/services", icon: Briefcase },
   { label: "Team", href: "/team", icon: UserCog },
   { label: "Finance", href: "/finance", icon: Landmark },
+  { label: "Knowledge", href: "/knowledge", icon: BookOpen },
   { label: "Documents", href: "/documents", icon: FileText },
   { label: "Costs", href: "/costs", icon: DollarSign },
   { label: "Domains", href: "/domains", icon: Globe },
   { label: "Rocks", href: "/rocks", icon: Target },
-  { label: "Analytics", href: "/analytics", icon: TrendingUp },
+  { label: "Forecast", href: "/forecast", icon: TrendingUp },
+  { label: "Analytics", href: "/analytics", icon: LineChart },
   { label: "Scorecard", href: "/scorecard", icon: BarChart3 },
   { label: "Meetings", href: "/meetings", icon: CalendarDays },
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "AI", href: "/ai", icon: Bot },
   { label: "Alerts", href: "/alerts", icon: Bell },
+  { label: "Compliance", href: "/compliance", icon: ShieldCheck },
   { label: "Activity", href: "/activity", icon: Activity },
   { label: "Settings", href: "/settings", icon: Settings },
 ] as const;
@@ -149,6 +162,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
           <div className="flex items-center gap-3">
+            <CompanySwitcher />
             {/* Search trigger */}
             <button
               onClick={() => {

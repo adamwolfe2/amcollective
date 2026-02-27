@@ -182,6 +182,28 @@ export const notifications = pgTable(
   ]
 );
 
+// ─── Presence ───────────────────────────────────────────────────────────────
+
+export const userPresence = pgTable(
+  "user_presence",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id", { length: 255 }).notNull().unique(),
+    userName: varchar("user_name", { length: 255 }),
+    userImageUrl: text("user_image_url"),
+    status: varchar("status", { length: 20 }).default("online").notNull(),
+    currentPage: varchar("current_page", { length: 500 }),
+    lastHeartbeat: timestamp("last_heartbeat", { mode: "date" })
+      .defaultNow()
+      .notNull(),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("user_presence_user_id_idx").on(table.userId),
+    index("user_presence_heartbeat_idx").on(table.lastHeartbeat),
+  ]
+);
+
 // ─── Relations ──────────────────────────────────────────────────────────────
 
 export const webhookRegistrationsRelations = relations(
