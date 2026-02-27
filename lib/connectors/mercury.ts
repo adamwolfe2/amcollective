@@ -78,7 +78,7 @@ function mapAccount(raw: MercuryAccountRaw): MercuryAccount {
     id: raw.id,
     name: raw.name,
     accountNumber: raw.accountNumber.slice(-4),
-    type: raw.type as "checking" | "savings",
+    type: (raw.type === "savings" ? "savings" : "checking") as "checking" | "savings",
     currentBalance: raw.currentBalance,
     availableBalance: raw.availableBalance,
     currency: raw.currency,
@@ -100,10 +100,18 @@ interface MercuryTransactionRaw {
 }
 
 function mapTransaction(raw: MercuryTransactionRaw): MercuryTransaction {
+  // Mercury may omit `direction` — infer from amount sign if missing
+  const direction: "credit" | "debit" =
+    raw.direction === "credit" || raw.direction === "debit"
+      ? raw.direction
+      : raw.amount >= 0
+        ? "credit"
+        : "debit";
+
   return {
     id: raw.id,
     amount: raw.amount,
-    direction: raw.direction as "credit" | "debit",
+    direction,
     status: raw.status,
     description: raw.note || raw.bankDescription || "",
     counterpartyName: raw.counterpartyName ?? null,
