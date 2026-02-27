@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { invoices, clients } from "@/lib/db/schema";
+import { invoices, clients, subscriptions, payments } from "@/lib/db/schema";
 import { eq, desc, count, sql, and } from "drizzle-orm";
 import { createAuditLog } from "./audit";
 
@@ -165,4 +165,92 @@ export async function sendInvoice(id: string, actorId: string) {
     });
   }
   return invoice ?? null;
+}
+
+export async function getBillingKpis() {
+  const [mrrResult, revenueThisMonth, outstanding, overdue, activeClients] =
+    await Promise.all([
+      // MRR: sum of active subscription amounts
+      db
+        .select({
+          total: sql<number>`COALESCE(SUM(${subscriptions.amount}), 0)`,
+        })
+        .from(subscriptions)
+        .where(eq(subscriptions.status, "active")),
+      // Revenue this month: sum of paid invoices with paidAt in current month
+      db
+        .select({
+          total: sql<number>`COALESCE(SUM(${invoices.amount}), 0)`,
+        })
+        .from(invoices)
+        .where(
+          and(
+            eq(invoices.status, "paid"),
+            sql`${invoices.paidAt} >= date_trunc('month', now())`
+          )
+        ),
+      // Outstanding: sum of open invoices
+      db
+        .select({
+          count: count(),
+          total: sql<number>`COALESCE(SUM(${invoices.amount}), 0)`,
+        })
+        .from(invoices)
+        .where(sql`${invoices.status} IN ('open', 'sent')`),
+      // Overdue: sum of overdue invoices
+      db
+        .select({
+          count: count(),
+          total: sql<number>`COALESCE(SUM(${invoices.amount}), 0)`,
+        })
+        .from(invoices)
+        .where(eq(invoices.status, "overdue")),
+      // Active clients: clients with healthy payment or positive MRR
+      db
+        .select({ value: count() })
+        .from(clients)
+        .where(
+          sql`${clients.paymentStatus} = 'healthy' OR ${clients.currentMrr} > 0`
+        ),
+    ]);
+
+  return {
+    mrr: Number(mrrResult[0]?.total ?? 0),
+    revenueThisMonth: Number(revenueThisMonth[0]?.total ?? 0),
+    outstanding: {
+      count: outstanding[0]?.count ?? 0,
+      total: Number(outstanding[0]?.total ?? 0),
+    },
+    overdue: {
+      count: overdue[0]?.count ?? 0,
+      total: Number(overdue[0]?.total ?? 0),
+    },
+    activeClients: activeClients[0]?.value ?? 0,
+  };
+}
+
+export async function getRevenueByMonth(months = 12) {
+  const result = await db.execute(sql`
+    SELECT
+      TO_CHAR(DATE_TRUNC('month', ${invoices.paidAt}), 'YYYY-MM') as month,
+      COALESCE(SUM(${invoices.amount}), 0)::int as revenue
+    FROM ${invoices}
+    WHERE ${invoices.status} = 'paid'
+      AND ${invoices.paidAt} >= NOW() - INTERVAL '${sql.raw(String(months))} months'
+    GROUP BY DATE_TRUNC('month', ${invoices.paidAt})
+    ORDER BY month ASC
+  `);
+  return result.rows as { month: string; revenue: number }[];
+}
+
+export async function getRecentPayments(limit = 10) {
+  return db
+    .select({
+      payment: payments,
+      clientName: clients.name,
+    })
+    .from(payments)
+    .leftJoin(clients, eq(payments.clientId, clients.id))
+    .orderBy(desc(payments.paymentDate))
+    .limit(limit);
 }

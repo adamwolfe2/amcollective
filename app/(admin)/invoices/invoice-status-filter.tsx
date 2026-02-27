@@ -13,8 +13,11 @@ const STATUSES = [
   { value: "all", label: "All statuses" },
   { value: "draft", label: "Draft" },
   { value: "sent", label: "Sent" },
+  { value: "open", label: "Open" },
   { value: "paid", label: "Paid" },
   { value: "overdue", label: "Overdue" },
+  { value: "void", label: "Void" },
+  { value: "uncollectible", label: "Uncollectible" },
   { value: "cancelled", label: "Cancelled" },
 ];
 
