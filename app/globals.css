@@ -1,0 +1,167 @@
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Newsreader", Georgia, "Times New Roman", serif;
+  --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo,
+    Consolas, monospace;
+  --color-cream: #F5F3EE;
+}
+
+:root {
+  /* Backgrounds */
+  --bg-primary: #F5F3EE;
+  --bg-white: #FFFFFF;
+  --bg-blue: #1B3A6B;
+  --bg-blue-dark: #112649;
+
+  /* Text */
+  --text-headline: #0F1523;
+  --text-body: #3D4556;
+  --text-muted: #8B92A5;
+  --text-on-blue: #FFFFFF;
+  --text-on-cream: #0F1523;
+
+  /* Accent / Brand Blue */
+  --blue: #2A52BE;
+  --blue-hover: #1B3A6B;
+  --blue-light: #EEF2FB;
+  --blue-border: #C5D0E8;
+
+  /* Neutrals */
+  --border: #E2DDD6;
+  --border-strong: #C8C3BB;
+
+  /* Black */
+  --black: #0F1523;
+  --cream: #F5F3EE;
+}
+
+/* ── Selection ──────────────────────────────────────────────────────────── */
+::selection {
+  background: var(--blue);
+  color: white;
+}
+
+/* ── Custom scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border: 2px solid var(--bg-primary);
+}
+
+/* ── Marquee keyframes ──────────────────────────────────────────────────── */
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+@keyframes marquee-reverse {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 35s linear infinite;
+}
+.animate-marquee-reverse {
+  animation: marquee-reverse 30s linear infinite;
+}
+
+/* Ticker for demo portal trust bar */
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.animate-ticker {
+  animation: ticker 22s linear infinite;
+  will-change: transform;
+}
+.animate-ticker:hover {
+  animation-play-state: paused;
+}
+
+/* ── Loading pulse ──────────────────────────────────────────────────────── */
+@keyframes loading-bar {
+  0% {
+    width: 0%;
+  }
+  50% {
+    width: 70%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+.animate-loading-bar {
+  animation: loading-bar 2.5s ease-in-out;
+}
+
+/* ── Brand utility classes ─────────────────────────────────────────────── */
+.btn-blue {
+  background-color: var(--blue);
+  color: white;
+  transition: background-color 0.15s ease;
+}
+.btn-blue:hover {
+  background-color: var(--blue-hover);
+}
+
+.link-body {
+  color: var(--text-body);
+  transition: color 0.15s ease;
+}
+.link-body:hover {
+  color: var(--blue);
+}
+
+.btn-outline {
+  border: 1px solid var(--border-strong);
+  color: var(--text-headline);
+  transition: border-color 0.15s ease;
+}
+.btn-outline:hover {
+  border-color: var(--text-headline);
+}
+
+.btn-outline-white {
+  border: 1px solid rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.8);
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.btn-outline-white:hover {
+  border-color: white;
+  color: white;
+}
+
+/* ── Focus styles ──────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+/* ── Section fade-in on scroll ─────────────────────────────────────── */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up {
+  animation: fade-up 0.5s ease-out both;
+}
