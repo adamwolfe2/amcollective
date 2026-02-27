@@ -7,6 +7,7 @@ import {
   timestamp,
   integer,
   index,
+  uniqueIndex,
   date,
 } from "drizzle-orm/pg-core";
 import { pgEnum } from "drizzle-orm/pg-core";
@@ -44,6 +45,13 @@ export const valuePeriodEnum = pgEnum("value_period", [
 
 // ─── Tables ─────────────────────────────────────────────────────────────────
 
+export const clientPaymentStatusEnum = pgEnum("client_payment_status", [
+  "healthy",
+  "at_risk",
+  "failed",
+  "churned",
+]);
+
 export const clients = pgTable(
   "clients",
   {
@@ -57,6 +65,13 @@ export const clients = pgTable(
     portalAccess: boolean("portal_access").default(false).notNull(),
     accessLevel: accessLevelEnum("access_level").default("viewer").notNull(),
     notes: text("notes"),
+    // Stripe billing fields
+    stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+    currentMrr: integer("current_mrr").default(0).notNull(), // cents
+    lifetimeValue: integer("lifetime_value").default(0).notNull(), // cents
+    paymentStatus: clientPaymentStatusEnum("payment_status").default("healthy"),
+    lastPaymentDate: timestamp("last_payment_date", { mode: "date" }),
+    hasPaymentMethod: boolean("has_payment_method").default(false).notNull(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -67,6 +82,8 @@ export const clients = pgTable(
     index("clients_email_idx").on(table.email),
     index("clients_clerk_user_id_idx").on(table.clerkUserId),
     index("clients_created_at_idx").on(table.createdAt),
+    uniqueIndex("clients_stripe_customer_id_idx").on(table.stripeCustomerId),
+    index("clients_payment_status_idx").on(table.paymentStatus),
   ]
 );
 
