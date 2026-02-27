@@ -48,6 +48,7 @@
     "@radix-ui/react-tooltip": "1.2.8",
     "@react-email/components": "^1.0.8",
     "@react-pdf/renderer": "^4.3.2",
+    "@sentry/nextjs": "^10.40.0",
     "@stripe/stripe-js": "^8.8.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.2",
@@ -87,6 +88,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "dotenv": "^17.3.1",
     "drizzle-kit": "^0.30.0",
     "eslint": "^9.39.3",
     "eslint-config-next": "^15.5.12",
@@ -100,7 +102,8 @@
     "onlyBuiltDependencies": [
       "esbuild",
       "sharp",
-      "@clerk/shared"
+      "@clerk/shared",
+      "@sentry/cli"
     ]
   }
 }
