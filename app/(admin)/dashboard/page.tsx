@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatDistanceToNow } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import { getActiveProjectCount } from "@/lib/db/repositories/projects";
 import { getOpenInvoiceStats } from "@/lib/db/repositories/invoices";
 import { getTeamCount } from "@/lib/db/repositories/team";
@@ -9,8 +9,15 @@ import * as vercelConnector from "@/lib/connectors/vercel";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import { gatherBriefingData, generateBriefing } from "@/lib/ai/agents/morning-briefing";
 import { RevenueChart } from "./revenue-chart";
+import { db } from "@/lib/db";
+import * as schema from "@/lib/db/schema";
+import { eq, and, sql, desc, gte, lte } from "drizzle-orm";
 
 export default async function DashboardPage() {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
   const [
     activeProjects,
     invoiceStats,
@@ -21,6 +28,12 @@ export default async function DashboardPage() {
     revenueTrendResult,
     unresolvedAlerts,
     briefingData,
+    dbMrrResult,
+    collectedResult,
+    outstandingResult,
+    atRiskRevenueResult,
+    upcomingInvoices,
+    recentPayments,
   ] = await Promise.all([
     getActiveProjectCount(),
     getOpenInvoiceStats(),
@@ -31,7 +44,72 @@ export default async function DashboardPage() {
     stripeConnector.getRevenueTrend(6),
     getUnresolvedCount(),
     gatherBriefingData().catch(() => null),
+    // Financial Health: MRR from subscriptions
+    db
+      .select({ total: sql<number>`coalesce(sum(${schema.subscriptions.amount}), 0)` })
+      .from(schema.subscriptions)
+      .where(eq(schema.subscriptions.status, "active")),
+    // Financial Health: Collected this month
+    db
+      .select({ total: sql<number>`coalesce(sum(${schema.invoices.amount}), 0)` })
+      .from(schema.invoices)
+      .where(
+        and(
+          eq(schema.invoices.status, "paid"),
+          gte(schema.invoices.paidAt, monthStart)
+        )
+      ),
+    // Financial Health: Outstanding
+    db
+      .select({ total: sql<number>`coalesce(sum(${schema.invoices.amount}), 0)` })
+      .from(schema.invoices)
+      .where(
+        sql`${schema.invoices.status} IN ('open', 'sent', 'overdue')`
+      ),
+    // Financial Health: At-Risk Revenue
+    db
+      .select({ total: sql<number>`coalesce(sum(${schema.clients.currentMrr}), 0)` })
+      .from(schema.clients)
+      .where(eq(schema.clients.paymentStatus, "at_risk")),
+    // Upcoming This Week: invoices due in next 7 days
+    db
+      .select({
+        id: schema.invoices.id,
+        number: schema.invoices.number,
+        amount: schema.invoices.amount,
+        dueDate: schema.invoices.dueDate,
+        clientName: schema.clients.name,
+      })
+      .from(schema.invoices)
+      .leftJoin(schema.clients, eq(schema.invoices.clientId, schema.clients.id))
+      .where(
+        and(
+          sql`${schema.invoices.status} IN ('open', 'sent')`,
+          gte(schema.invoices.dueDate, now),
+          lte(schema.invoices.dueDate, weekFromNow)
+        )
+      )
+      .orderBy(schema.invoices.dueDate)
+      .limit(10),
+    // Recent Payments Feed: last 10 payments
+    db
+      .select({
+        id: schema.payments.id,
+        amount: schema.payments.amount,
+        status: schema.payments.status,
+        paymentDate: schema.payments.paymentDate,
+        clientName: schema.clients.name,
+      })
+      .from(schema.payments)
+      .leftJoin(schema.clients, eq(schema.payments.clientId, schema.clients.id))
+      .orderBy(desc(schema.payments.paymentDate))
+      .limit(10),
   ]);
+
+  const financialMrr = Number(dbMrrResult[0]?.total ?? 0);
+  const financialCollected = Number(collectedResult[0]?.total ?? 0);
+  const financialOutstanding = Number(outstandingResult[0]?.total ?? 0);
+  const financialAtRisk = Number(atRiskRevenueResult[0]?.total ?? 0);
 
   const mrr = mrrResult.success ? mrrResult.data?.mrr ?? 0 : null;
   const deploys = deploysResult.success ? deploysResult.data ?? [] : [];
@@ -103,6 +181,113 @@ export default async function DashboardPage() {
             )}
           </div>
         ))}
+      </div>
+
+      {/* Financial Health */}
+      <div className="mb-10">
+        <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
+          Financial Health
+        </h2>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          {[
+            { label: "MRR", value: financialMrr },
+            { label: "Collected This Month", value: financialCollected },
+            { label: "Outstanding", value: financialOutstanding },
+            { label: "At-Risk Revenue", value: financialAtRisk },
+          ].map((card) => (
+            <div
+              key={card.label}
+              className="border border-[#0A0A0A]/10 bg-white p-5"
+            >
+              <p className="font-mono text-2xl font-bold text-[#0A0A0A] tracking-tight">
+                ${(card.value / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+              </p>
+              <p className="font-serif text-sm text-[#0A0A0A]/50 mt-2">
+                {card.label}
+              </p>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Upcoming This Week */}
+          <div>
+            <h3 className="font-serif text-sm font-bold text-[#0A0A0A]/70 mb-3 uppercase tracking-wide">
+              Upcoming This Week
+            </h3>
+            {upcomingInvoices.length === 0 ? (
+              <div className="border border-[#0A0A0A]/10 bg-white py-8 text-center">
+                <p className="text-[#0A0A0A]/40 font-serif text-sm">
+                  No invoices due this week.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-[#0A0A0A]/10 bg-white divide-y divide-[#0A0A0A]/5">
+                {upcomingInvoices.map((inv) => (
+                  <div key={inv.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                    <span className="font-serif text-sm text-[#0A0A0A] truncate">
+                      {inv.clientName ?? "Unknown"}
+                    </span>
+                    <span className="font-mono text-sm text-[#0A0A0A]/70 shrink-0">
+                      ${(inv.amount / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      {" "}
+                      <span className="text-[#0A0A0A]/40 text-xs">
+                        due {inv.dueDate ? format(new Date(inv.dueDate), "MMM d") : "—"}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Recent Payments Feed */}
+          <div>
+            <h3 className="font-serif text-sm font-bold text-[#0A0A0A]/70 mb-3 uppercase tracking-wide">
+              Recent Payments
+            </h3>
+            {recentPayments.length === 0 ? (
+              <div className="border border-[#0A0A0A]/10 bg-white py-8 text-center">
+                <p className="text-[#0A0A0A]/40 font-serif text-sm">
+                  No payments recorded yet.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-[#0A0A0A]/10 bg-white divide-y divide-[#0A0A0A]/5">
+                {recentPayments.map((pmt) => (
+                  <div key={pmt.id} className="px-5 py-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          pmt.status === "succeeded"
+                            ? "bg-emerald-500"
+                            : pmt.status === "failed"
+                              ? "bg-red-500"
+                              : pmt.status === "refunded"
+                                ? "bg-amber-500"
+                                : "bg-gray-400"
+                        }`}
+                      />
+                      <span className="font-serif text-sm text-[#0A0A0A] truncate">
+                        {pmt.clientName ?? "Unknown"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="font-mono text-sm text-[#0A0A0A]/70">
+                        ${(pmt.amount / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="font-mono text-[10px] text-[#0A0A0A]/30">
+                        {formatDistanceToNow(new Date(pmt.paymentDate), {
+                          addSuffix: true,
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* Morning Briefing + Alerts */}
