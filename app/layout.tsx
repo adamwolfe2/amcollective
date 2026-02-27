@@ -5,12 +5,20 @@ import "./globals.css";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "AM Collective — Operations Dashboard",
+  title: {
+    template: "AM Collective | %s",
+    default: "AM Collective",
+  },
   description:
-    "Internal operations platform for AM Collective Capital. CRM, project management, financial tracking, and AI-powered intelligence.",
+    "AM Collective Capital — Internal operations dashboard",
   metadataBase: new URL(
     process.env.NEXT_PUBLIC_APP_URL || "https://portal.amcollectivecapital.com"
   ),
+  openGraph: {
+    title: "AM Collective",
+    description:
+      "AM Collective Capital — Internal operations dashboard",
+  },
   icons: {
     icon: "/icon.svg",
   },

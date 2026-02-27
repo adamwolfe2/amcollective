@@ -101,6 +101,25 @@ export const domains = pgTable(
   ]
 );
 
+export const webhookEvents = pgTable(
+  "webhook_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    source: varchar("source", { length: 50 }).notNull(), // "stripe", "vercel", "clerk", "project"
+    externalId: varchar("external_id", { length: 255 }).notNull(), // e.g. evt_xxx from Stripe
+    eventType: varchar("event_type", { length: 255 }).notNull(),
+    payload: jsonb("payload"),
+    processedAt: timestamp("processed_at", { mode: "date" }),
+    error: text("error"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("webhook_events_source_idx").on(table.source),
+    index("webhook_events_external_id_idx").on(table.externalId),
+    index("webhook_events_created_at_idx").on(table.createdAt),
+  ]
+);
+
 // ─── Relations ──────────────────────────────────────────────────────────────
 
 export const webhookRegistrationsRelations = relations(
