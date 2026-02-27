@@ -11,3 +11,4 @@ export { morningBriefing } from "./morning-briefing";
 export { clientHealthCheck } from "./client-health-check";
 export { weeklyCostAnalysis } from "./cost-analysis";
 export { syncStripeFull } from "./sync-stripe-full";
+export { checkOverdueInvoices } from "./check-overdue-invoices";

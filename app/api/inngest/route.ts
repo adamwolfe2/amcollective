@@ -17,6 +17,7 @@ import {
   clientHealthCheck,
   weeklyCostAnalysis,
   syncStripeFull,
+  checkOverdueInvoices,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -31,5 +32,6 @@ export const { GET, POST, PUT } = serve({
     clientHealthCheck,
     weeklyCostAnalysis,
     syncStripeFull,
+    checkOverdueInvoices,
   ],
 });
