@@ -1,0 +1,104 @@
+/**
+ * Alerts Repository
+ *
+ * Uses existing alerts table from operations.ts schema.
+ */
+
+import { db } from "@/lib/db";
+import * as schema from "@/lib/db/schema";
+import { eq, desc, and, count } from "drizzle-orm";
+import { createAuditLog } from "./audit";
+
+export async function getAlerts(filters?: {
+  severity?: string;
+  type?: string;
+  isResolved?: boolean;
+  limit?: number;
+}) {
+  const conditions = [];
+  if (filters?.severity) {
+    conditions.push(
+      eq(schema.alerts.severity, filters.severity as "info" | "warning" | "critical")
+    );
+  }
+  if (filters?.type) {
+    conditions.push(
+      eq(schema.alerts.type, filters.type as "error_spike" | "cost_anomaly" | "build_fail" | "health_drop")
+    );
+  }
+  if (filters?.isResolved !== undefined) {
+    conditions.push(eq(schema.alerts.isResolved, filters.isResolved));
+  }
+
+  return db
+    .select({
+      alert: schema.alerts,
+      project: {
+        id: schema.portfolioProjects.id,
+        name: schema.portfolioProjects.name,
+      },
+    })
+    .from(schema.alerts)
+    .leftJoin(
+      schema.portfolioProjects,
+      eq(schema.alerts.projectId, schema.portfolioProjects.id)
+    )
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(desc(schema.alerts.createdAt))
+    .limit(filters?.limit ?? 50);
+}
+
+export async function createAlert(data: {
+  type: "error_spike" | "cost_anomaly" | "build_fail" | "health_drop";
+  severity: "info" | "warning" | "critical";
+  title: string;
+  message?: string;
+  projectId?: string;
+  metadata?: Record<string, unknown>;
+}) {
+  const [alert] = await db
+    .insert(schema.alerts)
+    .values({
+      type: data.type,
+      severity: data.severity,
+      title: data.title,
+      message: data.message ?? null,
+      projectId: data.projectId ?? null,
+      metadata: data.metadata ?? null,
+    })
+    .returning();
+
+  return alert;
+}
+
+export async function resolveAlert(id: string, actorId: string) {
+  const [alert] = await db
+    .update(schema.alerts)
+    .set({
+      isResolved: true,
+      resolvedAt: new Date(),
+      resolvedBy: actorId,
+    })
+    .where(eq(schema.alerts.id, id))
+    .returning();
+
+  if (alert) {
+    await createAuditLog({
+      actorId,
+      actorType: "user",
+      action: "resolve",
+      entityType: "alert",
+      entityId: id,
+    });
+  }
+
+  return alert ?? null;
+}
+
+export async function getUnresolvedCount() {
+  const [result] = await db
+    .select({ count: count() })
+    .from(schema.alerts)
+    .where(eq(schema.alerts.isResolved, false));
+  return result?.count ?? 0;
+}

@@ -8,3 +8,4 @@ export * from "./operations";
 export * from "./costs";
 export * from "./ai";
 export * from "./system";
+export * from "./eos";
