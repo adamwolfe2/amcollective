@@ -221,7 +221,7 @@ async function ChartsZone() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const [revenueTrendResult, cashFlowData, dauData, mrrByCompany] = await Promise.all([
+    const [revenueTrendResult, cashFlowData, dauData, mrrByCompany, portfolioActivity] = await Promise.all([
       stripeConnector.getRevenueTrend(6),
       db
         .select({
@@ -235,6 +235,7 @@ async function ChartsZone() {
         .orderBy(sql`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`),
       getCachedDau(),
       getCachedMrrByCompany(),
+      vercelConnector.getPortfolioActivity(),
     ]);
 
     const revenueTrend = revenueTrendResult.success
@@ -307,6 +308,79 @@ async function ChartsZone() {
                   {formatCurrency(mrrByCompany.reduce((s, c) => s + c.mrr, 0) / 100)}
                 </span>
               </div>
+            </div>
+          </div>
+        )}
+
+        {portfolioActivity.success && portfolioActivity.data && (
+          <div className="border border-[#0A0A0A]/10 bg-white p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-serif font-bold text-[#0A0A0A]">
+                Vercel Portfolio — 30 Days
+              </h2>
+              <div className="flex items-center gap-3">
+                <span className="font-mono text-[10px] text-[#0A0A0A]/40">
+                  {portfolioActivity.data.totalDeploys} deploys
+                </span>
+                <span className={`font-mono text-[10px] font-medium ${
+                  portfolioActivity.data.successRate >= 95
+                    ? "text-emerald-600"
+                    : portfolioActivity.data.successRate >= 80
+                      ? "text-amber-600"
+                      : "text-red-600"
+                }`}>
+                  {portfolioActivity.data.successRate}% success
+                </span>
+              </div>
+            </div>
+            <div className="divide-y divide-[#0A0A0A]/5">
+              {portfolioActivity.data.projects.map((project) => (
+                <div
+                  key={project.projectId}
+                  className="flex items-center justify-between py-2.5"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span
+                      className={`w-2 h-2 rounded-full shrink-0 ${
+                        project.lastDeployState === "ERROR"
+                          ? "bg-red-500"
+                          : project.lastDeployState === "READY"
+                            ? "bg-emerald-500"
+                            : project.lastDeployState === "BUILDING"
+                              ? "bg-amber-500"
+                              : "bg-[#0A0A0A]/20"
+                      }`}
+                    />
+                    <div className="min-w-0">
+                      <span className="font-mono text-xs font-medium text-[#0A0A0A]">
+                        {project.projectName}
+                      </span>
+                      {project.framework && (
+                        <span className="font-mono text-[10px] text-[#0A0A0A]/30 ml-2">
+                          {project.framework}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <span className="font-mono text-[10px] text-[#0A0A0A]/40">
+                      {project.totalDeploys} deploy{project.totalDeploys !== 1 ? "s" : ""}
+                      {project.failedDeploys > 0 && (
+                        <span className="text-red-500 ml-1">
+                          ({project.failedDeploys} failed)
+                        </span>
+                      )}
+                    </span>
+                    {project.lastDeployAt && (
+                      <span className="font-mono text-[10px] text-[#0A0A0A]/30">
+                        {formatDistanceToNow(new Date(project.lastDeployAt), {
+                          addSuffix: true,
+                        })}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}

@@ -222,6 +222,128 @@ export async function getBuildLogs(
   );
 }
 
+// ─── Portfolio Constants ─────────────────────────────────────────────────────
+
+/** Known portfolio projects — maps Vercel project IDs to display names. */
+const PORTFOLIO_PROJECTS: Record<string, string> = {
+  prj_pWERrQuAlX8doYVNcMl0LrsqQuRT: "AM Collective",
+  prj_YiLrYZG8axICSIpa7pOILUC7obfG: "TaskSpace",
+  prj_Fyn7Gb9ew75vyxySNzOoghzekbMW: "Cursive",
+  prj_GxMgXdOYErqgqg6Hsabk5oom5M94: "TBGC",
+  prj_rOTfyyrnzCje8W2XyQAv3OgC2j19: "Wholesail",
+  prj_iKdtrJrRjsS6JVLEjDiLLedIGzep: "Trackr",
+  prj_kSQ0hEjqGqDADD2Y8wjNVvWqwFCh: "Hook",
+};
+
+// ─── Project Activity ────────────────────────────────────────────────────────
+
+export interface VercelProjectActivity {
+  projectId: string;
+  projectName: string;
+  framework: string | null;
+  totalDeploys: number;
+  successfulDeploys: number;
+  failedDeploys: number;
+  lastDeployAt: number | null;
+  lastDeployState: string | null;
+}
+
+export interface VercelPortfolioSummary {
+  totalProjects: number;
+  totalDeploys: number;
+  failedDeploys: number;
+  successRate: number;
+  projects: VercelProjectActivity[];
+}
+
+/**
+ * Get deployment activity for all portfolio projects (last 30 days).
+ * Returns per-project deploy counts, success rates, and overall summary.
+ */
+export async function getPortfolioActivity(): Promise<ConnectorResult<VercelPortfolioSummary>> {
+  return safeCall(() =>
+    cached(
+      "vercel:portfolio-activity",
+      async () => {
+        const thirtyDaysAgo = Math.floor(
+          (Date.now() - 30 * 24 * 60 * 60 * 1000) / 1000
+        );
+
+        const projectsResult = await vercelFetch<{
+          projects: VercelProject[];
+        }>("/v9/projects?limit=50");
+
+        const activities: VercelProjectActivity[] = [];
+
+        // Fetch deployments for each known portfolio project in parallel
+        const knownProjects = projectsResult.projects.filter(
+          (p) => p.id in PORTFOLIO_PROJECTS
+        );
+
+        const deployResults = await Promise.allSettled(
+          knownProjects.map((project) =>
+            vercelFetch<{ deployments: VercelDeployment[] }>(
+              `/v6/deployments?projectId=${project.id}&limit=100&since=${thirtyDaysAgo * 1000}`
+            ).then((res) => ({ project, deployments: res.deployments }))
+          )
+        );
+
+        for (const result of deployResults) {
+          if (result.status === "rejected") continue;
+          const { project, deployments } = result.value;
+
+          const successful = deployments.filter(
+            (d) => d.state === "READY"
+          ).length;
+          const failed = deployments.filter(
+            (d) => d.state === "ERROR"
+          ).length;
+          const latest = deployments[0] ?? null;
+
+          activities.push({
+            projectId: project.id,
+            projectName: PORTFOLIO_PROJECTS[project.id] ?? project.name,
+            framework: project.framework,
+            totalDeploys: deployments.length,
+            successfulDeploys: successful,
+            failedDeploys: failed,
+            lastDeployAt: latest?.created ?? null,
+            lastDeployState: latest?.state ?? null,
+          });
+        }
+
+        // Sort by most recent activity
+        activities.sort(
+          (a, b) => (b.lastDeployAt ?? 0) - (a.lastDeployAt ?? 0)
+        );
+
+        const totalDeploys = activities.reduce(
+          (s, a) => s + a.totalDeploys,
+          0
+        );
+        const failedDeploys = activities.reduce(
+          (s, a) => s + a.failedDeploys,
+          0
+        );
+
+        return {
+          totalProjects: activities.length,
+          totalDeploys,
+          failedDeploys,
+          successRate:
+            totalDeploys > 0
+              ? Math.round(
+                  ((totalDeploys - failedDeploys) / totalDeploys) * 100
+                )
+              : 100,
+          projects: activities,
+        };
+      },
+      10 * 60 * 1000 // 10 min cache
+    )
+  );
+}
+
 /**
  * Trigger a redeployment for a project (uses latest deployment as source).
  */
