@@ -34,6 +34,17 @@ function formatCurrency(amount: number) {
 
 // ─── Cached data fetchers ───────────────────────────────────────────────────
 
+/** MRR by company from Stripe connector — cached 5 min */
+const getCachedMrrByCompany = unstable_cache(
+  async () => {
+    const result = await stripeConnector.getMRRByCompany();
+    if (!result.success || !result.data) return [];
+    return result.data;
+  },
+  ["dashboard-mrr-by-company"],
+  { revalidate: 300 }
+);
+
 /** MRR from active subscriptions — cached 5 min */
 const getCachedMrr = unstable_cache(
   async () => {
@@ -210,7 +221,7 @@ async function ChartsZone() {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const [revenueTrendResult, cashFlowData, dauData] = await Promise.all([
+    const [revenueTrendResult, cashFlowData, dauData, mrrByCompany] = await Promise.all([
       stripeConnector.getRevenueTrend(6),
       db
         .select({
@@ -223,6 +234,7 @@ async function ChartsZone() {
         .groupBy(sql`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`)
         .orderBy(sql`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`),
       getCachedDau(),
+      getCachedMrrByCompany(),
     ]);
 
     const revenueTrend = revenueTrendResult.success
@@ -259,6 +271,45 @@ async function ChartsZone() {
           </h2>
           <DauChart data={dauData.dauByProduct.map((d) => ({ product: d.name, dau: d.dau }))} />
         </div>
+
+        {mrrByCompany.length > 0 && (
+          <div className="border border-[#0A0A0A]/10 bg-white p-5">
+            <h2 className="font-serif font-bold text-[#0A0A0A] mb-4">
+              MRR by Company
+            </h2>
+            <div className="divide-y divide-[#0A0A0A]/5">
+              {mrrByCompany
+                .filter((c) => c.mrr > 0 || c.activeSubscriptions > 0)
+                .sort((a, b) => b.mrr - a.mrr)
+                .map((company) => (
+                  <div
+                    key={company.accountId}
+                    className="flex items-center justify-between py-2.5"
+                  >
+                    <div>
+                      <span className="font-mono text-xs font-medium text-[#0A0A0A]">
+                        {company.name}
+                      </span>
+                      <span className="font-mono text-[10px] text-[#0A0A0A]/40 ml-2">
+                        {company.activeSubscriptions} sub{company.activeSubscriptions !== 1 ? "s" : ""}
+                      </span>
+                    </div>
+                    <span className="font-mono text-sm font-bold text-[#0A0A0A]">
+                      {formatCurrency(company.mrr / 100)}
+                    </span>
+                  </div>
+                ))}
+              <div className="flex items-center justify-between py-2.5 pt-3">
+                <span className="font-mono text-xs font-bold text-[#0A0A0A]">
+                  Total
+                </span>
+                <span className="font-mono text-sm font-bold text-[#0A0A0A]">
+                  {formatCurrency(mrrByCompany.reduce((s, c) => s + c.mrr, 0) / 100)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   } catch (err) {

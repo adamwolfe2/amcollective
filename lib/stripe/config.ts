@@ -10,11 +10,9 @@ import { StripeNotConfiguredError } from "./errors";
 
 let _stripe: Stripe | null = null;
 
-/** Returns true if all required Stripe environment variables are present */
+/** Returns true if the Stripe org key is present */
 export function isStripeConfigured(): boolean {
-  return !!(
-    process.env.STRIPE_SECRET_KEY && process.env.STRIPE_WEBHOOK_SECRET
-  );
+  return !!process.env.STRIPE_SECRET_KEY;
 }
 
 /**

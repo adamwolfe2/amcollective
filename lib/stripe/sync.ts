@@ -10,6 +10,7 @@
 import type Stripe from "stripe";
 import { eq, sql, and, sum, max } from "drizzle-orm";
 import { getStripeClient } from "@/lib/stripe/config";
+import { STRIPE_ACCOUNTS } from "@/lib/stripe/constants";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 
@@ -93,74 +94,80 @@ export async function syncAllCustomers(): Promise<number> {
   const stripe = getStripeClient();
   let count = 0;
 
-  for await (const customer of stripe.customers.list({ limit: 100 })) {
-    // Skip deleted customers
-    if (customer.deleted) continue;
+  for (const account of STRIPE_ACCOUNTS) {
+    const opts = { stripeAccount: account.accountId };
 
-    const stripeCustomer = customer as Stripe.Customer;
-    const email = stripeCustomer.email;
-    const hasPaymentMethod = !!(
-      stripeCustomer.invoice_settings?.default_payment_method ||
-      stripeCustomer.default_source
-    );
+    for await (const customer of stripe.customers.list({ limit: 100 }, opts)) {
+      // Skip deleted customers
+      if (customer.deleted) continue;
 
-    if (email) {
-      // Try to find existing client by email (case-insensitive)
-      const [existingClient] = await db
-        .select({ id: schema.clients.id })
-        .from(schema.clients)
-        .where(sql`lower(${schema.clients.email}) = lower(${email})`)
-        .limit(1);
+      const stripeCustomer = customer as Stripe.Customer;
+      const email = stripeCustomer.email;
+      const hasPaymentMethod = !!(
+        stripeCustomer.invoice_settings?.default_payment_method ||
+        stripeCustomer.default_source
+      );
 
-      if (existingClient) {
-        // Update existing client with Stripe info
-        await db
-          .update(schema.clients)
-          .set({
+      if (email) {
+        // Try to find existing client by email (case-insensitive)
+        const [existingClient] = await db
+          .select({ id: schema.clients.id })
+          .from(schema.clients)
+          .where(sql`lower(${schema.clients.email}) = lower(${email})`)
+          .limit(1);
+
+        if (existingClient) {
+          // Update existing client with Stripe info
+          await db
+            .update(schema.clients)
+            .set({
+              stripeCustomerId: stripeCustomer.id,
+              hasPaymentMethod,
+            })
+            .where(eq(schema.clients.id, existingClient.id));
+        } else {
+          // Create new client record from Stripe customer
+          await db.insert(schema.clients).values({
+            name: stripeCustomer.name ?? email,
+            email,
+            companyName: stripeCustomer.metadata?.company ?? null,
             stripeCustomerId: stripeCustomer.id,
             hasPaymentMethod,
-          })
-          .where(eq(schema.clients.id, existingClient.id));
+            phone: stripeCustomer.phone ?? null,
+          });
+        }
       } else {
-        // Create new client record from Stripe customer
-        await db.insert(schema.clients).values({
-          name: stripeCustomer.name ?? email,
-          email,
-          companyName: stripeCustomer.metadata?.company ?? null,
-          stripeCustomerId: stripeCustomer.id,
-          hasPaymentMethod,
-          phone: stripeCustomer.phone ?? null,
-        });
-      }
-    } else {
-      // No email — check if we already have this customer ID linked
-      const [existingClient] = await db
-        .select({ id: schema.clients.id })
-        .from(schema.clients)
-        .where(eq(schema.clients.stripeCustomerId, stripeCustomer.id))
-        .limit(1);
+        // No email — check if we already have this customer ID linked
+        const [existingClient] = await db
+          .select({ id: schema.clients.id })
+          .from(schema.clients)
+          .where(eq(schema.clients.stripeCustomerId, stripeCustomer.id))
+          .limit(1);
 
-      if (!existingClient) {
-        // Create client with whatever info we have
-        await db.insert(schema.clients).values({
-          name: stripeCustomer.name ?? `Stripe Customer ${stripeCustomer.id}`,
-          stripeCustomerId: stripeCustomer.id,
-          hasPaymentMethod,
-          phone: stripeCustomer.phone ?? null,
-        });
-      } else {
-        // Update payment method status
-        await db
-          .update(schema.clients)
-          .set({ hasPaymentMethod })
-          .where(eq(schema.clients.id, existingClient.id));
+        if (!existingClient) {
+          // Create client with whatever info we have
+          await db.insert(schema.clients).values({
+            name: stripeCustomer.name ?? `Stripe Customer ${stripeCustomer.id}`,
+            stripeCustomerId: stripeCustomer.id,
+            hasPaymentMethod,
+            phone: stripeCustomer.phone ?? null,
+          });
+        } else {
+          // Update payment method status
+          await db
+            .update(schema.clients)
+            .set({ hasPaymentMethod })
+            .where(eq(schema.clients.id, existingClient.id));
+        }
       }
+
+      count++;
     }
 
-    count++;
+    console.log(`[Stripe Sync] Synced customers from ${account.name} (${account.accountId})`);
   }
 
-  console.log(`[Stripe Sync] Synced ${count} customers`);
+  console.log(`[Stripe Sync] Synced ${count} customers total across ${STRIPE_ACCOUNTS.length} accounts`);
   return count;
 }
 
@@ -176,73 +183,64 @@ export async function syncAllSubscriptions(): Promise<number> {
   const stripe = getStripeClient();
   let count = 0;
 
-  for await (const sub of stripe.subscriptions
-    .list({ status: "all", expand: ["data.items"], limit: 100 })) {
-    // Resolve the customer ID (could be string or expanded object)
-    const stripeCustomerId =
-      typeof sub.customer === "string" ? sub.customer : sub.customer.id;
+  for (const account of STRIPE_ACCOUNTS) {
+    const opts = { stripeAccount: account.accountId };
 
-    // Find the client in our DB by stripeCustomerId
-    const [client] = await db
-      .select({ id: schema.clients.id })
-      .from(schema.clients)
-      .where(eq(schema.clients.stripeCustomerId, stripeCustomerId))
-      .limit(1);
+    for await (const sub of stripe.subscriptions
+      .list({ status: "all", expand: ["data.items"], limit: 100 }, opts)) {
+      // Resolve the customer ID (could be string or expanded object)
+      const stripeCustomerId =
+        typeof sub.customer === "string" ? sub.customer : sub.customer.id;
 
-    if (!client) {
-      // No matching client — skip
-      continue;
-    }
+      // Find the client in our DB by stripeCustomerId
+      const [client] = await db
+        .select({ id: schema.clients.id })
+        .from(schema.clients)
+        .where(eq(schema.clients.stripeCustomerId, stripeCustomerId))
+        .limit(1);
 
-    const item = sub.items.data[0];
-    const price = item?.price;
-    const interval = price?.recurring?.interval ?? "month";
-
-    // Determine plan name: prefer nickname, fall back to product name or ID
-    let planName: string | null = price?.nickname ?? null;
-    if (!planName && price?.product) {
-      if (typeof price.product === "string") {
-        // It's a product ID — try to fetch the product name
-        try {
-          const product = await stripe.products.retrieve(price.product);
-          planName = product.name;
-        } catch {
-          planName = price.product;
-        }
-      } else {
-        planName = (price.product as Stripe.Product).name ?? null;
+      if (!client) {
+        // No matching client — skip
+        continue;
       }
-    }
 
-    // Calculate the monthly amount in cents
-    const rawAmount = item?.price?.unit_amount ?? 0;
-    const monthlyAmount = interval === "year" ? Math.round(rawAmount / 12) : rawAmount;
+      const item = sub.items.data[0];
+      const price = item?.price;
+      const interval = price?.recurring?.interval ?? "month";
 
-    // Map Stripe status to our enum
-    const status = mapSubscriptionStatus(sub.status);
+      // Determine plan name: prefer nickname, fall back to product name or ID
+      let planName: string | null = price?.nickname ?? null;
+      if (!planName && price?.product) {
+        if (typeof price.product === "string") {
+          // It's a product ID — try to fetch the product name
+          try {
+            const product = await stripe.products.retrieve(price.product, opts);
+            planName = product.name;
+          } catch {
+            planName = price.product;
+          }
+        } else {
+          planName = (price.product as Stripe.Product).name ?? null;
+        }
+      }
 
-    // In Stripe v20, current_period lives on the subscription item, not the subscription
-    const currentPeriodStart = item ? unixToDate(item.current_period_start) : null;
-    const currentPeriodEnd = item ? unixToDate(item.current_period_end) : null;
+      // Calculate the monthly amount in cents
+      const rawAmount = item?.price?.unit_amount ?? 0;
+      const monthlyAmount = interval === "year" ? Math.round(rawAmount / 12) : rawAmount;
 
-    // Upsert subscription
-    await db
-      .insert(schema.subscriptions)
-      .values({
-        clientId: client.id,
-        stripeSubscriptionId: sub.id,
-        planName,
-        amount: monthlyAmount,
-        interval,
-        status,
-        currentPeriodStart,
-        currentPeriodEnd,
-        cancelledAt: unixToDate(sub.canceled_at),
-      })
-      .onConflictDoUpdate({
-        target: schema.subscriptions.stripeSubscriptionId,
-        set: {
+      // Map Stripe status to our enum
+      const status = mapSubscriptionStatus(sub.status);
+
+      // In Stripe v20, current_period lives on the subscription item, not the subscription
+      const currentPeriodStart = item ? unixToDate(item.current_period_start) : null;
+      const currentPeriodEnd = item ? unixToDate(item.current_period_end) : null;
+
+      // Upsert subscription
+      await db
+        .insert(schema.subscriptions)
+        .values({
           clientId: client.id,
+          stripeSubscriptionId: sub.id,
           planName,
           amount: monthlyAmount,
           interval,
@@ -250,10 +248,25 @@ export async function syncAllSubscriptions(): Promise<number> {
           currentPeriodStart,
           currentPeriodEnd,
           cancelledAt: unixToDate(sub.canceled_at),
-        },
-      });
+        })
+        .onConflictDoUpdate({
+          target: schema.subscriptions.stripeSubscriptionId,
+          set: {
+            clientId: client.id,
+            planName,
+            amount: monthlyAmount,
+            interval,
+            status,
+            currentPeriodStart,
+            currentPeriodEnd,
+            cancelledAt: unixToDate(sub.canceled_at),
+          },
+        });
 
-    count++;
+      count++;
+    }
+
+    console.log(`[Stripe Sync] Synced subscriptions from ${account.name} (${account.accountId})`);
   }
 
   // ── Recalculate MRR and payment status per client ──
@@ -318,90 +331,96 @@ export async function syncAllInvoices(): Promise<number> {
 
   const twelveMonthsAgo = Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
 
-  for await (const invoice of stripe.invoices
-    .list({ limit: 100, created: { gte: twelveMonthsAgo } })) {
-    // Resolve customer ID
-    const stripeCustomerId =
-      typeof invoice.customer === "string"
-        ? invoice.customer
-        : invoice.customer?.id ?? null;
+  for (const account of STRIPE_ACCOUNTS) {
+    const opts = { stripeAccount: account.accountId };
 
-    if (!stripeCustomerId) continue;
+    for await (const invoice of stripe.invoices
+      .list({ limit: 100, created: { gte: twelveMonthsAgo } }, opts)) {
+      // Resolve customer ID
+      const stripeCustomerId =
+        typeof invoice.customer === "string"
+          ? invoice.customer
+          : invoice.customer?.id ?? null;
 
-    // Find the client in our DB
-    const [client] = await db
-      .select({ id: schema.clients.id })
-      .from(schema.clients)
-      .where(eq(schema.clients.stripeCustomerId, stripeCustomerId))
-      .limit(1);
+      if (!stripeCustomerId) continue;
 
-    if (!client) continue;
+      // Find the client in our DB
+      const [client] = await db
+        .select({ id: schema.clients.id })
+        .from(schema.clients)
+        .where(eq(schema.clients.stripeCustomerId, stripeCustomerId))
+        .limit(1);
 
-    // Map status
-    const status = mapInvoiceStatus(invoice.status, invoice.due_date);
+      if (!client) continue;
 
-    // Build line items JSON
-    // In Stripe v20, unit pricing is in line.pricing.unit_amount_decimal
-    const lineItems = (invoice.lines?.data ?? []).map((line: Stripe.InvoiceLineItem) => {
-      const quantity = line.quantity ?? 1;
-      const unitPrice = line.pricing?.unit_amount_decimal
-        ? Math.round(Number(line.pricing.unit_amount_decimal))
-        : quantity > 0
-          ? Math.round(line.amount / quantity)
-          : line.amount;
+      // Map status
+      const status = mapInvoiceStatus(invoice.status, invoice.due_date);
 
-      return {
-        description: line.description ?? "Line item",
-        quantity,
-        unitPrice,
-      };
-    });
+      // Build line items JSON
+      // In Stripe v20, unit pricing is in line.pricing.unit_amount_decimal
+      const lineItems = (invoice.lines?.data ?? []).map((line: Stripe.InvoiceLineItem) => {
+        const quantity = line.quantity ?? 1;
+        const unitPrice = line.pricing?.unit_amount_decimal
+          ? Math.round(Number(line.pricing.unit_amount_decimal))
+          : quantity > 0
+            ? Math.round(line.amount / quantity)
+            : line.amount;
 
-    // Determine paidAt timestamp
-    const paidAt = invoice.status_transitions?.paid_at
-      ? unixToDate(invoice.status_transitions.paid_at)
-      : null;
+        return {
+          description: line.description ?? "Line item",
+          quantity,
+          unitPrice,
+        };
+      });
 
-    // Check if this invoice already exists (by stripeInvoiceId)
-    const [existing] = await db
-      .select({ id: schema.invoices.id })
-      .from(schema.invoices)
-      .where(eq(schema.invoices.stripeInvoiceId, invoice.id))
-      .limit(1);
+      // Determine paidAt timestamp
+      const paidAt = invoice.status_transitions?.paid_at
+        ? unixToDate(invoice.status_transitions.paid_at)
+        : null;
 
-    if (existing) {
-      // Update existing invoice
-      await db
-        .update(schema.invoices)
-        .set({
+      // Check if this invoice already exists (by stripeInvoiceId)
+      const [existing] = await db
+        .select({ id: schema.invoices.id })
+        .from(schema.invoices)
+        .where(eq(schema.invoices.stripeInvoiceId, invoice.id))
+        .limit(1);
+
+      if (existing) {
+        // Update existing invoice
+        await db
+          .update(schema.invoices)
+          .set({
+            status,
+            amount: invoice.amount_due ?? invoice.total ?? 0,
+            currency: invoice.currency ?? "usd",
+            stripeHostedUrl: invoice.hosted_invoice_url ?? null,
+            number: invoice.number ?? null,
+            dueDate: unixToDate(invoice.due_date),
+            paidAt,
+            lineItems,
+          })
+          .where(eq(schema.invoices.id, existing.id));
+      } else {
+        // Insert new invoice
+        await db.insert(schema.invoices).values({
+          clientId: client.id,
+          stripeInvoiceId: invoice.id,
+          stripeHostedUrl: invoice.hosted_invoice_url ?? null,
+          number: invoice.number ?? null,
           status,
           amount: invoice.amount_due ?? invoice.total ?? 0,
           currency: invoice.currency ?? "usd",
-          stripeHostedUrl: invoice.hosted_invoice_url ?? null,
-          number: invoice.number ?? null,
           dueDate: unixToDate(invoice.due_date),
           paidAt,
           lineItems,
-        })
-        .where(eq(schema.invoices.id, existing.id));
-    } else {
-      // Insert new invoice
-      await db.insert(schema.invoices).values({
-        clientId: client.id,
-        stripeInvoiceId: invoice.id,
-        stripeHostedUrl: invoice.hosted_invoice_url ?? null,
-        number: invoice.number ?? null,
-        status,
-        amount: invoice.amount_due ?? invoice.total ?? 0,
-        currency: invoice.currency ?? "usd",
-        dueDate: unixToDate(invoice.due_date),
-        paidAt,
-        lineItems,
-        reminderCount: 0,
-      });
+          reminderCount: 0,
+        });
+      }
+
+      count++;
     }
 
-    count++;
+    console.log(`[Stripe Sync] Synced invoices from ${account.name} (${account.accountId})`);
   }
 
   // ── Recalculate lifetimeValue and lastPaymentDate per client ──
@@ -463,78 +482,84 @@ export async function syncAllCharges(): Promise<number> {
 
   const ninetyDaysAgo = Math.floor(Date.now() / 1000) - 90 * 24 * 60 * 60;
 
-  for await (const charge of stripe.charges
-    .list({ limit: 100, created: { gte: ninetyDaysAgo } })) {
-    // Resolve customer ID
-    const stripeCustomerId =
-      typeof charge.customer === "string"
-        ? charge.customer
-        : charge.customer?.id ?? null;
+  for (const account of STRIPE_ACCOUNTS) {
+    const opts = { stripeAccount: account.accountId };
 
-    if (!stripeCustomerId) continue;
+    for await (const charge of stripe.charges
+      .list({ limit: 100, created: { gte: ninetyDaysAgo } }, opts)) {
+      // Resolve customer ID
+      const stripeCustomerId =
+        typeof charge.customer === "string"
+          ? charge.customer
+          : charge.customer?.id ?? null;
 
-    // Find the client in our DB
-    const [client] = await db
-      .select({ id: schema.clients.id })
-      .from(schema.clients)
-      .where(eq(schema.clients.stripeCustomerId, stripeCustomerId))
-      .limit(1);
+      if (!stripeCustomerId) continue;
 
-    if (!client) continue;
-
-    // Check if charge already exists — skip if so (charges are immutable)
-    if (charge.id) {
-      const [existing] = await db
-        .select({ id: schema.payments.id })
-        .from(schema.payments)
-        .where(eq(schema.payments.stripeChargeId, charge.id))
+      // Find the client in our DB
+      const [client] = await db
+        .select({ id: schema.clients.id })
+        .from(schema.clients)
+        .where(eq(schema.clients.stripeCustomerId, stripeCustomerId))
         .limit(1);
 
-      if (existing) continue;
+      if (!client) continue;
+
+      // Check if charge already exists — skip if so (charges are immutable)
+      if (charge.id) {
+        const [existing] = await db
+          .select({ id: schema.payments.id })
+          .from(schema.payments)
+          .where(eq(schema.payments.stripeChargeId, charge.id))
+          .limit(1);
+
+        if (existing) continue;
+      }
+
+      // In Stripe v20, charge.invoice was removed. Try to match via payment_intent
+      // metadata or leave null. The webhook handler can link charges to invoices
+      // when processing invoice.payment_succeeded events.
+      let invoiceId: string | null = null;
+      const invoiceIdFromMeta = charge.metadata?.invoiceId;
+      if (invoiceIdFromMeta) {
+        const [localInvoice] = await db
+          .select({ id: schema.invoices.id })
+          .from(schema.invoices)
+          .where(eq(schema.invoices.stripeInvoiceId, invoiceIdFromMeta))
+          .limit(1);
+
+        invoiceId = localInvoice?.id ?? null;
+      }
+
+      // Map charge status
+      const status = mapChargeStatus(charge);
+
+      // Resolve payment intent ID
+      const stripePaymentIntentId =
+        typeof charge.payment_intent === "string"
+          ? charge.payment_intent
+          : charge.payment_intent?.id ?? null;
+
+      await db.insert(schema.payments).values({
+        clientId: client.id,
+        invoiceId,
+        stripeChargeId: charge.id,
+        stripePaymentIntentId,
+        amount: charge.amount,
+        currency: charge.currency ?? "usd",
+        status,
+        paymentDate: unixToDate(charge.created) ?? new Date(),
+        refundAmount: charge.amount_refunded > 0 ? charge.amount_refunded : null,
+        failureReason: charge.failure_message ?? null,
+        receiptUrl: charge.receipt_url ?? null,
+      });
+
+      count++;
     }
 
-    // In Stripe v20, charge.invoice was removed. Try to match via payment_intent
-    // metadata or leave null. The webhook handler can link charges to invoices
-    // when processing invoice.payment_succeeded events.
-    let invoiceId: string | null = null;
-    const invoiceIdFromMeta = charge.metadata?.invoiceId;
-    if (invoiceIdFromMeta) {
-      const [localInvoice] = await db
-        .select({ id: schema.invoices.id })
-        .from(schema.invoices)
-        .where(eq(schema.invoices.stripeInvoiceId, invoiceIdFromMeta))
-        .limit(1);
-
-      invoiceId = localInvoice?.id ?? null;
-    }
-
-    // Map charge status
-    const status = mapChargeStatus(charge);
-
-    // Resolve payment intent ID
-    const stripePaymentIntentId =
-      typeof charge.payment_intent === "string"
-        ? charge.payment_intent
-        : charge.payment_intent?.id ?? null;
-
-    await db.insert(schema.payments).values({
-      clientId: client.id,
-      invoiceId,
-      stripeChargeId: charge.id,
-      stripePaymentIntentId,
-      amount: charge.amount,
-      currency: charge.currency ?? "usd",
-      status,
-      paymentDate: unixToDate(charge.created) ?? new Date(),
-      refundAmount: charge.amount_refunded > 0 ? charge.amount_refunded : null,
-      failureReason: charge.failure_message ?? null,
-      receiptUrl: charge.receipt_url ?? null,
-    });
-
-    count++;
+    console.log(`[Stripe Sync] Synced charges from ${account.name} (${account.accountId})`);
   }
 
-  console.log(`[Stripe Sync] Synced ${count} new charges`);
+  console.log(`[Stripe Sync] Synced ${count} new charges total across ${STRIPE_ACCOUNTS.length} accounts`);
   return count;
 }
 

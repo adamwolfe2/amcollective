@@ -2,15 +2,24 @@
  * AM Collective — Stripe Connector (READ-ONLY)
  *
  * Pulls revenue, charges, and subscription data from Stripe.
- * Adapted from lib/stripe/config.ts (reuses the same Stripe client singleton).
+ * Aggregates across all 6 connected accounts via the organization API key.
  */
 
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe/config";
+import { STRIPE_ACCOUNTS } from "@/lib/stripe/constants";
 import { cached, safeCall, type ConnectorResult } from "./base";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface MRRData {
+  mrr: number; // cents
+  activeSubscriptions: number;
+}
+
+export interface MRRByCompany {
+  accountId: string;
+  name: string;
+  companyTag: string;
   mrr: number; // cents
   activeSubscriptions: number;
 }
@@ -23,6 +32,7 @@ export interface RecentCharge {
   customerEmail: string | null;
   description: string | null;
   created: number; // unix timestamp
+  accountName?: string;
 }
 
 export interface InvoiceStats {
@@ -36,6 +46,18 @@ export interface RevenueTrendPoint {
   revenue: number; // cents
 }
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+/** Calculate MRR contribution from a single subscription item */
+function calcItemMrr(price: { unit_amount?: number | null; recurring?: { interval?: string } | null }, quantity: number): number {
+  if (!price.unit_amount) return 0;
+  const amount = price.unit_amount * quantity;
+  if (price.recurring?.interval === "year") return Math.round(amount / 12);
+  if (price.recurring?.interval === "month") return amount;
+  if (price.recurring?.interval === "week") return Math.round((amount * 52) / 12);
+  return 0;
+}
+
 // ─── Public API ──────────────────────────────────────────────────────────────
 
 export async function getMRR(): Promise<ConnectorResult<MRRData>> {
@@ -45,30 +67,62 @@ export async function getMRR(): Promise<ConnectorResult<MRRData>> {
   return safeCall(() =>
     cached("stripe:mrr", async () => {
       const stripe = getStripeClient();
-      const subs = await stripe.subscriptions.list({
-        status: "active",
-        limit: 100,
-        expand: ["data.items"],
-      });
+      let totalMrr = 0;
+      let totalSubs = 0;
 
-      let mrr = 0;
-      for (const sub of subs.data) {
-        for (const item of sub.items.data) {
-          const price = item.price;
-          if (!price.unit_amount) continue;
-          const amount = price.unit_amount * (item.quantity ?? 1);
-          // Normalize to monthly
-          if (price.recurring?.interval === "year") {
-            mrr += Math.round(amount / 12);
-          } else if (price.recurring?.interval === "month") {
-            mrr += amount;
-          } else if (price.recurring?.interval === "week") {
-            mrr += Math.round((amount * 52) / 12);
+      for (const account of STRIPE_ACCOUNTS) {
+        const opts = { stripeAccount: account.accountId };
+        const subs = await stripe.subscriptions.list(
+          { status: "active", limit: 100, expand: ["data.items"] },
+          opts
+        );
+
+        for (const sub of subs.data) {
+          for (const item of sub.items.data) {
+            totalMrr += calcItemMrr(item.price, item.quantity ?? 1);
           }
         }
+        totalSubs += subs.data.length;
       }
 
-      return { mrr, activeSubscriptions: subs.data.length };
+      return { mrr: totalMrr, activeSubscriptions: totalSubs };
+    })
+  );
+}
+
+export async function getMRRByCompany(): Promise<ConnectorResult<MRRByCompany[]>> {
+  if (!isStripeConfigured()) {
+    return { success: false, error: "Stripe not configured", fetchedAt: new Date() };
+  }
+  return safeCall(() =>
+    cached("stripe:mrr-by-company", async () => {
+      const stripe = getStripeClient();
+      const results: MRRByCompany[] = [];
+
+      for (const account of STRIPE_ACCOUNTS) {
+        const opts = { stripeAccount: account.accountId };
+        const subs = await stripe.subscriptions.list(
+          { status: "active", limit: 100, expand: ["data.items"] },
+          opts
+        );
+
+        let mrr = 0;
+        for (const sub of subs.data) {
+          for (const item of sub.items.data) {
+            mrr += calcItemMrr(item.price, item.quantity ?? 1);
+          }
+        }
+
+        results.push({
+          accountId: account.accountId,
+          name: account.name,
+          companyTag: account.companyTag,
+          mrr,
+          activeSubscriptions: subs.data.length,
+        });
+      }
+
+      return results;
     })
   );
 }
@@ -82,16 +136,28 @@ export async function getRecentCharges(
   return safeCall(() =>
     cached(`stripe:charges:${limit}`, async () => {
       const stripe = getStripeClient();
-      const charges = await stripe.charges.list({ limit });
-      return charges.data.map((c) => ({
-        id: c.id,
-        amount: c.amount,
-        currency: c.currency,
-        status: c.status,
-        customerEmail: c.billing_details?.email ?? null,
-        description: c.description,
-        created: c.created,
-      }));
+      const allCharges: RecentCharge[] = [];
+
+      for (const account of STRIPE_ACCOUNTS) {
+        const opts = { stripeAccount: account.accountId };
+        const charges = await stripe.charges.list({ limit }, opts);
+        for (const c of charges.data) {
+          allCharges.push({
+            id: c.id,
+            amount: c.amount,
+            currency: c.currency,
+            status: c.status,
+            customerEmail: c.billing_details?.email ?? null,
+            description: c.description,
+            created: c.created,
+            accountName: account.name,
+          });
+        }
+      }
+
+      // Sort by created desc and take the requested limit
+      allCharges.sort((a, b) => b.created - a.created);
+      return allCharges.slice(0, limit);
     })
   );
 }
@@ -105,25 +171,31 @@ export async function getInvoiceStats(): Promise<ConnectorResult<InvoiceStats>> 
       const stripe = getStripeClient();
       const now = Math.floor(Date.now() / 1000);
 
-      const [open, paid] = await Promise.all([
-        stripe.invoices.list({ status: "open", limit: 100 }),
-        stripe.invoices.list({ status: "paid", limit: 100 }),
-      ]);
+      let openCount = 0, openTotal = 0;
+      let paidCount = 0, paidTotal = 0;
+      let overdueCount = 0, overdueTotal = 0;
 
-      const openTotal = open.data.reduce((s, i) => s + (i.amount_due ?? 0), 0);
-      const paidTotal = paid.data.reduce((s, i) => s + (i.amount_paid ?? 0), 0);
-      const overdueInvoices = open.data.filter(
-        (i) => i.due_date && i.due_date < now
-      );
-      const overdueTotal = overdueInvoices.reduce(
-        (s, i) => s + (i.amount_due ?? 0),
-        0
-      );
+      for (const account of STRIPE_ACCOUNTS) {
+        const opts = { stripeAccount: account.accountId };
+        const [open, paid] = await Promise.all([
+          stripe.invoices.list({ status: "open", limit: 100 }, opts),
+          stripe.invoices.list({ status: "paid", limit: 100 }, opts),
+        ]);
+
+        openCount += open.data.length;
+        openTotal += open.data.reduce((s, i) => s + (i.amount_due ?? 0), 0);
+        paidCount += paid.data.length;
+        paidTotal += paid.data.reduce((s, i) => s + (i.amount_paid ?? 0), 0);
+
+        const overdue = open.data.filter((i) => i.due_date && i.due_date < now);
+        overdueCount += overdue.length;
+        overdueTotal += overdue.reduce((s, i) => s + (i.amount_due ?? 0), 0);
+      }
 
       return {
-        open: { count: open.data.length, total: openTotal },
-        paid: { count: paid.data.length, total: paidTotal },
-        overdue: { count: overdueInvoices.length, total: overdueTotal },
+        open: { count: openCount, total: openTotal },
+        paid: { count: paidCount, total: paidTotal },
+        overdue: { count: overdueCount, total: overdueTotal },
       };
     })
   );
@@ -140,24 +212,33 @@ export async function getRevenueTrend(
       `stripe:revenue-trend:${months}`,
       async () => {
         const stripe = getStripeClient();
-        const points: RevenueTrendPoint[] = [];
         const now = new Date();
 
+        // Build month buckets
+        const points: RevenueTrendPoint[] = [];
         for (let i = months - 1; i >= 0; i--) {
           const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
           const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
 
-          const charges = await stripe.charges.list({
-            created: {
-              gte: Math.floor(start.getTime() / 1000),
-              lt: Math.floor(end.getTime() / 1000),
-            },
-            limit: 100,
-          });
+          let revenue = 0;
 
-          const revenue = charges.data
-            .filter((c) => c.status === "succeeded")
-            .reduce((s, c) => s + c.amount, 0);
+          for (const account of STRIPE_ACCOUNTS) {
+            const opts = { stripeAccount: account.accountId };
+            const charges = await stripe.charges.list(
+              {
+                created: {
+                  gte: Math.floor(start.getTime() / 1000),
+                  lt: Math.floor(end.getTime() / 1000),
+                },
+                limit: 100,
+              },
+              opts
+            );
+
+            revenue += charges.data
+              .filter((c) => c.status === "succeeded")
+              .reduce((s, c) => s + c.amount, 0);
+          }
 
           points.push({
             month: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`,
@@ -178,11 +259,15 @@ export async function getCustomerCount(): Promise<ConnectorResult<number>> {
   return safeCall(() =>
     cached("stripe:customer-count", async () => {
       const stripe = getStripeClient();
-      // Use search to count — faster than listing all
-      const customers = await stripe.customers.list({ limit: 1 });
-      return customers.data.length > 0
-        ? (customers as unknown as { total_count?: number }).total_count ?? customers.data.length
-        : 0;
+      let total = 0;
+
+      for (const account of STRIPE_ACCOUNTS) {
+        const opts = { stripeAccount: account.accountId };
+        const customers = await stripe.customers.list({ limit: 100 }, opts);
+        total += customers.data.length;
+      }
+
+      return total;
     })
   );
 }
