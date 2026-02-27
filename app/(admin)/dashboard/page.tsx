@@ -4,8 +4,10 @@ import { getActiveProjectCount } from "@/lib/db/repositories/projects";
 import { getOpenInvoiceStats } from "@/lib/db/repositories/invoices";
 import { getTeamCount } from "@/lib/db/repositories/team";
 import { getRecentActivity } from "@/lib/db/repositories/activity";
+import { getUnresolvedCount } from "@/lib/db/repositories/alerts";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import * as stripeConnector from "@/lib/connectors/stripe";
+import { gatherBriefingData, generateBriefing } from "@/lib/ai/agents/morning-briefing";
 import { RevenueChart } from "./revenue-chart";
 
 export default async function DashboardPage() {
@@ -17,6 +19,8 @@ export default async function DashboardPage() {
     mrrResult,
     deploysResult,
     revenueTrendResult,
+    unresolvedAlerts,
+    briefingData,
   ] = await Promise.all([
     getActiveProjectCount(),
     getOpenInvoiceStats(),
@@ -25,6 +29,8 @@ export default async function DashboardPage() {
     stripeConnector.getMRR(),
     vercelConnector.getRecentDeployments(10),
     stripeConnector.getRevenueTrend(6),
+    getUnresolvedCount(),
+    gatherBriefingData().catch(() => null),
   ]);
 
   const mrr = mrrResult.success ? mrrResult.data?.mrr ?? 0 : null;
@@ -97,6 +103,47 @@ export default async function DashboardPage() {
             )}
           </div>
         ))}
+      </div>
+
+      {/* Morning Briefing + Alerts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+        <div>
+          <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
+            Morning Briefing
+          </h2>
+          <div className="border border-[#0A0A0A]/10 bg-white p-5">
+            {briefingData ? (
+              <BriefingCard data={briefingData} />
+            ) : (
+              <p className="text-[#0A0A0A]/40 font-serif text-sm">
+                Briefing data unavailable.
+              </p>
+            )}
+          </div>
+        </div>
+        <div>
+          <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
+            AM Agent
+          </h2>
+          <div className="border border-[#0A0A0A]/10 bg-white p-5 flex flex-col gap-4">
+            <p className="font-serif text-sm text-[#0A0A0A]/60">
+              Ask AM Agent about clients, costs, invoices, or anything else.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {unresolvedAlerts > 0 && (
+                <span className="px-2 py-1 text-xs font-mono bg-red-50 text-red-700 border border-red-200">
+                  {unresolvedAlerts} unresolved alert{unresolvedAlerts !== 1 ? "s" : ""}
+                </span>
+              )}
+            </div>
+            <Link
+              href="/ai"
+              className="inline-flex items-center justify-center border border-[#0A0A0A] bg-[#0A0A0A] text-white px-5 py-2.5 font-mono text-xs uppercase tracking-wider hover:bg-[#0A0A0A]/90 transition-colors"
+            >
+              Open AM Agent
+            </Link>
+          </div>
+        </div>
       </div>
 
       {/* Two-column layout: Deploys + Revenue Chart */}
@@ -254,8 +301,68 @@ export default async function DashboardPage() {
           >
             View Costs
           </Link>
+          <Link
+            href="/ai"
+            className="border border-[#0A0A0A] bg-white text-[#0A0A0A] px-5 py-2.5 font-mono text-xs uppercase tracking-wider hover:bg-[#0A0A0A]/5 transition-colors"
+          >
+            Ask AM Agent
+          </Link>
         </div>
       </div>
+    </div>
+  );
+}
+
+function BriefingCard({ data }: { data: Awaited<ReturnType<typeof gatherBriefingData>> }) {
+  const items = [
+    {
+      label: "MRR",
+      value: data.mrr !== null ? `$${(data.mrr / 100).toLocaleString()}` : "Not connected",
+      alert: false,
+    },
+    {
+      label: "Failed Deploys",
+      value: String(data.failedDeploys),
+      alert: data.failedDeploys > 0,
+    },
+    {
+      label: "Unresolved Alerts",
+      value: String(data.unresolvedAlerts),
+      alert: data.unresolvedAlerts > 0,
+    },
+    {
+      label: "Unread Messages",
+      value: String(data.unreadMessages),
+      alert: data.unreadMessages > 3,
+    },
+    {
+      label: "At-Risk Rocks",
+      value: String(data.atRiskRocks),
+      alert: data.atRiskRocks > 0,
+    },
+    {
+      label: "Overdue Invoices",
+      value: data.overdueInvoices > 0
+        ? `${data.overdueInvoices} ($${(data.overdueAmount / 100).toLocaleString()})`
+        : "0",
+      alert: data.overdueInvoices > 0,
+    },
+  ];
+
+  return (
+    <div className="space-y-2">
+      {items.map((item) => (
+        <div key={item.label} className="flex items-center justify-between py-1">
+          <span className="font-serif text-sm text-[#0A0A0A]/60">{item.label}</span>
+          <span
+            className={`font-mono text-sm ${
+              item.alert ? "text-red-600 font-bold" : "text-[#0A0A0A]"
+            }`}
+          >
+            {item.value}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
