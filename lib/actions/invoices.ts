@@ -6,6 +6,12 @@ import { z } from "zod";
 import * as invoicesRepo from "@/lib/db/repositories/invoices";
 import { getClient } from "@/lib/db/repositories/clients";
 import { createAndFinalizeInvoice } from "@/lib/stripe/stripe-service";
+import { generateInvoiceNumber } from "@/lib/invoices/number";
+import { buildInvoiceEmail } from "@/lib/invoices/email";
+import { Resend } from "resend";
+import { getStripeClient } from "@/lib/stripe/config";
+import { format } from "date-fns";
+import { captureError } from "@/lib/errors";
 
 const lineItemSchema = z.object({
   description: z.string(),
@@ -131,11 +137,14 @@ export async function createInvoice(
     }
   }
 
+  // Auto-generate invoice number if not provided
+  const invoiceNumber = parsed.data.number || await generateInvoiceNumber();
+
   const invoice = await invoicesRepo.createInvoice(
     {
       clientId: parsed.data.clientId,
       engagementId: parsed.data.engagementId || null,
-      number: parsed.data.number || null,
+      number: invoiceNumber,
       amount: parsed.data.amount,
       currency: parsed.data.currency,
       dueDate: parsed.data.dueDate ? new Date(parsed.data.dueDate) : null,
@@ -179,12 +188,90 @@ export async function sendInvoiceAction(id: string): Promise<ActionResult> {
   const userId = await getUserId();
   if (!userId) return { success: false, error: "Unauthorized" };
 
-  const invoice = await invoicesRepo.sendInvoice(id, userId);
-  if (!invoice) return { success: false, error: "Invoice not found" };
+  // Fetch invoice + client
+  const data = await invoicesRepo.getInvoice(id);
+  if (!data) return { success: false, error: "Invoice not found" };
+
+  const { invoice, clientName, clientEmail } = data;
+  if (invoice.status !== "draft") {
+    return { success: false, error: "Only draft invoices can be sent" };
+  }
+  if (!clientEmail) {
+    return { success: false, error: "Client has no email address" };
+  }
+
+  const lineItems = (invoice.lineItems as { description: string; quantity: number; unitPrice: number }[] | null) ?? [];
+  const subtotal = lineItems.reduce((s, li) => s + li.quantity * li.unitPrice, 0);
+
+  // Generate Stripe payment link if Stripe is configured and total > 0
+  let paymentLinkUrl: string | null = null;
+  if (process.env.STRIPE_SECRET_KEY && invoice.amount > 0) {
+    try {
+      const stripe = getStripeClient();
+      const paymentLink = await stripe.paymentLinks.create({
+        line_items: [
+          {
+            price_data: {
+              currency: invoice.currency,
+              product_data: {
+                name: `Invoice ${invoice.number ?? id.slice(0, 8)}`,
+                description: `AM Collective — Due ${invoice.dueDate ? format(invoice.dueDate, "MMM d, yyyy") : "upon receipt"}`,
+              },
+              unit_amount: invoice.amount,
+            },
+            quantity: 1,
+          },
+        ],
+        metadata: {
+          invoiceId: invoice.id,
+          invoiceNumber: invoice.number ?? "",
+        },
+      });
+      paymentLinkUrl = paymentLink.url;
+      await invoicesRepo.updatePaymentLink(id, paymentLink.url);
+    } catch (err) {
+      captureError(err, { tags: { action: "sendInvoice", step: "stripe_payment_link" } });
+      // Non-fatal — continue sending without payment link
+    }
+  }
+
+  // Send email via Resend
+  const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+  if (resend) {
+    try {
+      const emailHtml = buildInvoiceEmail({
+        invoiceNumber: invoice.number ?? `INV-${id.slice(0, 8)}`,
+        issueDate: format(invoice.createdAt, "MMMM d, yyyy"),
+        dueDate: invoice.dueDate ? format(invoice.dueDate, "MMMM d, yyyy") : "Upon receipt",
+        clientName: clientName ?? "Client",
+        lineItems,
+        subtotal,
+        taxRate: invoice.taxRate ?? 0,
+        taxAmount: invoice.taxAmount ?? 0,
+        total: invoice.amount,
+        notes: invoice.notes,
+        paymentLinkUrl,
+      });
+
+      const from = process.env.RESEND_FROM_EMAIL || "AM Collective <team@amcollectivecapital.com>";
+      await resend.emails.send({
+        from,
+        to: clientEmail,
+        subject: `Invoice ${invoice.number ?? id.slice(0, 8)} — $${(invoice.amount / 100).toFixed(2)} due ${invoice.dueDate ? format(invoice.dueDate, "MMM d, yyyy") : "upon receipt"}`,
+        html: emailHtml,
+      });
+    } catch (err) {
+      captureError(err, { tags: { action: "sendInvoice", step: "resend_email" } });
+      return { success: false, error: "Failed to send email" };
+    }
+  }
+
+  // Update status to sent
+  const updated = await invoicesRepo.sendInvoice(id, userId);
 
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${id}`);
-  return { success: true, data: invoice };
+  return { success: true, data: { ...updated, paymentLinkUrl } };
 }
 
 export async function markPaid(id: string): Promise<ActionResult> {

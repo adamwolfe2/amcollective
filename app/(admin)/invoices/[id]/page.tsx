@@ -78,7 +78,11 @@ export default async function InvoiceDetailPage({
             {formatCents(invoice.amount)}
           </p>
         </div>
-        <InvoiceActions invoiceId={invoice.id} status={invoice.status} />
+        <InvoiceActions
+          invoiceId={invoice.id}
+          status={invoice.status}
+          paymentLinkUrl={invoice.stripePaymentLinkUrl}
+        />
       </div>
 
       <Separator className="bg-[#0A0A0A]/10 mb-6" />
@@ -129,6 +133,16 @@ export default async function InvoiceDetailPage({
                   : "\u2014"}
               </span>
             </div>
+            {invoice.sentAt && (
+              <div className="flex justify-between">
+                <span className="font-mono text-xs text-[#0A0A0A]/40">
+                  Sent At
+                </span>
+                <span className="font-mono text-xs text-blue-700">
+                  {format(invoice.sentAt, "MMMM d, yyyy")}
+                </span>
+              </div>
+            )}
             {invoice.paidAt && (
               <div className="flex justify-between">
                 <span className="font-mono text-xs text-[#0A0A0A]/40">
@@ -210,6 +224,34 @@ export default async function InvoiceDetailPage({
           )}
         </Table>
       </div>
+      {/* Payment link */}
+      {invoice.stripePaymentLinkUrl && (
+        <div className="mt-6 border border-[#0A0A0A] bg-white p-5">
+          <h2 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50 mb-2">
+            Payment Link
+          </h2>
+          <a
+            href={invoice.stripePaymentLinkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono text-xs text-blue-700 underline break-all"
+          >
+            {invoice.stripePaymentLinkUrl}
+          </a>
+        </div>
+      )}
+
+      {/* Notes */}
+      {invoice.notes && (
+        <div className="mt-6 border border-[#0A0A0A] bg-white p-5">
+          <h2 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50 mb-2">
+            Notes
+          </h2>
+          <p className="font-serif text-sm text-[#0A0A0A]/70">
+            {invoice.notes}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

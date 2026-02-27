@@ -25,7 +25,7 @@ export const syncMercury = inngest.createFunction(
       });
     },
   },
-  { cron: "0 11 * * *" },
+  { cron: "*/15 * * * *" }, // every 15 minutes for near-real-time balance visibility
   async ({ step }) => {
     // Step 1: Fetch all Mercury accounts
     const accountsResult = await step.run("fetch-accounts", async () => {

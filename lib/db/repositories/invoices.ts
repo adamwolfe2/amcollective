@@ -151,7 +151,7 @@ export async function markInvoicePaid(id: string, actorId: string) {
 export async function sendInvoice(id: string, actorId: string) {
   const result = await db
     .update(invoices)
-    .set({ status: "sent" })
+    .set({ status: "sent", sentAt: new Date() })
     .where(eq(invoices.id, id))
     .returning();
   const invoice = result[0];
@@ -165,6 +165,16 @@ export async function sendInvoice(id: string, actorId: string) {
     });
   }
   return invoice ?? null;
+}
+
+export async function updatePaymentLink(
+  id: string,
+  paymentLinkUrl: string
+) {
+  await db
+    .update(invoices)
+    .set({ stripePaymentLinkUrl: paymentLinkUrl })
+    .where(eq(invoices.id, id));
 }
 
 export async function getBillingKpis() {

@@ -12,6 +12,7 @@ import * as schema from "@/lib/db/schema";
 import { eq, and, sql, lt } from "drizzle-orm";
 import { createAlert } from "@/lib/db/repositories/alerts";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { notifySlack } from "@/lib/webhooks/slack";
 
 export const checkOverdueInvoices = inngest.createFunction(
   {
@@ -59,6 +60,13 @@ export const checkOverdueInvoices = inngest.createFunction(
               lt(schema.invoices.dueDate, today)
             )
           );
+      }
+
+      // Notify Slack for each newly overdue invoice
+      for (const r of results) {
+        await notifySlack(
+          `Invoice overdue — ${r.invoice.number ?? r.invoice.id.slice(0, 8)} ($${(r.invoice.amount / 100).toFixed(2)}) from ${r.clientName ?? "unknown"}`
+        );
       }
 
       return results.map((r) => ({

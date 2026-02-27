@@ -60,11 +60,16 @@ export const invoices = pgTable(
       .references(() => clients.id, { onDelete: "cascade" }),
     stripeInvoiceId: varchar("stripe_invoice_id", { length: 255 }),
     stripeHostedUrl: varchar("stripe_hosted_url", { length: 1000 }),
+    stripePaymentLinkUrl: varchar("stripe_payment_link_url", { length: 1000 }),
     number: varchar("number", { length: 100 }),
     status: invoiceStatusEnum("status").default("draft").notNull(),
     amount: integer("amount").notNull(), // cents
     currency: varchar("currency", { length: 10 }).default("usd").notNull(),
     dueDate: date("due_date", { mode: "date" }),
+    subtotal: integer("subtotal").default(0), // cents
+    taxRate: integer("tax_rate").default(0), // basis points (1000 = 10%)
+    taxAmount: integer("tax_amount").default(0), // cents
+    sentAt: timestamp("sent_at", { mode: "date" }),
     paidAt: timestamp("paid_at", { mode: "date" }),
     pdfUrl: varchar("pdf_url", { length: 500 }),
     lineItems: jsonb("line_items"), // [{description, quantity, unitPrice}]

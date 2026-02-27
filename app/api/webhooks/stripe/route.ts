@@ -19,6 +19,7 @@ import * as schema from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { createAlert } from "@/lib/db/repositories/alerts";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { notifySlack } from "@/lib/webhooks/slack";
 import { ajWebhook } from "@/lib/middleware/arcjet";
 import type Stripe from "stripe";
 
@@ -328,6 +329,10 @@ async function handleInvoicePaid(event: Stripe.Event) {
       localInvoiceId: existing[0]?.id ?? null,
     },
   });
+
+  await notifySlack(
+    `Invoice paid — $${((invoice.amount_paid ?? 0) / 100).toFixed(2)} from ${invoice.customer_email ?? "unknown"}`
+  );
 }
 
 async function handleInvoicePaymentFailed(event: Stripe.Event) {
@@ -390,6 +395,10 @@ async function handleInvoicePaymentFailed(event: Stripe.Event) {
       clientId: client?.id ?? null,
     },
   });
+
+  await notifySlack(
+    `Payment FAILED — $${((invoice.amount_due ?? 0) / 100).toFixed(2)} from ${invoice.customer_email ?? "unknown"} (attempt ${invoice.attempt_count ?? 1})`
+  );
 }
 
 async function handleInvoiceOverdue(event: Stripe.Event) {
@@ -580,6 +589,11 @@ async function handleSubscriptionCreated(event: Stripe.Event) {
       clientId: client?.id ?? null,
     },
   });
+
+  const monthlyAmount = interval === "year" ? Math.round(amount / 12) : amount;
+  await notifySlack(
+    `New subscription — $${(monthlyAmount / 100).toFixed(2)}/mo (${planName ?? "unknown plan"})`
+  );
 }
 
 async function handleSubscriptionUpdated(event: Stripe.Event) {
@@ -729,6 +743,10 @@ async function handleSubscriptionDeleted(event: Stripe.Event) {
       clientId: client?.id ?? null,
     },
   });
+
+  await notifySlack(
+    `Subscription churned — ${client?.name ?? customerId ?? "unknown"}`
+  );
 }
 
 // ─── Charge Handlers ──────────────────────────────────────────────────────────
