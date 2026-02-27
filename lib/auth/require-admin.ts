@@ -4,22 +4,50 @@
  * Uses Clerk session claims for role checking (no DB query needed).
  * Roles: owner, admin, member, client
  *
- * Configure Clerk session claims to include `metadata.role` or use
- * Clerk organization membership roles.
+ * Super admins (by email) always get "owner" role regardless of metadata.
  *
  * Example usage in an API route:
  *   const { userId, error } = await requireRole(["owner", "admin"]);
  *   if (error) return error;
  */
-import { auth } from "@clerk/nextjs/server";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
 type AuthResult =
-  | { userId: string; error: null }
-  | { userId: null; error: NextResponse };
+  | { userId: string; role: string; error: null }
+  | { userId: null; role: null; error: NextResponse };
 
 const ADMIN_ROLES = ["owner", "admin"] as const;
 const MEMBER_ROLES = ["owner", "admin", "member"] as const;
+
+/**
+ * Super admin emails — these users ALWAYS get "owner" role.
+ * This is the single source of truth for who owns everything.
+ */
+export const SUPER_ADMIN_EMAILS = [
+  "adamwolfe102@gmail.com",
+] as const;
+
+/**
+ * Check if an email is a super admin.
+ */
+export function isSuperAdmin(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return SUPER_ADMIN_EMAILS.includes(email.toLowerCase() as typeof SUPER_ADMIN_EMAILS[number]);
+}
+
+/**
+ * Resolve the effective role for a user.
+ * Super admins always get "owner" regardless of Clerk metadata.
+ */
+export function resolveRole(
+  sessionClaims: Record<string, unknown> | null | undefined,
+  email: string | null | undefined
+): string {
+  if (isSuperAdmin(email)) return "owner";
+  const metadata = sessionClaims?.metadata as Record<string, unknown> | undefined;
+  return (metadata?.role as string) || "member";
+}
 
 /**
  * Require user to have one of the specified roles.
@@ -29,7 +57,7 @@ export async function requireRole(
   allowedRoles: readonly string[]
 ): Promise<AuthResult> {
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-    return { userId: "dev-admin", error: null };
+    return { userId: "dev-admin", role: "owner", error: null };
   }
 
   const { userId, sessionClaims } = await auth();
@@ -37,23 +65,26 @@ export async function requireRole(
   if (!userId) {
     return {
       userId: null,
+      role: null,
       error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
     };
   }
 
-  // Role comes from Clerk session claims (public metadata)
-  const role =
-    (sessionClaims?.metadata as Record<string, unknown>)?.role as string ||
-    "member";
+  // Get user email for super admin check
+  const user = await currentUser();
+  const email = user?.emailAddresses?.[0]?.emailAddress;
+
+  const role = resolveRole(sessionClaims, email);
 
   if (!allowedRoles.includes(role)) {
     return {
       userId: null,
+      role: null,
       error: NextResponse.json({ error: "Forbidden" }, { status: 403 }),
     };
   }
 
-  return { userId, error: null };
+  return { userId, role, error: null };
 }
 
 /** Require owner or admin role */
