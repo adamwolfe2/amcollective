@@ -79,37 +79,74 @@ export default async function ClientInvoicesPage() {
                 <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
                   Paid At
                 </TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                  Action
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {invoices.map((inv) => (
-                <TableRow
-                  key={inv.id}
-                  className="border-[#0A0A0A]/10"
-                >
-                  <TableCell className="font-mono text-sm font-medium text-[#0A0A0A]">
-                    {inv.number || "\u2014"}
-                  </TableCell>
-                  <TableCell className="font-mono text-sm text-[#0A0A0A]/70">
-                    ${(inv.amount / 100).toLocaleString("en-US", {
-                      minimumFractionDigits: 2,
-                    })}
-                  </TableCell>
-                  <TableCell>
-                    <InvoiceStatusBadge status={inv.status} />
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-[#0A0A0A]/40">
-                    {inv.dueDate
-                      ? format(new Date(inv.dueDate), "MMM d, yyyy")
-                      : "\u2014"}
-                  </TableCell>
-                  <TableCell className="font-mono text-xs text-[#0A0A0A]/40">
-                    {inv.paidAt
-                      ? format(new Date(inv.paidAt), "MMM d, yyyy")
-                      : "\u2014"}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {invoices.map((inv) => {
+                const isPayable =
+                  (inv.status === "open" || inv.status === "overdue" || inv.status === "sent") &&
+                  !!inv.stripeHostedUrl;
+                const isPaid = inv.status === "paid" && !!inv.stripeHostedUrl;
+
+                return (
+                  <TableRow
+                    key={inv.id}
+                    className="border-[#0A0A0A]/10"
+                  >
+                    <TableCell className="font-mono text-sm font-medium text-[#0A0A0A]">
+                      {inv.number || "\u2014"}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm text-[#0A0A0A]/70">
+                      ${(inv.amount / 100).toLocaleString("en-US", {
+                        minimumFractionDigits: 2,
+                      })}
+                    </TableCell>
+                    <TableCell>
+                      <InvoiceStatusBadge status={inv.status} />
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-[#0A0A0A]/40">
+                      {inv.dueDate
+                        ? format(new Date(inv.dueDate), "MMM d, yyyy")
+                        : "\u2014"}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs text-[#0A0A0A]/40">
+                      {inv.paidAt
+                        ? format(new Date(inv.paidAt), "MMM d, yyyy")
+                        : "\u2014"}
+                    </TableCell>
+                    <TableCell>
+                      {isPayable && (
+                        <a
+                          href={inv.stripeHostedUrl!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center border border-[#0A0A0A] bg-[#0A0A0A] text-white px-3 py-1 font-mono text-[10px] uppercase tracking-wider hover:bg-[#0A0A0A]/90 transition-colors"
+                        >
+                          Pay Now
+                        </a>
+                      )}
+                      {isPaid && (
+                        <a
+                          href={inv.stripeHostedUrl!}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center border border-[#0A0A0A]/20 text-[#0A0A0A]/60 px-3 py-1 font-mono text-[10px] uppercase tracking-wider hover:bg-[#0A0A0A]/5 transition-colors"
+                        >
+                          Receipt
+                        </a>
+                      )}
+                      {!isPayable && !isPaid && (
+                        <span className="text-[#0A0A0A]/20 font-mono text-[10px]">
+                          {"\u2014"}
+                        </span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>
