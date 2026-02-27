@@ -6,6 +6,7 @@
  */
 
 import { inngest } from "../client";
+import { captureError } from "@/lib/errors";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -17,6 +18,12 @@ export const syncStripeMrr = inngest.createFunction(
     id: "sync-stripe-mrr",
     name: "Sync Stripe MRR",
     retries: 3,
+    onFailure: async ({ error }) => {
+      captureError(error, {
+        tags: { source: "inngest", job: "sync-stripe-mrr" },
+        level: "error",
+      });
+    },
   },
   { cron: "0 * * * *" }, // Every hour
   async ({ step }) => {

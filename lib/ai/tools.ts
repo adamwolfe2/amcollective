@@ -26,6 +26,10 @@ import {
   POSTHOG_TOOL_DEFINITIONS,
   executePosthogTool,
 } from "@/lib/mcp/posthog";
+import {
+  MERCURY_TOOL_DEFINITIONS,
+  executeMercuryTool,
+} from "@/lib/mcp/mercury";
 
 // ─── Tool Definitions ────────────────────────────────────────────────────────
 
@@ -136,6 +140,7 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
   },
   ...VERCEL_TOOL_DEFINITIONS,
   ...POSTHOG_TOOL_DEFINITIONS,
+  ...MERCURY_TOOL_DEFINITIONS,
 ];
 
 // ─── Tool Executor ───────────────────────────────────────────────────────────
@@ -277,6 +282,10 @@ export async function executeTool(
         // Check PostHog tools
         if (name.startsWith("get_posthog_")) {
           return executePosthogTool(name, input);
+        }
+        // Check Mercury tools
+        if (name.startsWith("get_mercury_") || name.startsWith("get_cash_") || name.startsWith("search_mercury_")) {
+          return executeMercuryTool(name, input);
         }
         return JSON.stringify({ error: `Unknown tool: ${name}` });
       }

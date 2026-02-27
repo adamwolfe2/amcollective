@@ -4,6 +4,9 @@ import { format, formatDistanceToNow } from "date-fns";
 import * as clientsRepo from "@/lib/db/repositories/clients";
 import { getClientInvoices } from "@/lib/db/repositories/invoices";
 import { getEntityActivity } from "@/lib/db/repositories/activity";
+import { db } from "@/lib/db";
+import * as schema from "@/lib/db/schema";
+import { eq, asc } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -27,7 +30,7 @@ export default async function ClientDetailPage({
   const client = await clientsRepo.getClient(id);
   if (!client) notFound();
 
-  const [projects, invoices, activity, subs, recentPayments, billingSummary] =
+  const [projects, invoices, activity, subs, recentPayments, billingSummary, kanbanCards] =
     await Promise.all([
       clientsRepo.getClientProjects(id),
       getClientInvoices(id),
@@ -35,6 +38,7 @@ export default async function ClientDetailPage({
       clientsRepo.getClientSubscriptions(id),
       clientsRepo.getClientPayments(id),
       clientsRepo.getClientBillingSummary(id),
+      db.select().from(schema.kanbanCards).where(eq(schema.kanbanCards.clientId, id)),
     ]);
 
   return (
@@ -111,6 +115,17 @@ export default async function ClientDetailPage({
             className="font-mono text-xs uppercase tracking-wider rounded-none data-[state=active]:bg-[#0A0A0A] data-[state=active]:text-white px-4 py-2"
           >
             Billing
+          </TabsTrigger>
+          <TabsTrigger
+            value="board"
+            className="font-mono text-xs uppercase tracking-wider rounded-none data-[state=active]:bg-[#0A0A0A] data-[state=active]:text-white px-4 py-2"
+          >
+            Board
+            {kanbanCards.length > 0 && (
+              <span className="ml-1.5 text-[10px] opacity-60">
+                {kanbanCards.length}
+              </span>
+            )}
           </TabsTrigger>
           <TabsTrigger
             value="activity"
@@ -514,6 +529,59 @@ export default async function ClientDetailPage({
                   </TableBody>
                 </Table>
               </div>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Board Tab */}
+        <TabsContent value="board" className="mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <p className="font-serif text-sm text-[#0A0A0A]/50">
+              {kanbanCards.length} card{kanbanCards.length !== 1 ? "s" : ""} across all columns
+            </p>
+            <Link
+              href={`/clients/${id}/kanban`}
+              className="px-4 py-2 text-xs font-mono uppercase tracking-wider border border-[#0A0A0A] bg-[#0A0A0A] text-white hover:bg-[#0A0A0A]/80 transition-colors"
+            >
+              Open Board
+            </Link>
+          </div>
+          {kanbanCards.length === 0 ? (
+            <EmptyTab
+              title="No board cards"
+              description="Open the board to create columns and cards for this client."
+            />
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {kanbanCards.slice(0, 6).map((card) => (
+                <div
+                  key={card.id}
+                  className="border border-[#0A0A0A]/10 bg-white p-4"
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="font-serif text-sm font-medium truncate">
+                      {card.title}
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className={`rounded-none text-[9px] uppercase font-mono tracking-wider shrink-0 ml-2 ${
+                        card.priority === "urgent"
+                          ? "text-red-600 border-red-300"
+                          : card.priority === "high"
+                            ? "text-amber-600 border-amber-300"
+                            : ""
+                      }`}
+                    >
+                      {card.priority}
+                    </Badge>
+                  </div>
+                  {card.dueDate && (
+                    <span className="font-mono text-[10px] text-[#0A0A0A]/40">
+                      Due {format(card.dueDate, "MMM d")}
+                    </span>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </TabsContent>

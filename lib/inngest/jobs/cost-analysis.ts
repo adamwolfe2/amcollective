@@ -6,6 +6,7 @@
  */
 
 import { inngest } from "../client";
+import { captureError } from "@/lib/errors";
 import { analyzeCosts } from "@/lib/ai/agents/cost-analysis";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 
@@ -14,6 +15,12 @@ export const weeklyCostAnalysis = inngest.createFunction(
     id: "weekly-cost-analysis",
     name: "Weekly Cost Analysis",
     retries: 1,
+    onFailure: async ({ error }) => {
+      captureError(error, {
+        tags: { source: "inngest", job: "weekly-cost-analysis" },
+        level: "error",
+      });
+    },
   },
   { cron: "0 15 * * 1" }, // Monday 3 PM UTC = 9 AM CT
   async ({ step }) => {

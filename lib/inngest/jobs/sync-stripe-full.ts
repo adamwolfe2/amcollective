@@ -6,6 +6,7 @@
  */
 
 import { inngest } from "../client";
+import { captureError } from "@/lib/errors";
 import { syncEverything } from "@/lib/stripe/sync";
 import { createAlert } from "@/lib/db/repositories/alerts";
 import { createAuditLog } from "@/lib/db/repositories/audit";
@@ -14,6 +15,12 @@ export const syncStripeFull = inngest.createFunction(
   {
     id: "sync-stripe-full",
     name: "Full Stripe Data Sync",
+    onFailure: async ({ error }) => {
+      captureError(error, {
+        tags: { source: "inngest", job: "sync-stripe-full" },
+        level: "error",
+      });
+    },
   },
   { cron: "0 10 * * *" }, // 10 AM UTC = 2 AM PT
   async ({ step }) => {

@@ -6,6 +6,7 @@
  */
 
 import { inngest } from "../client";
+import { captureError } from "@/lib/errors";
 import * as posthogConnector from "@/lib/connectors/posthog";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -17,6 +18,12 @@ export const syncPosthogAnalytics = inngest.createFunction(
     id: "sync-posthog-analytics",
     name: "Sync PostHog Analytics",
     retries: 3,
+    onFailure: async ({ error }) => {
+      captureError(error, {
+        tags: { source: "inngest", job: "sync-posthog-analytics" },
+        level: "error",
+      });
+    },
   },
   { cron: "0 10 * * *" },
   async ({ step }) => {

@@ -6,6 +6,7 @@
  */
 
 import { inngest } from "../client";
+import { captureError } from "@/lib/errors";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -17,6 +18,12 @@ export const syncVercelCosts = inngest.createFunction(
     id: "sync-vercel-costs",
     name: "Sync Vercel Costs",
     retries: 3,
+    onFailure: async ({ error }) => {
+      captureError(error, {
+        tags: { source: "inngest", job: "sync-vercel-costs" },
+        level: "error",
+      });
+    },
   },
   // Run nightly at midnight PT (08:00 UTC)
   { cron: "0 8 * * *" },

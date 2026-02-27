@@ -20,6 +20,7 @@ import {
   checkOverdueInvoices,
   syncVercelFull,
   syncPosthogAnalytics,
+  syncMercury,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -37,5 +38,6 @@ export const { GET, POST, PUT } = serve({
     checkOverdueInvoices,
     syncVercelFull,
     syncPosthogAnalytics,
+    syncMercury,
   ],
 });

@@ -9,3 +9,5 @@ export * from "./costs";
 export * from "./ai";
 export * from "./system";
 export * from "./eos";
+export * from "./kanban";
+export * from "./documents";

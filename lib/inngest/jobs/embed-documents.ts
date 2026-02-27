@@ -7,6 +7,7 @@
  */
 
 import { inngest } from "../client";
+import { captureError } from "@/lib/errors";
 import { storeEmbedding } from "@/lib/ai/embeddings";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -17,6 +18,12 @@ export const embedDocuments = inngest.createFunction(
     id: "embed-documents",
     name: "Embed Documents for RAG",
     retries: 1,
+    onFailure: async ({ error }) => {
+      captureError(error, {
+        tags: { source: "inngest", job: "embed-documents" },
+        level: "error",
+      });
+    },
   },
   { cron: "0 3 * * *" }, // 3 AM UTC nightly
   async ({ step }) => {

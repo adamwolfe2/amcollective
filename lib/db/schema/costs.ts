@@ -1,5 +1,6 @@
 import {
   pgTable,
+  pgEnum,
   uuid,
   varchar,
   text,
@@ -7,11 +8,31 @@ import {
   integer,
   index,
   jsonb,
+  boolean,
   numeric,
   date,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { portfolioProjects } from "./projects";
+
+// ─── Enums ──────────────────────────────────────────────────────────────────
+
+export const companyTagEnum = pgEnum("company_tag", [
+  "trackr",
+  "wholesail",
+  "taskspace",
+  "cursive",
+  "tbgc",
+  "hook",
+  "am_collective",
+  "personal",
+  "untagged",
+]);
+
+export const mercuryAccountTypeEnum = pgEnum("mercury_account_type", [
+  "checking",
+  "savings",
+]);
 
 // ─── Tables ─────────────────────────────────────────────────────────────────
 
@@ -80,6 +101,34 @@ export const apiUsage = pgTable(
   ]
 );
 
+// ─── Subscription Costs (Tool/SaaS recurring costs) ─────────────────────────
+
+export const subscriptionCosts = pgTable(
+  "subscription_costs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: varchar("name", { length: 255 }).notNull(),
+    vendor: varchar("vendor", { length: 255 }).notNull(),
+    companyTag: companyTagEnum("company_tag").notNull().default("am_collective"),
+    amount: integer("amount").notNull(), // cents
+    billingCycle: varchar("billing_cycle", { length: 20 }).notNull().default("monthly"), // monthly | annual
+    nextRenewal: date("next_renewal", { mode: "date" }),
+    category: varchar("category", { length: 100 }), // infrastructure, ai, marketing, etc.
+    notes: text("notes"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("subscription_costs_company_tag_idx").on(table.companyTag),
+    index("subscription_costs_is_active_idx").on(table.isActive),
+    index("subscription_costs_next_renewal_idx").on(table.nextRenewal),
+  ]
+);
+
 // ─── Snapshot Tables ────────────────────────────────────────────────────────
 
 export const vercelProjectSnapshots = pgTable(
@@ -131,6 +180,54 @@ export const posthogSnapshots = pgTable(
   ]
 );
 
+// ─── Mercury Tables ────────────────────────────────────────────────────────
+
+export const mercuryAccounts = pgTable(
+  "mercury_accounts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    externalId: varchar("external_id", { length: 255 }).notNull().unique(),
+    name: varchar("name", { length: 255 }).notNull(),
+    accountNumber: varchar("account_number", { length: 4 }).notNull(),
+    type: mercuryAccountTypeEnum("type").notNull(),
+    balance: numeric("balance", { precision: 14, scale: 2 }).notNull(),
+    availableBalance: numeric("available_balance", { precision: 14, scale: 2 }).notNull(),
+    currency: varchar("currency", { length: 3 }).notNull().default("USD"),
+    lastSyncedAt: timestamp("last_synced_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("mercury_accounts_external_id_idx").on(table.externalId),
+    index("mercury_accounts_created_at_idx").on(table.createdAt),
+  ]
+);
+
+export const mercuryTransactions = pgTable(
+  "mercury_transactions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    accountId: uuid("account_id")
+      .notNull()
+      .references(() => mercuryAccounts.id, { onDelete: "cascade" }),
+    externalId: varchar("external_id", { length: 255 }).notNull().unique(),
+    amount: numeric("amount", { precision: 14, scale: 2 }).notNull(),
+    direction: varchar("direction", { length: 10 }).notNull(), // credit | debit
+    status: varchar("status", { length: 50 }).notNull(),
+    description: text("description"),
+    counterpartyName: varchar("counterparty_name", { length: 255 }),
+    companyTag: companyTagEnum("company_tag").notNull().default("untagged"),
+    postedAt: timestamp("posted_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("mercury_txns_account_id_idx").on(table.accountId),
+    index("mercury_txns_external_id_idx").on(table.externalId),
+    index("mercury_txns_company_tag_idx").on(table.companyTag),
+    index("mercury_txns_posted_at_idx").on(table.postedAt),
+    index("mercury_txns_created_at_idx").on(table.createdAt),
+  ]
+);
+
 // ─── Relations ──────────────────────────────────────────────────────────────
 
 export const toolAccountsRelations = relations(toolAccounts, ({ many }) => ({
@@ -171,6 +268,23 @@ export const posthogSnapshotsRelations = relations(
     project: one(portfolioProjects, {
       fields: [posthogSnapshots.projectId],
       references: [portfolioProjects.id],
+    }),
+  })
+);
+
+export const mercuryAccountsRelations = relations(
+  mercuryAccounts,
+  ({ many }) => ({
+    transactions: many(mercuryTransactions),
+  })
+);
+
+export const mercuryTransactionsRelations = relations(
+  mercuryTransactions,
+  ({ one }) => ({
+    account: one(mercuryAccounts, {
+      fields: [mercuryTransactions.accountId],
+      references: [mercuryAccounts.id],
     }),
   })
 );

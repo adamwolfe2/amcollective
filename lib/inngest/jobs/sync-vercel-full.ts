@@ -6,6 +6,7 @@
  */
 
 import { inngest } from "../client";
+import { captureError } from "@/lib/errors";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -17,6 +18,12 @@ export const syncVercelFull = inngest.createFunction(
     id: "sync-vercel-full",
     name: "Sync Vercel Full Details",
     retries: 3,
+    onFailure: async ({ error }) => {
+      captureError(error, {
+        tags: { source: "inngest", job: "sync-vercel-full" },
+        level: "error",
+      });
+    },
   },
   { cron: "0 9 * * *" },
   async ({ step }) => {

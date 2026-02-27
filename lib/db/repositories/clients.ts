@@ -6,6 +6,8 @@ import {
   subscriptions,
   payments,
   invoices,
+  kanbanColumns,
+  DEFAULT_KANBAN_COLUMNS,
 } from "@/lib/db/schema";
 import { eq, desc, ilike, or, sql, count, and } from "drizzle-orm";
 import { createAuditLog } from "./audit";
@@ -71,6 +73,18 @@ export async function createClient(data: NewClient, actorId: string) {
     entityId: client.id,
     metadata: { name: client.name },
   });
+
+  // Seed default Kanban columns for new client
+  await db.insert(kanbanColumns).values(
+    DEFAULT_KANBAN_COLUMNS.map((col) => ({
+      clientId: client.id,
+      name: col.name,
+      position: col.position,
+      color: col.color,
+      isDefault: true,
+    }))
+  );
+
   return client;
 }
 

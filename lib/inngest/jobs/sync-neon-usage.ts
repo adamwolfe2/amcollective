@@ -6,6 +6,7 @@
  */
 
 import { inngest } from "../client";
+import { captureError } from "@/lib/errors";
 import * as neonConnector from "@/lib/connectors/neon";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -17,6 +18,12 @@ export const syncNeonUsage = inngest.createFunction(
     id: "sync-neon-usage",
     name: "Sync Neon Usage",
     retries: 3,
+    onFailure: async ({ error }) => {
+      captureError(error, {
+        tags: { source: "inngest", job: "sync-neon-usage" },
+        level: "error",
+      });
+    },
   },
   { cron: "30 8 * * *" }, // Nightly at 00:30 PT (08:30 UTC), after Vercel sync
   async ({ step }) => {

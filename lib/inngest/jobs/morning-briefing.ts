@@ -6,6 +6,7 @@
  */
 
 import { inngest } from "../client";
+import { captureError } from "@/lib/errors";
 import { gatherBriefingData, generateBriefing, sendToSlack } from "@/lib/ai/agents/morning-briefing";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 
@@ -14,6 +15,12 @@ export const morningBriefing = inngest.createFunction(
     id: "morning-briefing",
     name: "Morning Briefing",
     retries: 1,
+    onFailure: async ({ error }) => {
+      captureError(error, {
+        tags: { source: "inngest", job: "morning-briefing" },
+        level: "error",
+      });
+    },
   },
   { cron: "0 13 * * 1-5" }, // 1 PM UTC = 7 AM CT, weekdays only
   async ({ step }) => {

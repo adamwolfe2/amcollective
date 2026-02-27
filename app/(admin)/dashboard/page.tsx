@@ -1,553 +1,553 @@
+// Data pattern: Server component with direct DB queries (consistent with Finance, Analytics, Clients pages)
+// Zone isolation: Each zone is an independent async component with try/catch — one failing doesn't blank the others
+// Caching: unstable_cache on expensive aggregation queries; Mercury balance + failed payments stay fresh
+
+import { Suspense } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
-import { getActiveProjectCount } from "@/lib/db/repositories/projects";
-import { getOpenInvoiceStats } from "@/lib/db/repositories/invoices";
-import { getTeamCount } from "@/lib/db/repositories/team";
-import { getRecentActivity } from "@/lib/db/repositories/activity";
-import { getUnresolvedCount } from "@/lib/db/repositories/alerts";
-import * as vercelConnector from "@/lib/connectors/vercel";
-import * as stripeConnector from "@/lib/connectors/stripe";
-import { gatherBriefingData, generateBriefing } from "@/lib/ai/agents/morning-briefing";
-import { RevenueChart } from "./revenue-chart";
+import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, and, sql, desc, gte, lte } from "drizzle-orm";
+import { eq, and, sql, desc, gte, count } from "drizzle-orm";
+import * as stripeConnector from "@/lib/connectors/stripe";
+import * as vercelConnector from "@/lib/connectors/vercel";
+import { getRecentActivity } from "@/lib/db/repositories/activity";
+import { MrrChart } from "./mrr-chart";
+import { CashFlowMiniChart } from "./cash-flow-mini-chart";
+import { DauChart } from "./dau-chart";
 
-export default async function DashboardPage() {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+function greeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  return "Good evening";
+}
 
-  const [
-    activeProjects,
-    invoiceStats,
-    teamCount,
-    recentActivity,
-    mrrResult,
-    deploysResult,
-    revenueTrendResult,
-    unresolvedAlerts,
-    briefingData,
-    dbMrrResult,
-    collectedResult,
-    outstandingResult,
-    atRiskRevenueResult,
-    upcomingInvoices,
-    recentPayments,
-  ] = await Promise.all([
-    getActiveProjectCount(),
-    getOpenInvoiceStats(),
-    getTeamCount(),
-    getRecentActivity(15),
-    stripeConnector.getMRR(),
-    vercelConnector.getRecentDeployments(10),
-    stripeConnector.getRevenueTrend(6),
-    getUnresolvedCount(),
-    gatherBriefingData().catch(() => null),
-    // Financial Health: MRR from subscriptions
-    db
-      .select({ total: sql<number>`coalesce(sum(${schema.subscriptions.amount}), 0)` })
+function formatCurrency(amount: number) {
+  return amount.toLocaleString("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+}
+
+// ─── Cached data fetchers ───────────────────────────────────────────────────
+
+/** MRR from active subscriptions — cached 5 min */
+const getCachedMrr = unstable_cache(
+  async () => {
+    const [result] = await db
+      .select({ total: sql<string>`COALESCE(SUM(${schema.subscriptions.amount}), 0)` })
       .from(schema.subscriptions)
-      .where(eq(schema.subscriptions.status, "active")),
-    // Financial Health: Collected this month
-    db
-      .select({ total: sql<number>`coalesce(sum(${schema.invoices.amount}), 0)` })
-      .from(schema.invoices)
-      .where(
-        and(
-          eq(schema.invoices.status, "paid"),
-          gte(schema.invoices.paidAt, monthStart)
-        )
-      ),
-    // Financial Health: Outstanding
-    db
-      .select({ total: sql<number>`coalesce(sum(${schema.invoices.amount}), 0)` })
-      .from(schema.invoices)
-      .where(
-        sql`${schema.invoices.status} IN ('open', 'sent', 'overdue')`
-      ),
-    // Financial Health: At-Risk Revenue
-    db
-      .select({ total: sql<number>`coalesce(sum(${schema.clients.currentMrr}), 0)` })
+      .where(eq(schema.subscriptions.status, "active"));
+    const [subsCount] = await db
+      .select({ value: count() })
+      .from(schema.subscriptions)
+      .where(eq(schema.subscriptions.status, "active"));
+    return {
+      mrr: Number(result?.total ?? 0) / 100,
+      activeSubs: subsCount?.value ?? 0,
+    };
+  },
+  ["dashboard-mrr"],
+  { revalidate: 300 }
+);
+
+/** DAU aggregation — cached 5 min */
+const getCachedDau = unstable_cache(
+  async () => {
+    const posthogData = await db
+      .select({
+        projectId: schema.posthogSnapshots.projectId,
+        dau: schema.posthogSnapshots.dau,
+        projectName: schema.portfolioProjects.name,
+      })
+      .from(schema.posthogSnapshots)
+      .innerJoin(schema.portfolioProjects, eq(schema.posthogSnapshots.projectId, schema.portfolioProjects.id))
+      .orderBy(desc(schema.posthogSnapshots.snapshotDate))
+      .limit(20);
+
+    const latestByProject = new Map<string, { dau: number; name: string }>();
+    for (const snap of posthogData) {
+      if (!latestByProject.has(snap.projectId)) {
+        latestByProject.set(snap.projectId, { dau: snap.dau ?? 0, name: snap.projectName });
+      }
+    }
+    const dauByProduct = Array.from(latestByProject.values());
+    return {
+      totalDau: dauByProduct.reduce((s, p) => s + p.dau, 0),
+      dauProductCount: dauByProduct.length,
+      dauByProduct,
+    };
+  },
+  ["dashboard-dau"],
+  { revalidate: 300 }
+);
+
+/** Stale clients — cached 5 min (expensive GROUP BY + HAVING) */
+const getCachedStaleClients = unstable_cache(
+  async () => {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    return db
+      .select({
+        clientId: schema.clients.id,
+        clientName: schema.clients.name,
+        lastCardUpdate: sql<Date>`MAX(${schema.kanbanCards.updatedAt})`,
+      })
       .from(schema.clients)
-      .where(eq(schema.clients.paymentStatus, "at_risk")),
-    // Upcoming This Week: invoices due in next 7 days
-    db
-      .select({
-        id: schema.invoices.id,
-        number: schema.invoices.number,
-        amount: schema.invoices.amount,
-        dueDate: schema.invoices.dueDate,
-        clientName: schema.clients.name,
-      })
-      .from(schema.invoices)
-      .leftJoin(schema.clients, eq(schema.invoices.clientId, schema.clients.id))
-      .where(
-        and(
-          sql`${schema.invoices.status} IN ('open', 'sent')`,
-          gte(schema.invoices.dueDate, now),
-          lte(schema.invoices.dueDate, weekFromNow)
-        )
-      )
-      .orderBy(schema.invoices.dueDate)
-      .limit(10),
-    // Recent Payments Feed: last 10 payments
-    db
-      .select({
-        id: schema.payments.id,
-        amount: schema.payments.amount,
-        status: schema.payments.status,
-        paymentDate: schema.payments.paymentDate,
-        clientName: schema.clients.name,
-      })
-      .from(schema.payments)
-      .leftJoin(schema.clients, eq(schema.payments.clientId, schema.clients.id))
-      .orderBy(desc(schema.payments.paymentDate))
-      .limit(10),
-  ]);
+      .innerJoin(schema.kanbanCards, eq(schema.kanbanCards.clientId, schema.clients.id))
+      .groupBy(schema.clients.id, schema.clients.name)
+      .having(sql`MAX(${schema.kanbanCards.updatedAt}) < ${sevenDaysAgo}`)
+      .limit(5);
+  },
+  ["dashboard-stale-clients"],
+  { revalidate: 300 }
+);
 
-  const financialMrr = Number(dbMrrResult[0]?.total ?? 0);
-  const financialCollected = Number(collectedResult[0]?.total ?? 0);
-  const financialOutstanding = Number(outstandingResult[0]?.total ?? 0);
-  const financialAtRisk = Number(atRiskRevenueResult[0]?.total ?? 0);
+// ─── Zone 1: Metric Cards ──────────────────────────────────────────────────
 
-  const mrr = mrrResult.success ? mrrResult.data?.mrr ?? 0 : null;
-  const deploys = deploysResult.success ? deploysResult.data ?? [] : [];
-  const revenueTrend = revenueTrendResult.success
-    ? revenueTrendResult.data ?? []
-    : [];
+async function MetricsZone() {
+  try {
+    const [mrrData, dauData, mercuryAccounts, totalClientsResult, overdueResult, projects, activeClientsResult, spendResult] =
+      await Promise.all([
+        getCachedMrr(),
+        getCachedDau(),
+        // Mercury balance — always fresh (no cache)
+        db.select().from(schema.mercuryAccounts),
+        db.select({ value: count() }).from(schema.clients),
+        db
+          .select({
+            cnt: count(),
+            total: sql<string>`COALESCE(SUM(${schema.invoices.amount}), 0)`,
+          })
+          .from(schema.invoices)
+          .where(eq(schema.invoices.status, "overdue")),
+        db
+          .select({ id: schema.portfolioProjects.id, status: schema.portfolioProjects.status })
+          .from(schema.portfolioProjects),
+        db
+          .select({ value: sql<number>`COUNT(DISTINCT ${schema.kanbanCards.clientId})` })
+          .from(schema.kanbanCards)
+          .where(sql`${schema.kanbanCards.completedAt} IS NULL`),
+        db
+          .select({ totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)` })
+          .from(schema.mercuryTransactions)
+          .where(
+            and(
+              eq(schema.mercuryTransactions.direction, "debit"),
+              gte(schema.mercuryTransactions.postedAt, new Date(Date.now() - 60 * 24 * 60 * 60 * 1000))
+            )
+          ),
+      ]);
 
-  const kpis = [
-    {
-      label: "Monthly Revenue",
-      value: mrr !== null ? `$${(mrr / 100).toLocaleString()}` : "--",
-      sub: mrr !== null
-        ? `${mrrResult.data?.activeSubscriptions ?? 0} active subs`
-        : "Stripe not connected",
-      connected: mrr !== null,
-    },
-    {
-      label: "Active Projects",
-      value: activeProjects,
-      connected: true,
-    },
-    {
-      label: "Open Invoices",
-      value: invoiceStats.count,
-      sub: `$${(invoiceStats.totalCents / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
-      connected: true,
-    },
-    {
-      label: "Team Size",
-      value: teamCount,
-      connected: true,
-    },
-  ];
+    const totalCash = mercuryAccounts.reduce((s, a) => s + Number(a.balance), 0);
+    const monthlySpend = Number(spendResult[0]?.totalSpend ?? 0) / 2;
+    const runway = monthlySpend > 0 ? totalCash / monthlySpend : null;
+    const overdueCount = overdueResult[0]?.cnt ?? 0;
+    const overdueTotal = Number(overdueResult[0]?.total ?? 0) / 100;
+    const activeProjects = projects.filter((p) => p.status === "active");
 
-  return (
-    <div>
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold font-serif tracking-tight">
-          Dashboard
-        </h1>
-        <p className="text-[#0A0A0A]/40 font-mono text-xs mt-1">
-          AM Collective Operations
-        </p>
+    return (
+      <div className="lg:col-span-3 space-y-4">
+        <MetricCard
+          label="MRR"
+          value={formatCurrency(mrrData.mrr)}
+          sub={`${mrrData.activeSubs} active sub${mrrData.activeSubs !== 1 ? "s" : ""}`}
+          href="/finance"
+        />
+        <MetricCard
+          label="Cash Position"
+          value={formatCurrency(totalCash)}
+          sub={runway ? `~${runway.toFixed(1)} mo runway` : "No spend data"}
+          href="/finance"
+        />
+        <MetricCard
+          label="Active Clients"
+          value={String(Number(activeClientsResult[0]?.value ?? 0))}
+          sub={`${totalClientsResult[0]?.value ?? 0} total`}
+          href="/clients"
+        />
+        <MetricCard
+          label="Daily Active Users"
+          value={String(dauData.totalDau)}
+          sub={`across ${dauData.dauProductCount} product${dauData.dauProductCount !== 1 ? "s" : ""}`}
+          href="/analytics"
+        />
+        <MetricCard
+          label="Overdue Invoices"
+          value={formatCurrency(overdueTotal)}
+          sub={`${overdueCount} invoice${overdueCount !== 1 ? "s" : ""}`}
+          href="/invoices"
+          alert={overdueCount > 0}
+        />
+        <MetricCard
+          label="Vercel Projects"
+          value={`${activeProjects.length} active`}
+          sub="Portfolio"
+          href="/projects"
+        />
       </div>
-
-      {/* KPI Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-        {kpis.map((kpi) => (
-          <div
-            key={kpi.label}
-            className="border border-[#0A0A0A]/10 bg-white p-5"
-          >
-            <p className="font-mono text-3xl font-bold text-[#0A0A0A] tracking-tight">
-              {kpi.value}
-            </p>
-            {kpi.sub && (
-              <p className="font-mono text-sm text-[#0A0A0A]/50 mt-0.5">
-                {kpi.sub}
-              </p>
-            )}
-            <p className="font-serif text-sm text-[#0A0A0A]/50 mt-2">
-              {kpi.label}
-            </p>
-            {!kpi.connected && (
-              <p className="font-mono text-[10px] text-amber-600 mt-1">
-                Connection needed
-              </p>
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Financial Health */}
-      <div className="mb-10">
-        <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
-          Financial Health
-        </h2>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          {[
-            { label: "MRR", value: financialMrr },
-            { label: "Collected This Month", value: financialCollected },
-            { label: "Outstanding", value: financialOutstanding },
-            { label: "At-Risk Revenue", value: financialAtRisk },
-          ].map((card) => (
-            <div
-              key={card.label}
-              className="border border-[#0A0A0A]/10 bg-white p-5"
-            >
-              <p className="font-mono text-2xl font-bold text-[#0A0A0A] tracking-tight">
-                ${(card.value / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-              </p>
-              <p className="font-serif text-sm text-[#0A0A0A]/50 mt-2">
-                {card.label}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Upcoming This Week */}
-          <div>
-            <h3 className="font-serif text-sm font-bold text-[#0A0A0A]/70 mb-3 uppercase tracking-wide">
-              Upcoming This Week
-            </h3>
-            {upcomingInvoices.length === 0 ? (
-              <div className="border border-[#0A0A0A]/10 bg-white py-8 text-center">
-                <p className="text-[#0A0A0A]/40 font-serif text-sm">
-                  No invoices due this week.
-                </p>
-              </div>
-            ) : (
-              <div className="border border-[#0A0A0A]/10 bg-white divide-y divide-[#0A0A0A]/5">
-                {upcomingInvoices.map((inv) => (
-                  <div key={inv.id} className="px-5 py-3 flex items-center justify-between gap-3">
-                    <span className="font-serif text-sm text-[#0A0A0A] truncate">
-                      {inv.clientName ?? "Unknown"}
-                    </span>
-                    <span className="font-mono text-sm text-[#0A0A0A]/70 shrink-0">
-                      ${(inv.amount / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                      {" "}
-                      <span className="text-[#0A0A0A]/40 text-xs">
-                        due {inv.dueDate ? format(new Date(inv.dueDate), "MMM d") : "—"}
-                      </span>
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Recent Payments Feed */}
-          <div>
-            <h3 className="font-serif text-sm font-bold text-[#0A0A0A]/70 mb-3 uppercase tracking-wide">
-              Recent Payments
-            </h3>
-            {recentPayments.length === 0 ? (
-              <div className="border border-[#0A0A0A]/10 bg-white py-8 text-center">
-                <p className="text-[#0A0A0A]/40 font-serif text-sm">
-                  No payments recorded yet.
-                </p>
-              </div>
-            ) : (
-              <div className="border border-[#0A0A0A]/10 bg-white divide-y divide-[#0A0A0A]/5">
-                {recentPayments.map((pmt) => (
-                  <div key={pmt.id} className="px-5 py-3 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${
-                          pmt.status === "succeeded"
-                            ? "bg-emerald-500"
-                            : pmt.status === "failed"
-                              ? "bg-red-500"
-                              : pmt.status === "refunded"
-                                ? "bg-amber-500"
-                                : "bg-gray-400"
-                        }`}
-                      />
-                      <span className="font-serif text-sm text-[#0A0A0A] truncate">
-                        {pmt.clientName ?? "Unknown"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                      <span className="font-mono text-sm text-[#0A0A0A]/70">
-                        ${(pmt.amount / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                      </span>
-                      <span className="font-mono text-[10px] text-[#0A0A0A]/30">
-                        {formatDistanceToNow(new Date(pmt.paymentDate), {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+    );
+  } catch (err) {
+    console.error("[Dashboard] MetricsZone failed:", err);
+    return (
+      <div className="lg:col-span-3">
+        <div className="border border-[#0A0A0A]/10 bg-white p-6 text-center">
+          <p className="text-[#0A0A0A]/40 font-mono text-xs">
+            Failed to load metrics
+          </p>
         </div>
       </div>
+    );
+  }
+}
 
-      {/* Morning Briefing + Alerts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
-        <div>
-          <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
-            Morning Briefing
+// ─── Zone 2: Charts ─────────────────────────────────────────────────────────
+
+async function ChartsZone() {
+  try {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    const [revenueTrendResult, cashFlowData, dauData] = await Promise.all([
+      stripeConnector.getRevenueTrend(6),
+      db
+        .select({
+          date: sql<string>`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`,
+          credits: sql<string>`COALESCE(SUM(CASE WHEN ${schema.mercuryTransactions.direction} = 'credit' THEN ABS(${schema.mercuryTransactions.amount}) ELSE 0 END), 0)`,
+          debits: sql<string>`COALESCE(SUM(CASE WHEN ${schema.mercuryTransactions.direction} = 'debit' THEN ABS(${schema.mercuryTransactions.amount}) ELSE 0 END), 0)`,
+        })
+        .from(schema.mercuryTransactions)
+        .where(gte(schema.mercuryTransactions.postedAt, thirtyDaysAgo))
+        .groupBy(sql`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`)
+        .orderBy(sql`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`),
+      getCachedDau(),
+    ]);
+
+    const revenueTrend = revenueTrendResult.success
+      ? (revenueTrendResult.data ?? []).map((p) => ({ month: p.month, revenue: p.revenue / 100 }))
+      : [];
+
+    let balance = 0;
+    const cashFlow = cashFlowData.map((d) => {
+      const credits = Number(d.credits);
+      const debits = Number(d.debits);
+      balance += credits - debits;
+      return { date: d.date ?? "", credits, debits, balance };
+    });
+
+    return (
+      <div className="lg:col-span-5 space-y-6">
+        <div className="border border-[#0A0A0A]/10 bg-white p-5">
+          <h2 className="font-serif font-bold text-[#0A0A0A] mb-4">
+            MRR Trend
           </h2>
-          <div className="border border-[#0A0A0A]/10 bg-white p-5">
-            {briefingData ? (
-              <BriefingCard data={briefingData} />
-            ) : (
+          <MrrChart data={revenueTrend} />
+        </div>
+
+        <div className="border border-[#0A0A0A]/10 bg-white p-5">
+          <h2 className="font-serif font-bold text-[#0A0A0A] mb-4">
+            Cash Flow — 30 Days
+          </h2>
+          <CashFlowMiniChart data={cashFlow} />
+        </div>
+
+        <div className="border border-[#0A0A0A]/10 bg-white p-5">
+          <h2 className="font-serif font-bold text-[#0A0A0A] mb-4">
+            DAU by Product
+          </h2>
+          <DauChart data={dauData.dauByProduct.map((d) => ({ product: d.name, dau: d.dau }))} />
+        </div>
+      </div>
+    );
+  } catch (err) {
+    console.error("[Dashboard] ChartsZone failed:", err);
+    return (
+      <div className="lg:col-span-5">
+        <div className="border border-[#0A0A0A]/10 bg-white p-6 text-center">
+          <p className="text-[#0A0A0A]/40 font-mono text-xs">
+            Failed to load charts
+          </p>
+        </div>
+      </div>
+    );
+  }
+}
+
+// ─── Zone 3: Action Items + Feed ────────────────────────────────────────────
+
+async function ActionsZone() {
+  try {
+    const now = new Date();
+    const [overdueInvoices, staleClients, deploysResult, recentActivity] = await Promise.all([
+      db
+        .select({
+          id: schema.invoices.id,
+          clientName: schema.clients.name,
+          amount: schema.invoices.amount,
+          dueDate: schema.invoices.dueDate,
+        })
+        .from(schema.invoices)
+        .leftJoin(schema.clients, eq(schema.invoices.clientId, schema.clients.id))
+        .where(eq(schema.invoices.status, "overdue"))
+        .orderBy(schema.invoices.dueDate)
+        .limit(5),
+      getCachedStaleClients(),
+      vercelConnector.getRecentDeployments(5),
+      getRecentActivity(20),
+    ]);
+
+    const failedDeploys = deploysResult.success
+      ? (deploysResult.data ?? []).filter((d) => d.state === "ERROR")
+      : [];
+
+    const actionItems: Array<{
+      severity: "critical" | "warning" | "info";
+      label: string;
+      detail: string;
+      url: string;
+    }> = [];
+
+    for (const inv of overdueInvoices) {
+      const daysOverdue = inv.dueDate
+        ? Math.floor((now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
+      actionItems.push({
+        severity: daysOverdue > 10 ? "critical" : "warning",
+        label: `Invoice overdue ${daysOverdue}d`,
+        detail: `${inv.clientName ?? "Unknown"} — ${formatCurrency(inv.amount / 100)}`,
+        url: `/invoices/${inv.id}`,
+      });
+    }
+
+    for (const deploy of failedDeploys) {
+      actionItems.push({
+        severity: "critical",
+        label: "Deploy failed",
+        detail: deploy.name,
+        url: `/projects`,
+      });
+    }
+
+    for (const c of staleClients) {
+      const days = Math.floor(
+        (now.getTime() - new Date(c.lastCardUpdate).getTime()) / (1000 * 60 * 60 * 24)
+      );
+      actionItems.push({
+        severity: days > 10 ? "critical" : "warning",
+        label: `No activity ${days}d`,
+        detail: c.clientName,
+        url: `/clients/${c.clientId}/kanban`,
+      });
+    }
+
+    actionItems.sort((a, b) => {
+      const order = { critical: 0, warning: 1, info: 2 };
+      return order[a.severity] - order[b.severity];
+    });
+
+    return (
+      <div className="lg:col-span-4 space-y-6">
+        {/* Action Required */}
+        <div>
+          <h2 className="font-serif font-bold text-[#0A0A0A] mb-3">
+            Action Required
+          </h2>
+          {actionItems.length === 0 ? (
+            <div className="border border-[#0A0A0A]/10 bg-white py-8 text-center">
               <p className="text-[#0A0A0A]/40 font-serif text-sm">
-                Briefing data unavailable.
+                All clear — nothing needs attention.
               </p>
-            )}
-          </div>
-        </div>
-        <div>
-          <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
-            AM Agent
-          </h2>
-          <div className="border border-[#0A0A0A]/10 bg-white p-5 flex flex-col gap-4">
-            <p className="font-serif text-sm text-[#0A0A0A]/60">
-              Ask AM Agent about clients, costs, invoices, or anything else.
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {unresolvedAlerts > 0 && (
-                <span className="px-2 py-1 text-xs font-mono bg-red-50 text-red-700 border border-red-200">
-                  {unresolvedAlerts} unresolved alert{unresolvedAlerts !== 1 ? "s" : ""}
-                </span>
-              )}
-            </div>
-            <Link
-              href="/ai"
-              className="inline-flex items-center justify-center border border-[#0A0A0A] bg-[#0A0A0A] text-white px-5 py-2.5 font-mono text-xs uppercase tracking-wider hover:bg-[#0A0A0A]/90 transition-colors"
-            >
-              Open AM Agent
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Two-column layout: Deploys + Revenue Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
-        {/* Deploy Activity */}
-        <div>
-          <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
-            Recent Deploys
-          </h2>
-          {deploys.length === 0 ? (
-            <div className="border border-[#0A0A0A]/10 py-12 text-center">
-              <p className="text-[#0A0A0A]/40 font-serif">
-                {deploysResult.success
-                  ? "No recent deployments."
-                  : "Vercel not connected"}
-              </p>
-              {!deploysResult.success && (
-                <p className="text-[#0A0A0A]/25 font-mono text-xs mt-1">
-                  {deploysResult.error}
-                </p>
-              )}
             </div>
           ) : (
             <div className="border border-[#0A0A0A]/10 bg-white divide-y divide-[#0A0A0A]/5">
-              {deploys.map((deploy) => (
-                <div
-                  key={deploy.uid}
-                  className="px-5 py-3 flex items-center justify-between gap-3"
+              {actionItems.slice(0, 8).map((item, i) => (
+                <Link
+                  key={i}
+                  href={item.url}
+                  className="px-4 py-3 flex items-start gap-3 hover:bg-[#0A0A0A]/[0.02] transition-colors block"
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span
-                      className={`w-2 h-2 rounded-full shrink-0 ${
-                        deploy.state === "READY"
-                          ? "bg-emerald-500"
-                          : deploy.state === "ERROR"
-                            ? "bg-red-500"
-                            : deploy.state === "BUILDING"
-                              ? "bg-amber-500"
-                              : "bg-gray-400"
-                      }`}
-                    />
-                    <span className="font-mono text-xs font-medium text-[#0A0A0A] truncate">
-                      {deploy.name}
-                    </span>
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${
+                      item.severity === "critical"
+                        ? "bg-red-500"
+                        : item.severity === "warning"
+                          ? "bg-amber-500"
+                          : "bg-emerald-500"
+                    }`}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono text-xs font-medium text-[#0A0A0A]">
+                      {item.label}
+                    </p>
+                    <p className="font-serif text-xs text-[#0A0A0A]/50 truncate">
+                      {item.detail}
+                    </p>
                   </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="font-mono text-[10px] text-[#0A0A0A]/40 max-w-32 truncate hidden sm:block">
-                      {deploy.meta?.githubCommitMessage ?? ""}
-                    </span>
-                    <span className="font-mono text-[10px] text-[#0A0A0A]/30">
-                      {formatDistanceToNow(new Date(deploy.created), {
-                        addSuffix: true,
-                      })}
-                    </span>
-                  </div>
-                </div>
+                </Link>
               ))}
             </div>
           )}
         </div>
 
-        {/* Revenue Chart */}
+        {/* Recent Activity */}
         <div>
-          <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
-            Revenue Trend
-          </h2>
-          {revenueTrend.length === 0 ? (
-            <div className="border border-[#0A0A0A]/10 py-12 text-center">
-              <p className="text-[#0A0A0A]/40 font-serif">
-                {revenueTrendResult.success
-                  ? "No revenue data yet."
-                  : "Stripe not connected"}
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-serif font-bold text-[#0A0A0A]">
+              Recent Activity
+            </h2>
+            <Link
+              href="/activity"
+              className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 hover:text-[#0A0A0A]/60"
+            >
+              View all
+            </Link>
+          </div>
+          {recentActivity.length === 0 ? (
+            <div className="border border-[#0A0A0A]/10 bg-white py-8 text-center">
+              <p className="text-[#0A0A0A]/40 font-serif text-sm">
+                No activity yet.
               </p>
             </div>
           ) : (
-            <div className="border border-[#0A0A0A]/10 bg-white p-5">
-              <RevenueChart
-                data={revenueTrend.map((p) => ({
-                  month: p.month,
-                  revenue: p.revenue / 100,
-                }))}
-              />
+            <div className="border border-[#0A0A0A]/10 bg-white divide-y divide-[#0A0A0A]/5">
+              {recentActivity.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="px-4 py-3 flex items-center justify-between gap-3"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-wider bg-[#0A0A0A]/5 text-[#0A0A0A]/50 shrink-0">
+                      {entry.action.length > 12
+                        ? entry.action.slice(0, 12)
+                        : entry.action}
+                    </span>
+                    <span className="font-serif text-xs text-[#0A0A0A]/60 truncate">
+                      {entry.entityType}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[10px] text-[#0A0A0A]/30 shrink-0">
+                    {formatDistanceToNow(new Date(entry.createdAt), {
+                      addSuffix: true,
+                    })}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </div>
       </div>
+    );
+  } catch (err) {
+    console.error("[Dashboard] ActionsZone failed:", err);
+    return (
+      <div className="lg:col-span-4">
+        <div className="border border-[#0A0A0A]/10 bg-white p-6 text-center">
+          <p className="text-[#0A0A0A]/40 font-mono text-xs">
+            Failed to load action items
+          </p>
+        </div>
+      </div>
+    );
+  }
+}
 
-      {/* Recent Activity */}
-      <div className="mb-10">
-        <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
-          Recent Activity
-        </h2>
-        {recentActivity.length === 0 ? (
-          <div className="border border-[#0A0A0A]/10 py-12 text-center">
-            <p className="text-[#0A0A0A]/40 font-serif">
-              No activity recorded yet.
-            </p>
-            <p className="text-[#0A0A0A]/25 font-mono text-xs mt-1">
-              Actions will appear here as you use the system.
-            </p>
-          </div>
-        ) : (
-          <div className="border border-[#0A0A0A]/10 bg-white divide-y divide-[#0A0A0A]/5">
-            {recentActivity.map((entry) => (
-              <div
-                key={entry.id}
-                className="px-5 py-3.5 flex items-center justify-between gap-4"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="font-mono text-xs font-medium text-[#0A0A0A] uppercase shrink-0">
-                    {entry.action}
-                  </span>
-                  <span className="font-serif text-sm text-[#0A0A0A]/60 truncate">
-                    {entry.entityType}
-                    <span className="text-[#0A0A0A]/30 mx-1">/</span>
-                    <span className="font-mono text-xs text-[#0A0A0A]/40">
-                      {entry.entityId.length > 12
-                        ? `${entry.entityId.slice(0, 12)}...`
-                        : entry.entityId}
-                    </span>
-                  </span>
-                </div>
-                <span className="font-mono text-[11px] text-[#0A0A0A]/30 shrink-0">
-                  {formatDistanceToNow(new Date(entry.createdAt), {
-                    addSuffix: true,
-                  })}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+// ─── Zone loading fallbacks ─────────────────────────────────────────────────
+
+function MetricsZoneSkeleton() {
+  return (
+    <div className="lg:col-span-3 space-y-4">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <div key={i} className="h-24 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
+      ))}
+    </div>
+  );
+}
+
+function ChartsZoneSkeleton() {
+  return (
+    <div className="lg:col-span-5 space-y-6">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <div key={i} className="h-[268px] bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
+      ))}
+    </div>
+  );
+}
+
+function ActionsZoneSkeleton() {
+  return (
+    <div className="lg:col-span-4 space-y-6">
+      <div className="h-64 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
+      <div className="h-80 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
+    </div>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
+
+export default function DashboardPage() {
+  const now = new Date();
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div>
+          <h1 className="text-2xl font-bold font-serif tracking-tight">
+            {greeting()}, Adam
+          </h1>
+          <p className="text-[#0A0A0A]/40 font-mono text-xs mt-1">
+            {format(now, "EEEE, MMMM d, yyyy")}
+          </p>
+        </div>
       </div>
 
-      {/* Quick Actions */}
-      <div>
-        <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
-          Quick Actions
-        </h2>
-        <div className="flex flex-wrap gap-3">
-          <Link
-            href="/clients"
-            className="border border-[#0A0A0A] bg-[#0A0A0A] text-white px-5 py-2.5 font-mono text-xs uppercase tracking-wider hover:bg-[#0A0A0A]/90 transition-colors"
-          >
-            Add Client
-          </Link>
-          <Link
-            href="/invoices"
-            className="border border-[#0A0A0A] bg-white text-[#0A0A0A] px-5 py-2.5 font-mono text-xs uppercase tracking-wider hover:bg-[#0A0A0A]/5 transition-colors"
-          >
-            Create Invoice
-          </Link>
-          <Link
-            href="/costs"
-            className="border border-[#0A0A0A] bg-white text-[#0A0A0A] px-5 py-2.5 font-mono text-xs uppercase tracking-wider hover:bg-[#0A0A0A]/5 transition-colors"
-          >
-            View Costs
-          </Link>
-          <Link
-            href="/ai"
-            className="border border-[#0A0A0A] bg-white text-[#0A0A0A] px-5 py-2.5 font-mono text-xs uppercase tracking-wider hover:bg-[#0A0A0A]/5 transition-colors"
-          >
-            Ask AM Agent
-          </Link>
-        </div>
+      {/* 3-Zone Layout — each zone streams independently */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        <Suspense fallback={<MetricsZoneSkeleton />}>
+          <MetricsZone />
+        </Suspense>
+        <Suspense fallback={<ChartsZoneSkeleton />}>
+          <ChartsZone />
+        </Suspense>
+        <Suspense fallback={<ActionsZoneSkeleton />}>
+          <ActionsZone />
+        </Suspense>
       </div>
     </div>
   );
 }
 
-function BriefingCard({ data }: { data: Awaited<ReturnType<typeof gatherBriefingData>> }) {
-  const items = [
-    {
-      label: "MRR",
-      value: data.mrr !== null ? `$${(data.mrr / 100).toLocaleString()}` : "Not connected",
-      alert: false,
-    },
-    {
-      label: "Failed Deploys",
-      value: String(data.failedDeploys),
-      alert: data.failedDeploys > 0,
-    },
-    {
-      label: "Unresolved Alerts",
-      value: String(data.unresolvedAlerts),
-      alert: data.unresolvedAlerts > 0,
-    },
-    {
-      label: "Unread Messages",
-      value: String(data.unreadMessages),
-      alert: data.unreadMessages > 3,
-    },
-    {
-      label: "At-Risk Rocks",
-      value: String(data.atRiskRocks),
-      alert: data.atRiskRocks > 0,
-    },
-    {
-      label: "Overdue Invoices",
-      value: data.overdueInvoices > 0
-        ? `${data.overdueInvoices} ($${(data.overdueAmount / 100).toLocaleString()})`
-        : "0",
-      alert: data.overdueInvoices > 0,
-    },
-  ];
+// ─── Components ──────────────────────────────────────────────────────────────
 
+function MetricCard({
+  label,
+  value,
+  sub,
+  href,
+  alert = false,
+}: {
+  label: string;
+  value: string;
+  sub: string;
+  href: string;
+  alert?: boolean;
+}) {
   return (
-    <div className="space-y-2">
-      {items.map((item) => (
-        <div key={item.label} className="flex items-center justify-between py-1">
-          <span className="font-serif text-sm text-[#0A0A0A]/60">{item.label}</span>
-          <span
-            className={`font-mono text-sm ${
-              item.alert ? "text-red-600 font-bold" : "text-[#0A0A0A]"
-            }`}
-          >
-            {item.value}
-          </span>
-        </div>
-      ))}
-    </div>
+    <Link
+      href={href}
+      className={`block border bg-white p-5 hover:bg-[#0A0A0A]/[0.02] transition-colors ${
+        alert
+          ? "border-red-300 border-l-4 border-l-red-500"
+          : "border-[#0A0A0A]/10"
+      }`}
+    >
+      <span className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
+        {label}
+      </span>
+      <div className="font-mono text-2xl font-bold mt-1">{value}</div>
+      <span className="font-mono text-xs text-[#0A0A0A]/40">{sub}</span>
+    </Link>
   );
 }

@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
+import { desc } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
+import { format } from "date-fns";
 
 const TABS = [
   { label: "General", href: "/settings" },
@@ -49,6 +51,11 @@ function getIntegrations(): Integration[] {
       connected: !!process.env.NEXT_PUBLIC_POSTHOG_KEY,
     },
     {
+      name: "Mercury",
+      description: "Business banking — account balances, transactions, and cash position tracking.",
+      connected: !!process.env.MERCURY_API_KEY,
+    },
+    {
       name: "Bloo.io",
       description: "Client messaging and communication portal integration.",
       connected: !!process.env.BLOOIO_API_KEY,
@@ -78,6 +85,12 @@ export default async function IntegrationsPage() {
   const posthogConfigured = projects.filter(
     (p) => p.posthogProjectId && p.posthogApiKey
   );
+
+  // Get Mercury account status
+  const mercuryAccounts = await db
+    .select()
+    .from(schema.mercuryAccounts)
+    .orderBy(desc(schema.mercuryAccounts.createdAt));
 
   return (
     <div>
@@ -157,7 +170,7 @@ export default async function IntegrationsPage() {
       </div>
 
       {/* PostHog Per-Project Config */}
-      <div>
+      <div className="mb-10">
         <div className="flex items-center gap-3 mb-4">
           <h2 className="font-serif text-lg font-bold text-[#0A0A0A]">
             PostHog — Per-Project Configuration
@@ -199,6 +212,68 @@ export default async function IntegrationsPage() {
             );
           })}
         </div>
+      </div>
+
+      {/* Mercury Banking Status */}
+      <div>
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="font-serif text-lg font-bold text-[#0A0A0A]">
+            Mercury — Banking Accounts
+          </h2>
+          <span className="px-2 py-0.5 text-xs font-mono border border-[#0A0A0A]">
+            {mercuryAccounts.length}
+          </span>
+        </div>
+        <p className="font-serif text-sm text-[#0A0A0A]/50 mb-4">
+          Mercury accounts are synced daily. Set <code className="font-mono text-xs">MERCURY_API_KEY</code> in
+          your environment variables to enable the connection.
+          {process.env.MERCURY_SANDBOX === "true" && (
+            <span className="ml-2 font-mono text-xs text-amber-600">
+              (Sandbox mode)
+            </span>
+          )}
+        </p>
+        {mercuryAccounts.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {mercuryAccounts.map((account) => (
+              <div
+                key={account.id}
+                className="border border-[#0A0A0A]/10 bg-white p-4"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-serif text-sm font-medium">
+                    {account.name}
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="rounded-none text-[9px] uppercase font-mono tracking-wider"
+                  >
+                    {account.type}
+                  </Badge>
+                </div>
+                <div className="font-mono text-lg font-bold">
+                  {Number(account.balance).toLocaleString("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                  })}
+                </div>
+                {account.lastSyncedAt && (
+                  <span className="font-mono text-[10px] text-[#0A0A0A]/30">
+                    Last synced {format(account.lastSyncedAt, "MMM d, h:mm a")}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="border border-[#0A0A0A]/10 bg-white p-6 text-center">
+            <p className="font-mono text-xs text-[#0A0A0A]/40">
+              {process.env.MERCURY_API_KEY
+                ? "No accounts synced yet. Trigger a sync from the Finance page."
+                : "MERCURY_API_KEY not configured. Add it to your environment variables."}
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

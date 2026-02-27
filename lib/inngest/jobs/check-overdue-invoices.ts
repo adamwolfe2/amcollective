@@ -6,6 +6,7 @@
  */
 
 import { inngest } from "../client";
+import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, and, sql, lt } from "drizzle-orm";
@@ -17,6 +18,12 @@ export const checkOverdueInvoices = inngest.createFunction(
     id: "check-overdue-invoices",
     name: "Check Overdue Invoices",
     retries: 2,
+    onFailure: async ({ error }) => {
+      captureError(error, {
+        tags: { source: "inngest", job: "check-overdue-invoices" },
+        level: "error",
+      });
+    },
   },
   { cron: "0 17 * * *" }, // 5 PM UTC = 9 AM PT
   async ({ step }) => {

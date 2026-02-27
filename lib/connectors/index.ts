@@ -10,4 +10,5 @@ export * as stripe from "./stripe";
 export * as neon from "./neon";
 export * as clerk from "./clerk";
 export * as posthog from "./posthog";
+export * as mercury from "./mercury";
 export { type ConnectorResult, invalidateCache } from "./base";

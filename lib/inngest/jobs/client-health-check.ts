@@ -6,6 +6,7 @@
  */
 
 import { inngest } from "../client";
+import { captureError } from "@/lib/errors";
 import { scoreAllClients } from "@/lib/ai/agents/client-health";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 
@@ -14,6 +15,12 @@ export const clientHealthCheck = inngest.createFunction(
     id: "client-health-check",
     name: "Client Health Check",
     retries: 1,
+    onFailure: async ({ error }) => {
+      captureError(error, {
+        tags: { source: "inngest", job: "client-health-check" },
+        level: "error",
+      });
+    },
   },
   { cron: "0 14 * * 1" }, // Monday 2 PM UTC = 8 AM CT
   async ({ step }) => {

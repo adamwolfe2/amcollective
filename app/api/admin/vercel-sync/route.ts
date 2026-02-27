@@ -6,23 +6,16 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
 import { inngest } from "@/lib/inngest/client";
+import { checkAdmin } from "@/lib/auth";
+import { captureError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const { userId, sessionClaims } = await auth();
+  const userId = await checkAdmin();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const role =
-    (sessionClaims?.publicMetadata as Record<string, unknown>)?.role ??
-    (userId === "user_2vqM8MZ1z7MxvJRLjJolHJAGnXp" ? "owner" : null);
-
-  if (role !== "owner" && role !== "admin") {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   void req;
@@ -32,6 +25,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true, message: "Vercel sync triggered" });
   } catch (err) {
     console.error("[vercel-sync] Error:", err);
+    captureError(err, { tags: { route: "POST /api/admin/vercel-sync" } });
     return NextResponse.json(
       {
         error: "Sync trigger failed",

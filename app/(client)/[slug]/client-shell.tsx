@@ -11,6 +11,8 @@ import {
   BarChart3,
   MessageSquare,
   ExternalLink,
+  Columns3,
+  FileText,
   Menu,
   X,
 } from "lucide-react";
@@ -20,6 +22,8 @@ function useClientNav() {
   return [
     { label: "Dashboard", href: `/${slug}/dashboard`, icon: LayoutDashboard },
     { label: "Projects", href: `/${slug}/projects`, icon: FolderKanban },
+    { label: "Board", href: `/${slug}/board`, icon: Columns3 },
+    { label: "Documents", href: `/${slug}/documents`, icon: FileText },
     { label: "Invoices", href: `/${slug}/invoices`, icon: Receipt },
     { label: "Reports", href: `/${slug}/reports`, icon: BarChart3 },
     { label: "Messages", href: `/${slug}/messages`, icon: MessageSquare },

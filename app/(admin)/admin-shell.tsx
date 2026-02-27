@@ -24,6 +24,9 @@ import {
   Settings,
   Menu,
   X,
+  Landmark,
+  FileText,
+  Search,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -33,6 +36,8 @@ const NAV_ITEMS = [
   { label: "Invoices", href: "/invoices", icon: Receipt },
   { label: "Services", href: "/services", icon: Briefcase },
   { label: "Team", href: "/team", icon: UserCog },
+  { label: "Finance", href: "/finance", icon: Landmark },
+  { label: "Documents", href: "/documents", icon: FileText },
   { label: "Costs", href: "/costs", icon: DollarSign },
   { label: "Domains", href: "/domains", icon: Globe },
   { label: "Rocks", href: "/rocks", icon: Target },
@@ -143,6 +148,21 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
           <div className="flex items-center gap-3">
+            {/* Search trigger */}
+            <button
+              onClick={() => {
+                document.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: "k", metaKey: true })
+                );
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 border border-[#0A0A0A]/10 bg-white/60 hover:bg-white text-[#0A0A0A]/40 hover:text-[#0A0A0A]/60 transition-colors"
+              title="Search (Cmd+K)"
+            >
+              <Search className="h-3.5 w-3.5" />
+              <span className="font-mono text-[10px] hidden sm:inline">
+                Cmd+K
+              </span>
+            </button>
             <UserButton
               appearance={{
                 elements: {

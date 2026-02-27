@@ -8,6 +8,7 @@
  */
 
 import { inngest } from "../client";
+import { captureError } from "@/lib/errors";
 import Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -26,6 +27,12 @@ export const sendClientReports = inngest.createFunction(
     id: "send-client-reports",
     name: "Send Client Status Reports",
     retries: 2,
+    onFailure: async ({ error }) => {
+      captureError(error, {
+        tags: { source: "inngest", job: "send-client-reports" },
+        level: "error",
+      });
+    },
   },
   { cron: "0 1 * * *" }, // 1 AM UTC = 5 PM PT
   async ({ step }) => {
