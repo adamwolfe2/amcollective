@@ -9,7 +9,7 @@
 
 import type Stripe from "stripe";
 import { eq, sql, and, sum, max } from "drizzle-orm";
-import { getStripeClient, isStripeConfigured } from "@/lib/stripe/config";
+import { getStripeClient } from "@/lib/stripe/config";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 
@@ -555,13 +555,13 @@ export interface SyncResult {
  * Returns aggregate counts and any error messages.
  */
 export async function syncEverything(): Promise<SyncResult> {
-  if (!isStripeConfigured()) {
+  if (!process.env.STRIPE_SECRET_KEY) {
     return {
       customers: 0,
       subscriptions: 0,
       invoices: 0,
       charges: 0,
-      errors: ["Stripe is not configured — missing STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET"],
+      errors: ["Stripe is not configured — missing STRIPE_SECRET_KEY"],
     };
   }
 

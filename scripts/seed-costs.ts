@@ -6,6 +6,9 @@
  * Seeds real AM Collective SaaS tool costs.
  */
 
+import { config } from "dotenv";
+config({ path: ".env.local" });
+
 import { db } from "../lib/db";
 import * as schema from "../lib/db/schema";
 

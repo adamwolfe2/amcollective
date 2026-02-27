@@ -7,6 +7,9 @@
  * Usage: npx tsx scripts/seed-snapshots.ts
  */
 
+import { config } from "dotenv";
+config({ path: ".env.local" });
+
 import { db } from "../lib/db";
 import * as schema from "../lib/db/schema";
 import { eq, sql, count } from "drizzle-orm";
