@@ -53,7 +53,7 @@ export default async function ContractDetailPage({ params }: PageProps) {
     isRequired: boolean;
   }>;
 
-  const signingUrl = `${process.env.NEXT_PUBLIC_APP_URL || ""}/contracts/${contract.token}`;
+  const signingUrl = `${process.env.NEXT_PUBLIC_APP_URL || ""}/contracts/sign/${contract.token}`;
 
   return (
     <div>
