@@ -19,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { createInvoice } from "@/lib/actions/invoices";
 import { Plus, Trash2 } from "lucide-react";
 
@@ -32,16 +33,22 @@ type Client = {
   id: string;
   name: string;
   companyName: string | null;
+  stripeCustomerId: string | null;
 };
 
 export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [clientId, setClientId] = useState("");
+  const [sendViaStripe, setSendViaStripe] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { description: "", quantity: 1, unitPrice: 0 },
   ]);
   const router = useRouter();
+
+  const selectedClient = clients.find((c) => c.id === clientId);
+  const clientHasStripe = !!selectedClient?.stripeCustomerId;
 
   function addLineItem() {
     setLineItems([...lineItems, { description: "", quantity: 1, unitPrice: 0 }]);
@@ -74,6 +81,7 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
     e.preventDefault();
     if (!clientId) return;
     setLoading(true);
+    setError(null);
 
     const formData = new FormData(e.currentTarget);
     const validLineItems = lineItems.filter((li) => li.description.trim());
@@ -85,14 +93,19 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
       number: (formData.get("number") as string) || undefined,
       dueDate: (formData.get("dueDate") as string) || undefined,
       lineItems: validLineItems.length > 0 ? validLineItems : undefined,
+      sendViaStripe,
     });
 
     setLoading(false);
     if (result.success) {
       setOpen(false);
       setClientId("");
+      setSendViaStripe(false);
+      setError(null);
       setLineItems([{ description: "", quantity: 1, unitPrice: 0 }]);
       router.refresh();
+    } else {
+      setError(result.error || "Failed to create invoice");
     }
   }
 
@@ -118,7 +131,17 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
             <Label className="font-mono text-xs uppercase tracking-wider">
               Client
             </Label>
-            <Select value={clientId} onValueChange={setClientId}>
+            <Select
+              value={clientId}
+              onValueChange={(value) => {
+                setClientId(value);
+                // Reset Stripe toggle if new client has no Stripe ID
+                const newClient = clients.find((c) => c.id === value);
+                if (!newClient?.stripeCustomerId) {
+                  setSendViaStripe(false);
+                }
+              }}
+            >
               <SelectTrigger className="border-[#0A0A0A] rounded-none bg-white font-serif text-sm">
                 <SelectValue placeholder="Select a client" />
               </SelectTrigger>
@@ -218,6 +241,37 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
             </div>
           </div>
 
+          {/* Send via Stripe */}
+          <div className="border border-[#0A0A0A]/10 bg-white p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="sendViaStripe"
+                checked={sendViaStripe}
+                onCheckedChange={(checked) =>
+                  setSendViaStripe(checked === true)
+                }
+                disabled={!clientHasStripe && !!clientId}
+                className="border-[#0A0A0A] rounded-none data-[state=checked]:bg-[#0A0A0A] data-[state=checked]:border-[#0A0A0A]"
+              />
+              <Label
+                htmlFor="sendViaStripe"
+                className="font-mono text-xs uppercase tracking-wider cursor-pointer"
+              >
+                Send via Stripe
+              </Label>
+            </div>
+            {sendViaStripe && (
+              <p className="font-mono text-[10px] text-[#0A0A0A]/50 pl-6">
+                Invoice will be created in Stripe and emailed to the client
+              </p>
+            )}
+            {clientId && !clientHasStripe && (
+              <p className="font-mono text-[10px] text-red-600 pl-6">
+                Selected client has no Stripe customer ID
+              </p>
+            )}
+          </div>
+
           {/* Total */}
           <div className="flex justify-between items-center border-t border-[#0A0A0A]/10 pt-3">
             <span className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
@@ -227,6 +281,13 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
               ${(totalCents() / 100).toFixed(2)}
             </span>
           </div>
+
+          {/* Error display */}
+          {error && (
+            <div className="border border-red-600 bg-red-50 p-2">
+              <p className="font-mono text-xs text-red-700">{error}</p>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-2">
             <Button
@@ -242,7 +303,13 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
               disabled={loading || !clientId}
               className="bg-[#0A0A0A] text-white rounded-none font-mono text-xs hover:bg-[#0A0A0A]/90"
             >
-              {loading ? "Creating..." : "Create Invoice"}
+              {loading
+                ? sendViaStripe
+                  ? "Sending via Stripe..."
+                  : "Creating..."
+                : sendViaStripe
+                  ? "Create & Send via Stripe"
+                  : "Create Invoice"}
             </Button>
           </div>
         </form>

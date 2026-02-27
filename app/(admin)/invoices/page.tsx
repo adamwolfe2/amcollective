@@ -140,7 +140,14 @@ export default async function InvoicesPage({
         <div className="flex items-center gap-2">
           <ExportCsvButton invoices={csvData} />
           <SyncStripeButton />
-          <CreateInvoiceDialog clients={clients} />
+          <CreateInvoiceDialog
+            clients={clients.map((c) => ({
+              id: c.id,
+              name: c.name,
+              companyName: c.companyName,
+              stripeCustomerId: c.stripeCustomerId,
+            }))}
+          />
         </div>
       </div>
 
