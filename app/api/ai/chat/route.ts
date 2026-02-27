@@ -6,14 +6,23 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { auth } from "@clerk/nextjs/server";
 import { chat, getConversations, getConversationMessages, type ChatMessage } from "@/lib/ai/agents/chat";
 import { runResearch } from "@/lib/ai/agents/research";
+import { ajAiChat } from "@/lib/middleware/arcjet";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
+  // Rate limit AI chat (20 req/min)
+  if (ajAiChat) {
+    const decision = await ajAiChat.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   const { userId } = await auth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

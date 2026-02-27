@@ -24,6 +24,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { ajWebhook } from "@/lib/middleware/arcjet";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -40,6 +41,13 @@ interface ClerkWebhookEvent {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
+  if (ajWebhook) {
+    const decision = await ajWebhook.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   const secret = process.env.CLERK_WEBHOOK_SECRET;
 
   // If webhook secret is not configured, acknowledge gracefully.

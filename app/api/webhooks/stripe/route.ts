@@ -17,6 +17,7 @@ import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { createAlert } from "@/lib/db/repositories/alerts";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { ajWebhook } from "@/lib/middleware/arcjet";
 import type Stripe from "stripe";
 
 export const runtime = "nodejs";
@@ -213,6 +214,14 @@ async function handleChargeFailed(event: Stripe.Event) {
 // ─── Route Handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  // Rate limit webhooks (200 req/min)
+  if (ajWebhook) {
+    const decision = await ajWebhook.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return json({ error: "Rate limited" }, 429);
+    }
+  }
+
   // If Stripe is not configured, acknowledge silently (dev/CI environments)
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
     return json({ received: true });

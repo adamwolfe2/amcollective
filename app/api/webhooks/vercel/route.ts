@@ -21,6 +21,7 @@ import * as schema from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createAlert } from "@/lib/db/repositories/alerts";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { ajWebhook } from "@/lib/middleware/arcjet";
 
 // ---------------------------------------------------------------------------
 // Signature verification
@@ -72,6 +73,13 @@ interface VercelDeploymentPayload {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
+  if (ajWebhook) {
+    const decision = await ajWebhook.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   const secret = process.env.VERCEL_WEBHOOK_SECRET;
 
   // If webhook secret is not configured, acknowledge but do not process.

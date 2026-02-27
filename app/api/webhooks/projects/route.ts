@@ -28,6 +28,7 @@ import * as schema from "@/lib/db/schema";
 import { eq, and } from "drizzle-orm";
 import { createAlert } from "@/lib/db/repositories/alerts";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { ajWebhook } from "@/lib/middleware/arcjet";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -65,6 +66,13 @@ function isValidPayload(body: unknown): body is ProjectWebhookPayload {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
+  if (ajWebhook) {
+    const decision = await ajWebhook.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   // ── Read & parse ─────────────────────────────────────────────────────────
   const webhookSecret = request.headers.get("x-webhook-secret");
   if (!webhookSecret) {

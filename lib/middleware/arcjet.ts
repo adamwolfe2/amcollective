@@ -4,7 +4,7 @@ import arcjet, { shield, detectBot, tokenBucket } from "@arcjet/next";
  * ArcJet security middleware — rate limiting + bot detection + shield.
  *
  * Usage in API routes:
- *   import { aj } from "@/lib/middleware/arcjet";
+ *   import { aj, ajWebhook, ajAiChat } from "@/lib/middleware/arcjet";
  *   const decision = await aj.protect(req);
  *   if (decision.isDenied()) {
  *     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -13,14 +13,13 @@ import arcjet, { shield, detectBot, tokenBucket } from "@arcjet/next";
 
 const key = process.env.ARCJET_KEY;
 
+/** Default rate limiter: 100 req/min per IP + shield + bot detection */
 export const aj = key
   ? arcjet({
       key,
       characteristics: ["ip.src"],
       rules: [
-        // Shield protects against common attacks (SQL injection, XSS, etc.)
         shield({ mode: "LIVE" }),
-        // Bot detection blocks automated requests
         detectBot({
           mode: "LIVE",
           allow: [
@@ -29,12 +28,45 @@ export const aj = key
             "CATEGORY:PREVIEW",
           ],
         }),
-        // Rate limiting: 100 requests per 60 seconds per IP
         tokenBucket({
           mode: "LIVE",
           refillRate: 100,
           interval: 60,
           capacity: 100,
+        }),
+      ],
+    })
+  : null;
+
+/** Webhook rate limiter: 200 req/min per IP (webhooks come in bursts) */
+export const ajWebhook = key
+  ? arcjet({
+      key,
+      characteristics: ["ip.src"],
+      rules: [
+        shield({ mode: "LIVE" }),
+        tokenBucket({
+          mode: "LIVE",
+          refillRate: 200,
+          interval: 60,
+          capacity: 200,
+        }),
+      ],
+    })
+  : null;
+
+/** AI chat rate limiter: 20 req/min per IP (prevent runaway AI costs) */
+export const ajAiChat = key
+  ? arcjet({
+      key,
+      characteristics: ["ip.src"],
+      rules: [
+        shield({ mode: "LIVE" }),
+        tokenBucket({
+          mode: "LIVE",
+          refillRate: 20,
+          interval: 60,
+          capacity: 20,
         }),
       ],
     })

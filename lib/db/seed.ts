@@ -18,7 +18,7 @@ async function seed() {
     .insert(schema.portfolioProjects)
     .values([
       {
-        name: "CampusGTM",
+        name: "CampusGTM / Cursive AI",
         slug: "campusgtm",
         domain: "campusgtm.com",
         vercelProjectId: "prj_gazgIB1ZxtryYeJzWIczS1plj949",
@@ -59,17 +59,44 @@ async function seed() {
         domain: "hookugc.com",
         vercelProjectId: "prj_kSQ0hEjqGqDADD2Y8wjNVvWqwFCh",
         githubRepo: "adamwolfe2/gtmengine",
-        status: "paused",
-        healthScore: 65,
+        status: "active",
+        healthScore: 75,
       },
       {
         name: "TBGC",
         slug: "tbgc",
-        domain: null,
+        domain: "tbgc.com",
         vercelProjectId: "prj_GxMgXdOYErqgqg6Hsabk5oom5M94",
         githubRepo: "adamwolfe2/TBGC",
         status: "active",
         healthScore: 90,
+      },
+      {
+        name: "VendHub",
+        slug: "vendhub",
+        domain: "vendhub.com",
+        vercelProjectId: null,
+        githubRepo: null,
+        status: "active",
+        healthScore: 70,
+      },
+      {
+        name: "Vendingpreneurs",
+        slug: "vendingpreneurs",
+        domain: "vendingpreneurs.com",
+        vercelProjectId: null,
+        githubRepo: null,
+        status: "active",
+        healthScore: 72,
+      },
+      {
+        name: "AIMS",
+        slug: "aims",
+        domain: "aimanagingservices.com",
+        vercelProjectId: "prj_8z1knXDv9ylzTNxgQxmgDa3jq6iS",
+        githubRepo: null,
+        status: "active",
+        healthScore: 80,
       },
     ])
     .returning();
@@ -82,23 +109,65 @@ async function seed() {
     .values([
       {
         name: "Adam Wolfe",
-        email: "adam@amcollectivecapital.com",
+        email: "adamwolfe102@gmail.com",
         role: "owner",
         title: "CEO / Founder",
         isActive: true,
       },
       {
-        name: "Sarah Chen",
-        email: "sarah@amcollectivecapital.com",
-        role: "admin",
-        title: "Head of Engineering",
+        name: "Sabbir",
+        email: "sabbir@amcollectivecapital.com",
+        role: "member",
+        title: "GHL Specialist",
         isActive: true,
       },
       {
-        name: "Marcus Rivera",
-        email: "marcus@amcollectivecapital.com",
+        name: "Sheenam",
+        email: "sheenam@amcollectivecapital.com",
         role: "member",
-        title: "Full-Stack Developer",
+        title: "SEO",
+        isActive: true,
+      },
+      {
+        name: "Kumar",
+        email: "kumar@amcollectivecapital.com",
+        role: "member",
+        title: "N8N Automation",
+        isActive: true,
+      },
+      {
+        name: "Maureen",
+        email: "maureen@amcollectivecapital.com",
+        role: "member",
+        title: "RevOps",
+        isActive: true,
+      },
+      {
+        name: "Ailyn",
+        email: "ailyn@amcollectivecapital.com",
+        role: "member",
+        title: "Newsletters",
+        isActive: true,
+      },
+      {
+        name: "Marco",
+        email: "marco@amcollectivecapital.com",
+        role: "member",
+        title: "Lead Lists",
+        isActive: true,
+      },
+      {
+        name: "Ivan",
+        email: "ivan@amcollectivecapital.com",
+        role: "member",
+        title: "Voice",
+        isActive: true,
+      },
+      {
+        name: "Saad",
+        email: "saad@amcollectivecapital.com",
+        role: "member",
+        title: "Lead Gen",
         isActive: true,
       },
     ])
@@ -108,46 +177,69 @@ async function seed() {
   // ─── Team Assignments ───────────────────────────────────────────────
   console.log("Creating team assignments...");
   const adam = members[0];
-  const sarah = members[1];
-  const marcus = members[2];
+  const sabbir = members[1];
+  const sheenam = members[2];
+  const kumar = members[3];
+  const maureen = members[4];
+
   const taskspace = projects.find((p) => p.slug === "taskspace")!;
   const trackr = projects.find((p) => p.slug === "trackr")!;
-  const wholesail = projects.find((p) => p.slug === "wholesail")!;
+  const aims = projects.find((p) => p.slug === "aims")!;
+  const campusgtm = projects.find((p) => p.slug === "campusgtm")!;
+  const hook = projects.find((p) => p.slug === "hook")!;
 
   await db.insert(schema.teamAssignments).values([
     { teamMemberId: adam.id, projectId: taskspace.id, role: "Lead", hoursPerWeek: "10" },
     { teamMemberId: adam.id, projectId: trackr.id, role: "Lead", hoursPerWeek: "8" },
-    { teamMemberId: sarah.id, projectId: trackr.id, role: "Engineer", hoursPerWeek: "20" },
-    { teamMemberId: sarah.id, projectId: wholesail.id, role: "Engineer", hoursPerWeek: "15" },
-    { teamMemberId: marcus.id, projectId: taskspace.id, role: "Developer", hoursPerWeek: "25" },
-    { teamMemberId: marcus.id, projectId: wholesail.id, role: "Developer", hoursPerWeek: "15" },
+    { teamMemberId: adam.id, projectId: aims.id, role: "Lead", hoursPerWeek: "15" },
+    { teamMemberId: sabbir.id, projectId: campusgtm.id, role: "GHL Build", hoursPerWeek: "20" },
+    { teamMemberId: sheenam.id, projectId: aims.id, role: "SEO", hoursPerWeek: "15" },
+    { teamMemberId: kumar.id, projectId: aims.id, role: "Automation", hoursPerWeek: "20" },
+    { teamMemberId: maureen.id, projectId: aims.id, role: "RevOps", hoursPerWeek: "25" },
+    { teamMemberId: members[7].id, projectId: hook.id, role: "Voice AI", hoursPerWeek: "15" },
   ]);
-  console.log("  ✓ 6 team assignments created");
+  console.log("  ✓ 8 team assignments created");
 
-  // ─── Clients ────────────────────────────────────────────────────────
-  console.log("Creating clients...");
+  // ─── Clients (sample placeholders) ─────────────────────────────────
+  console.log("Creating sample clients...");
   const clientRows = await db
     .insert(schema.clients)
     .values([
       {
-        name: "Jordan Matthews",
+        name: "Sample Client A",
         companyName: "Apex Ventures",
-        email: "jordan@apexventures.io",
+        email: "contact@apexventures.io",
         phone: "+1 (555) 234-5678",
         website: "https://apexventures.io",
         portalAccess: true,
         accessLevel: "admin",
-        notes: "Series A startup. Primary contact for TaskSpace + Trackr engagements.",
+        notes: "Demo client — replace with real client data when onboarding.",
       },
       {
-        name: "Elena Rodriguez",
+        name: "Sample Client B",
         companyName: "Brightpath Media",
-        email: "elena@brightpath.co",
+        email: "hello@brightpath.co",
         phone: "+1 (555) 876-5432",
         website: "https://brightpath.co",
         portalAccess: true,
         accessLevel: "viewer",
-        notes: "Content agency. Interested in Wholesail + Hook UGC for distribution.",
+        notes: "Demo client — replace with real client data when onboarding.",
+      },
+      {
+        name: "Sample Client C",
+        companyName: "Meridian Group",
+        email: "ops@meridiangroup.co",
+        portalAccess: false,
+        accessLevel: "viewer",
+        notes: "Demo client — prospective, no portal access yet.",
+      },
+      {
+        name: "Sample Client D",
+        companyName: "Pinecrest Holdings",
+        email: "admin@pinecrest.io",
+        portalAccess: true,
+        accessLevel: "collaborator",
+        notes: "Demo client — active engagement, collaborator access.",
       },
     ])
     .returning();
@@ -158,9 +250,11 @@ async function seed() {
   await db.insert(schema.clientProjects).values([
     { clientId: clientRows[0].id, projectId: taskspace.id, role: "Sponsor", status: "active" },
     { clientId: clientRows[0].id, projectId: trackr.id, role: "Beta User", status: "active" },
-    { clientId: clientRows[1].id, projectId: wholesail.id, role: "Customer", status: "active" },
+    { clientId: clientRows[1].id, projectId: campusgtm.id, role: "Customer", status: "active" },
+    { clientId: clientRows[2].id, projectId: aims.id, role: "Prospect", status: "active" },
+    { clientId: clientRows[3].id, projectId: hook.id, role: "Customer", status: "active" },
   ]);
-  console.log("  ✓ 3 client-project links created");
+  console.log("  ✓ 5 client-project links created");
 
   // ─── Engagements ───────────────────────────────────────────────────
   console.log("Creating engagements...");
@@ -168,8 +262,8 @@ async function seed() {
     {
       clientId: clientRows[0].id,
       projectId: taskspace.id,
-      title: "TaskSpace Custom Implementation",
-      description: "Full EOS platform customization and deployment for Apex Ventures team.",
+      title: "TaskSpace Custom Build",
+      description: "EOS platform customization and deployment.",
       type: "build",
       status: "active",
       value: 1500000,
@@ -177,16 +271,26 @@ async function seed() {
     },
     {
       clientId: clientRows[1].id,
-      projectId: wholesail.id,
-      title: "Wholesail Retainer",
-      description: "Monthly retainer for distribution portal maintenance and feature development.",
-      type: "retainer",
+      projectId: campusgtm.id,
+      title: "CampusGTM Lead Gen Package",
+      description: "Full lead generation infrastructure build.",
+      type: "build",
       status: "active",
       value: 500000,
       valuePeriod: "monthly",
     },
+    {
+      clientId: clientRows[3].id,
+      projectId: hook.id,
+      title: "Hook UGC Campaign",
+      description: "AI-powered UGC content generation campaign.",
+      type: "retainer",
+      status: "active",
+      value: 300000,
+      valuePeriod: "monthly",
+    },
   ]);
-  console.log("  ✓ 2 engagements created");
+  console.log("  ✓ 3 engagements created");
 
   // ─── Invoices ──────────────────────────────────────────────────────
   console.log("Creating invoices...");
@@ -207,58 +311,121 @@ async function seed() {
     {
       clientId: clientRows[1].id,
       number: "INV-2026-002",
-      status: "draft",
+      status: "sent",
       amount: 500000,
       currency: "usd",
       dueDate: new Date("2026-03-15"),
       lineItems: [
-        { description: "Wholesail Retainer — March 2026", quantity: 1, unitPrice: 500000 },
+        { description: "CampusGTM Lead Gen — March 2026", quantity: 1, unitPrice: 500000 },
+      ],
+    },
+    {
+      clientId: clientRows[3].id,
+      number: "INV-2026-003",
+      status: "draft",
+      amount: 300000,
+      currency: "usd",
+      dueDate: new Date("2026-03-01"),
+      lineItems: [
+        { description: "Hook UGC Campaign — March 2026", quantity: 1, unitPrice: 300000 },
       ],
     },
   ]);
-  console.log("  ✓ 2 invoices created");
+  console.log("  ✓ 3 invoices created");
 
-  // ─── Services ──────────────────────────────────────────────────────
+  // ─── Services (real catalog) ──────────────────────────────────────
   console.log("Creating services...");
   await db.insert(schema.services).values([
     {
-      name: "Platform Build",
-      description: "Full custom platform development from discovery to deployment.",
-      category: "Development",
-      basePrice: 2500000,
+      name: "AI Voice Dialer Setup",
+      description: "Full AI voice dialer configuration with custom scripts and integrations.",
+      category: "AI",
+      basePrice: 250000,
       pricePeriod: "one-time",
       isActive: true,
       sortOrder: 1,
     },
     {
-      name: "Monthly Retainer",
-      description: "Ongoing development, maintenance, and feature additions.",
-      category: "Retainer",
+      name: "GHL Build & Configuration",
+      description: "GoHighLevel CRM build with automations, pipelines, and integrations.",
+      category: "CRM",
       basePrice: 500000,
-      pricePeriod: "monthly",
+      pricePeriod: "one-time",
       isActive: true,
       sortOrder: 2,
     },
     {
-      name: "AI Integration",
-      description: "Claude/GPT integration, RAG pipelines, AI agent development.",
-      category: "AI",
-      basePrice: 750000,
-      pricePeriod: "one-time",
+      name: "Email Infrastructure (50K Daily)",
+      description: "Full email infrastructure for 50K daily sends — domains, warmup, deliverability.",
+      category: "Email",
+      basePrice: 300000,
+      pricePeriod: "monthly",
       isActive: true,
       sortOrder: 3,
     },
+    {
+      name: "AI Dashboard Deployment",
+      description: "Custom AI-powered dashboard build and deployment.",
+      category: "AI",
+      basePrice: 150000,
+      pricePeriod: "one-time",
+      isActive: true,
+      sortOrder: 4,
+    },
+    {
+      name: "SEO Audit & Strategy",
+      description: "Comprehensive SEO audit with actionable strategy and keyword plan.",
+      category: "SEO",
+      basePrice: 200000,
+      pricePeriod: "one-time",
+      isActive: true,
+      sortOrder: 5,
+    },
+    {
+      name: "N8N Automation Build",
+      description: "Custom n8n workflow automation — per workflow pricing.",
+      category: "Automation",
+      basePrice: 150000,
+      pricePeriod: "one-time",
+      isActive: true,
+      sortOrder: 6,
+    },
+    {
+      name: "Full AIMS Package",
+      description: "Complete AI Managing Services package — voice, email, CRM, automation, SEO.",
+      category: "Package",
+      basePrice: 500000,
+      pricePeriod: "monthly",
+      isActive: true,
+      sortOrder: 7,
+    },
   ]);
-  console.log("  ✓ 3 services created");
+  console.log("  ✓ 7 services created");
+
+  // ─── Tool Accounts (for cost tracking) ───────────────────────────
+  console.log("Creating tool accounts...");
+  await db.insert(schema.toolAccounts).values([
+    { name: "Vercel", monthlyBudget: 5000 },
+    { name: "Neon", monthlyBudget: 2500 },
+    { name: "Clerk", monthlyBudget: 5000 },
+    { name: "Resend", monthlyBudget: 2000 },
+    { name: "Anthropic (Claude)", monthlyBudget: 10000 },
+    { name: "OpenAI", monthlyBudget: 5000 },
+    { name: "Stripe", monthlyBudget: 0 },
+    { name: "Tavily", monthlyBudget: 1000 },
+    { name: "Firecrawl", monthlyBudget: 2000 },
+    { name: "PostHog", monthlyBudget: 0 },
+  ]);
+  console.log("  ✓ 10 tool accounts created");
 
   // ─── Audit Logs ────────────────────────────────────────────────────
-  console.log("Creating sample audit logs...");
+  console.log("Creating audit logs...");
   await db.insert(schema.auditLogs).values([
-    { actorId: "system", actorType: "system", action: "seed", entityType: "database", entityId: "all", metadata: { version: "1.0" } },
-    { actorId: adam.id, actorType: "user", action: "create", entityType: "client", entityId: clientRows[0].id, metadata: { name: "Jordan Matthews" } },
-    { actorId: adam.id, actorType: "user", action: "create", entityType: "client", entityId: clientRows[1].id, metadata: { name: "Elena Rodriguez" } },
+    { actorId: "system", actorType: "system", action: "seed", entityType: "database", entityId: "all", metadata: { version: "2.0" } },
+    { actorId: adam.id, actorType: "user", action: "create", entityType: "client", entityId: clientRows[0].id, metadata: { name: "Sample Client A" } },
+    { actorId: adam.id, actorType: "user", action: "create", entityType: "client", entityId: clientRows[1].id, metadata: { name: "Sample Client B" } },
     { actorId: adam.id, actorType: "user", action: "create", entityType: "invoice", entityId: "seed-inv-1", metadata: { number: "INV-2026-001", amount: 750000 } },
-    { actorId: sarah.id, actorType: "user", action: "mark_paid", entityType: "invoice", entityId: "seed-inv-1", metadata: { amount: 750000 } },
+    { actorId: adam.id, actorType: "user", action: "mark_paid", entityType: "invoice", entityId: "seed-inv-1", metadata: { amount: 750000 } },
   ]);
   console.log("  ✓ 5 audit log entries created");
 
