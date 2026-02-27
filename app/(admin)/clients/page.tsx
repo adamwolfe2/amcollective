@@ -1,5 +1,8 @@
 import Link from "next/link";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
+import { db } from "@/lib/db";
+import * as schema from "@/lib/db/schema";
+import { eq, desc, ilike, or, sql, count, and } from "drizzle-orm";
 import * as clientsRepo from "@/lib/db/repositories/clients";
 import {
   Table,
@@ -11,19 +14,57 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { ClientSearch } from "./client-search";
+import { ClientFilter } from "./client-filter";
 import { AddClientDialog } from "./add-client-dialog";
 
 export default async function ClientsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ search?: string }>;
+  searchParams: Promise<{ search?: string; filter?: string }>;
 }) {
   const params = await searchParams;
   const search = params.search || undefined;
-  const [clientsList, totalCount] = await Promise.all([
-    clientsRepo.getClients({ search }),
-    clientsRepo.getClientCount(),
-  ]);
+  const filter = params.filter || "all";
+
+  // Build filter conditions
+  const conditions = [];
+  if (search) {
+    conditions.push(
+      or(
+        ilike(schema.clients.name, `%${search}%`),
+        ilike(schema.clients.companyName, `%${search}%`),
+        ilike(schema.clients.email, `%${search}%`)
+      )
+    );
+  }
+  if (filter === "active") {
+    conditions.push(
+      or(
+        eq(schema.clients.paymentStatus, "healthy"),
+        sql`${schema.clients.currentMrr} > 0`
+      )
+    );
+  } else if (filter === "at_risk") {
+    conditions.push(eq(schema.clients.paymentStatus, "at_risk"));
+  } else if (filter === "churned") {
+    conditions.push(eq(schema.clients.paymentStatus, "churned"));
+  }
+
+  const whereClause =
+    conditions.length > 1
+      ? and(...conditions)
+      : conditions.length === 1
+        ? conditions[0]
+        : undefined;
+
+  const clientsList = await db
+    .select()
+    .from(schema.clients)
+    .where(whereClause)
+    .orderBy(desc(schema.clients.currentMrr))
+    .limit(50);
+
+  const totalCount = await clientsRepo.getClientCount();
 
   return (
     <div>
@@ -40,6 +81,11 @@ export default async function ClientsPage({
         <AddClientDialog />
       </div>
 
+      {/* Filters */}
+      <div className="flex items-center gap-4 mb-4">
+        <ClientFilter currentFilter={filter} />
+      </div>
+
       {/* Search */}
       <div className="mb-4">
         <ClientSearch defaultValue={search} />
@@ -49,11 +95,13 @@ export default async function ClientsPage({
       {clientsList.length === 0 ? (
         <div className="border border-[#0A0A0A]/10 py-16 text-center">
           <p className="text-[#0A0A0A]/40 font-serif text-lg">
-            {search ? "No clients match your search." : "No clients yet."}
+            {search || filter !== "all"
+              ? "No clients match your filters."
+              : "No clients yet."}
           </p>
           <p className="text-[#0A0A0A]/30 font-mono text-xs mt-2">
-            {search
-              ? "Try a different search term."
+            {search || filter !== "all"
+              ? "Try a different search or filter."
               : "Add your first client to get started."}
           </p>
         </div>
@@ -70,6 +118,15 @@ export default async function ClientsPage({
                 </TableHead>
                 <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
                   Email
+                </TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                  Revenue/mo
+                </TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                  Last Payment
+                </TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                  Payment Status
                 </TableHead>
                 <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
                   Access Level
@@ -99,6 +156,21 @@ export default async function ClientsPage({
                   <TableCell className="text-[#0A0A0A]/60 font-mono text-xs">
                     {client.email || "\u2014"}
                   </TableCell>
+                  <TableCell className="font-mono text-sm text-[#0A0A0A]/70">
+                    {client.currentMrr > 0
+                      ? `$${(client.currentMrr / 100).toLocaleString()}`
+                      : "\u2014"}
+                  </TableCell>
+                  <TableCell className="font-mono text-xs text-[#0A0A0A]/40">
+                    {client.lastPaymentDate
+                      ? formatDistanceToNow(new Date(client.lastPaymentDate), {
+                          addSuffix: true,
+                        })
+                      : "\u2014"}
+                  </TableCell>
+                  <TableCell>
+                    <PaymentStatusBadge status={client.paymentStatus} />
+                  </TableCell>
                   <TableCell>
                     <AccessBadge level={client.accessLevel} />
                   </TableCell>
@@ -112,6 +184,28 @@ export default async function ClientsPage({
         </div>
       )}
     </div>
+  );
+}
+
+function PaymentStatusBadge({ status }: { status: string | null }) {
+  const styles: Record<string, string> = {
+    healthy: "bg-transparent text-green-700 border-green-400",
+    at_risk: "bg-transparent text-amber-700 border-amber-400",
+    failed: "bg-transparent text-red-700 border-red-400",
+    churned: "bg-transparent text-[#0A0A0A]/30 border-[#0A0A0A]/10",
+  };
+
+  const label = status ? status.replace("_", " ") : "unknown";
+
+  return (
+    <Badge
+      variant="outline"
+      className={`font-mono text-[10px] uppercase tracking-wider rounded-none px-2 py-0.5 ${
+        styles[status ?? ""] || "bg-transparent text-[#0A0A0A]/30 border-[#0A0A0A]/10"
+      }`}
+    >
+      {label}
+    </Badge>
   );
 }
 
