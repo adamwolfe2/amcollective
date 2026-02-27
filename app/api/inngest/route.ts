@@ -12,9 +12,22 @@ import {
   syncStripeMrr,
   syncNeonUsage,
   sendClientReports,
+  embedDocuments,
+  morningBriefing,
+  clientHealthCheck,
+  weeklyCostAnalysis,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
   client: inngest,
-  functions: [syncVercelCosts, syncStripeMrr, syncNeonUsage, sendClientReports],
+  functions: [
+    syncVercelCosts,
+    syncStripeMrr,
+    syncNeonUsage,
+    sendClientReports,
+    embedDocuments,
+    morningBriefing,
+    clientHealthCheck,
+    weeklyCostAnalysis,
+  ],
 });
