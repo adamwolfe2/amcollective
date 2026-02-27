@@ -2,7 +2,7 @@ import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { getClientByClerkId, getClientProjects } from "@/lib/db/repositories/clients";
+import { getClientByClerkId, getClientProjects, getClientSubscriptions } from "@/lib/db/repositories/clients";
 import { getClientInvoices } from "@/lib/db/repositories/invoices";
 import { Badge } from "@/components/ui/badge";
 
@@ -31,10 +31,16 @@ export default async function ClientDashboardPage({
     );
   }
 
-  const [clientProjectLinks, invoices] = await Promise.all([
+  const [clientProjectLinks, invoices, allSubscriptions] = await Promise.all([
     getClientProjects(client.id),
     getClientInvoices(client.id),
+    getClientSubscriptions(client.id),
   ]);
+
+  const activeSubscriptions = allSubscriptions.filter(
+    (sub) => sub.status === "active"
+  );
+  const primarySub = activeSubscriptions[0] ?? null;
 
   const activeProjectCount = clientProjectLinks.filter(
     (cp) => cp.status === "active"
@@ -66,7 +72,7 @@ export default async function ClientDashboardPage({
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 gap-4 mb-10">
+      <div className="grid grid-cols-3 gap-4 mb-10">
         <div className="border border-[#0A0A0A]/10 bg-white p-5">
           <p className="font-mono text-3xl font-bold text-[#0A0A0A] tracking-tight">
             {activeProjectCount}
@@ -86,6 +92,25 @@ export default async function ClientDashboardPage({
           </p>
           <p className="font-serif text-sm text-[#0A0A0A]/50 mt-2">
             Open Invoices
+          </p>
+        </div>
+        <div className="border border-[#0A0A0A]/10 bg-white p-5">
+          <p className="font-mono text-3xl font-bold text-[#0A0A0A] tracking-tight">
+            ${((client.currentMrr ?? 0) / 100).toLocaleString("en-US", {
+              minimumFractionDigits: 0,
+            })}/mo
+          </p>
+          <p className="font-mono text-sm text-[#0A0A0A]/50 mt-0.5">
+            Next billing:{" "}
+            {primarySub?.currentPeriodEnd
+              ? format(new Date(primarySub.currentPeriodEnd), "MMM d, yyyy")
+              : "\u2014"}
+          </p>
+          <div className="mt-1.5">
+            <PaymentStatusBadge status={client.paymentStatus ?? "healthy"} />
+          </div>
+          <p className="font-serif text-sm text-[#0A0A0A]/50 mt-2">
+            Billing
           </p>
         </div>
       </div>
@@ -157,6 +182,33 @@ function InvoiceStatusBadge({ status }: { status: string }) {
       }`}
     >
       {status}
+    </Badge>
+  );
+}
+
+function PaymentStatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    healthy: "bg-transparent text-green-700 border-green-400",
+    at_risk: "bg-transparent text-yellow-700 border-yellow-400",
+    failed: "bg-transparent text-red-700 border-red-400",
+    churned: "bg-transparent text-[#0A0A0A]/50 border-[#0A0A0A]/20",
+  };
+
+  const labels: Record<string, string> = {
+    healthy: "healthy",
+    at_risk: "at risk",
+    failed: "failed",
+    churned: "churned",
+  };
+
+  return (
+    <Badge
+      variant="outline"
+      className={`font-mono text-[10px] uppercase tracking-wider rounded-none px-2 py-0.5 ${
+        styles[status] || styles.healthy
+      }`}
+    >
+      {labels[status] || status}
     </Badge>
   );
 }
