@@ -1,0 +1,78 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { deleteClient } from "@/lib/actions/clients";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+
+export function DeleteClientButton({
+  clientId,
+  clientName,
+}: {
+  clientId: string;
+  clientName: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState(false);
+  const router = useRouter();
+
+  async function handleDelete() {
+    setPending(true);
+    const result = await deleteClient(clientId);
+    setPending(false);
+
+    if (result.success) {
+      router.push("/clients");
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          variant="outline"
+          className="font-mono text-xs uppercase tracking-wider rounded-none border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-8 px-3"
+        >
+          Delete
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="rounded-none border-[#0A0A0A] sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="font-serif text-lg tracking-tight">
+            Delete Client
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <p className="font-mono text-sm text-[#0A0A0A]/60">
+            Are you sure you want to delete{" "}
+            <span className="font-medium text-[#0A0A0A]">{clientName}</span>?
+            This action cannot be undone.
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setOpen(false)}
+              className="font-mono text-xs uppercase tracking-wider rounded-none"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={pending}
+              className="font-mono text-xs uppercase tracking-wider rounded-none bg-red-600 text-white hover:bg-red-700"
+            >
+              {pending ? "Deleting..." : "Delete"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
