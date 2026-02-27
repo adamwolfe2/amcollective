@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { format } from "date-fns";
+import { format, formatDistanceToNow } from "date-fns";
 import * as clientsRepo from "@/lib/db/repositories/clients";
 import { getClientInvoices } from "@/lib/db/repositories/invoices";
 import { getEntityActivity } from "@/lib/db/repositories/activity";
@@ -27,11 +27,15 @@ export default async function ClientDetailPage({
   const client = await clientsRepo.getClient(id);
   if (!client) notFound();
 
-  const [projects, invoices, activity] = await Promise.all([
-    clientsRepo.getClientProjects(id),
-    getClientInvoices(id),
-    getEntityActivity("client", id),
-  ]);
+  const [projects, invoices, activity, subs, recentPayments, billingSummary] =
+    await Promise.all([
+      clientsRepo.getClientProjects(id),
+      getClientInvoices(id),
+      getEntityActivity("client", id),
+      clientsRepo.getClientSubscriptions(id),
+      clientsRepo.getClientPayments(id),
+      clientsRepo.getClientBillingSummary(id),
+    ]);
 
   return (
     <div>
@@ -101,6 +105,12 @@ export default async function ClientDetailPage({
                 {invoices.length}
               </span>
             )}
+          </TabsTrigger>
+          <TabsTrigger
+            value="billing"
+            className="font-mono text-xs uppercase tracking-wider rounded-none data-[state=active]:bg-[#0A0A0A] data-[state=active]:text-white px-4 py-2"
+          >
+            Billing
           </TabsTrigger>
           <TabsTrigger
             value="activity"
@@ -240,6 +250,274 @@ export default async function ClientDetailPage({
           )}
         </TabsContent>
 
+        {/* Billing Tab */}
+        <TabsContent value="billing" className="mt-6">
+          {/* Financial Summary Cards */}
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            <div className="border border-[#0A0A0A]/10 p-4">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-1">
+                Monthly Revenue (MRR)
+              </p>
+              <p className="font-serif text-2xl font-bold text-[#0A0A0A]">
+                {client.currentMrr > 0
+                  ? `$${(client.currentMrr / 100).toLocaleString()}`
+                  : "$0"}
+              </p>
+              {subs.filter((s) => s.status === "active").length > 0 && (
+                <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-1">
+                  {subs.filter((s) => s.status === "active").length} active{" "}
+                  {subs.filter((s) => s.status === "active").length === 1
+                    ? "subscription"
+                    : "subscriptions"}
+                </p>
+              )}
+            </div>
+            <div className="border border-[#0A0A0A]/10 p-4">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-1">
+                Lifetime Value
+              </p>
+              <p className="font-serif text-2xl font-bold text-[#0A0A0A]">
+                {client.lifetimeValue > 0
+                  ? `$${(client.lifetimeValue / 100).toLocaleString()}`
+                  : "$0"}
+              </p>
+              <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-1">
+                {billingSummary.paidCount} paid invoices
+              </p>
+            </div>
+            <div className="border border-[#0A0A0A]/10 p-4">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-1">
+                Payment Status
+              </p>
+              <div className="mt-1">
+                <PaymentStatusBadge status={client.paymentStatus} />
+              </div>
+              {client.lastPaymentDate && (
+                <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-2">
+                  Last paid{" "}
+                  {formatDistanceToNow(new Date(client.lastPaymentDate), {
+                    addSuffix: true,
+                  })}
+                </p>
+              )}
+            </div>
+            <div className="border border-[#0A0A0A]/10 p-4">
+              <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-1">
+                Avg Days to Pay
+              </p>
+              <p className="font-serif text-2xl font-bold text-[#0A0A0A]">
+                {billingSummary.avgDaysToPay > 0
+                  ? billingSummary.avgDaysToPay
+                  : "\u2014"}
+              </p>
+              {billingSummary.outstandingCount > 0 && (
+                <p className="font-mono text-[10px] text-amber-600 mt-1">
+                  {billingSummary.outstandingCount} outstanding ($
+                  {(billingSummary.outstandingAmount / 100).toLocaleString()})
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Active Subscriptions */}
+          <div className="mb-6">
+            <h3 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50 mb-3">
+              Subscriptions
+            </h3>
+            {subs.length === 0 ? (
+              <div className="border border-[#0A0A0A]/10 py-8 text-center">
+                <p className="text-[#0A0A0A]/30 font-mono text-xs">
+                  No subscriptions found
+                </p>
+              </div>
+            ) : (
+              <div className="border border-[#0A0A0A]/10">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-[#0A0A0A]/10 hover:bg-transparent">
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                        Plan
+                      </TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50 text-right">
+                        Amount
+                      </TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                        Interval
+                      </TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                        Status
+                      </TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                        Next Billing
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {subs.map((sub) => (
+                      <TableRow key={sub.id} className="border-[#0A0A0A]/10">
+                        <TableCell className="font-serif font-medium text-[#0A0A0A]">
+                          {sub.planName || "Subscription"}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm text-right">
+                          ${(sub.amount / 100).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-[#0A0A0A]/50">
+                          /{sub.interval}
+                        </TableCell>
+                        <TableCell>
+                          <SubscriptionStatusBadge status={sub.status} />
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-[#0A0A0A]/40">
+                          {sub.currentPeriodEnd
+                            ? format(
+                                new Date(sub.currentPeriodEnd),
+                                "MMM d, yyyy"
+                              )
+                            : "\u2014"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          {/* Invoice History */}
+          <div className="mb-6">
+            <h3 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50 mb-3">
+              Invoice History
+            </h3>
+            {invoices.length === 0 ? (
+              <div className="border border-[#0A0A0A]/10 py-8 text-center">
+                <p className="text-[#0A0A0A]/30 font-mono text-xs">
+                  No invoices found
+                </p>
+              </div>
+            ) : (
+              <div className="border border-[#0A0A0A]/10">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-[#0A0A0A]/10 hover:bg-transparent">
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                        Invoice #
+                      </TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50 text-right">
+                        Amount
+                      </TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                        Status
+                      </TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                        Due Date
+                      </TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                        Paid Date
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.map((inv) => (
+                      <TableRow key={inv.id} className="border-[#0A0A0A]/10">
+                        <TableCell className="font-mono text-sm font-medium">
+                          {inv.number || inv.id.slice(0, 8)}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm text-right">
+                          {formatCents(inv.amount, inv.currency)}
+                        </TableCell>
+                        <TableCell>
+                          <InvoiceStatusBadge status={inv.status} />
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-[#0A0A0A]/40">
+                          {inv.dueDate
+                            ? format(new Date(inv.dueDate), "MMM d, yyyy")
+                            : "\u2014"}
+                        </TableCell>
+                        <TableCell className="font-mono text-xs text-[#0A0A0A]/40">
+                          {inv.paidAt
+                            ? format(new Date(inv.paidAt), "MMM d, yyyy")
+                            : "\u2014"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {/* Running total */}
+                    <TableRow className="border-[#0A0A0A]/10 bg-[#0A0A0A]/[0.02]">
+                      <TableCell className="font-mono text-xs font-medium text-[#0A0A0A]/50">
+                        Total ({invoices.length} invoices)
+                      </TableCell>
+                      <TableCell className="font-mono text-sm font-bold text-right">
+                        ${(
+                          invoices.reduce((sum, inv) => sum + inv.amount, 0) /
+                          100
+                        ).toLocaleString()}
+                      </TableCell>
+                      <TableCell colSpan={3} />
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          {/* Recent Payments */}
+          {recentPayments.length > 0 && (
+            <div>
+              <h3 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50 mb-3">
+                Recent Payments
+              </h3>
+              <div className="border border-[#0A0A0A]/10">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-[#0A0A0A]/10 hover:bg-transparent">
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                        Date
+                      </TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50 text-right">
+                        Amount
+                      </TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                        Status
+                      </TableHead>
+                      <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+                        Receipt
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {recentPayments.map((p) => (
+                      <TableRow key={p.id} className="border-[#0A0A0A]/10">
+                        <TableCell className="font-mono text-xs text-[#0A0A0A]/60">
+                          {format(new Date(p.paymentDate), "MMM d, yyyy")}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm text-right">
+                          ${(p.amount / 100).toLocaleString()}
+                        </TableCell>
+                        <TableCell>
+                          <PaymentBadge status={p.status} />
+                        </TableCell>
+                        <TableCell>
+                          {p.receiptUrl ? (
+                            <a
+                              href={p.receiptUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/50 hover:text-[#0A0A0A] underline underline-offset-2"
+                            >
+                              View
+                            </a>
+                          ) : (
+                            <span className="text-[#0A0A0A]/20">{"\u2014"}</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+        </TabsContent>
+
         {/* Activity Tab */}
         <TabsContent value="activity" className="mt-6">
           {activity.length === 0 ? (
@@ -334,6 +612,72 @@ function formatCents(cents: number, currency: string) {
     style: "currency",
     currency: currency.toUpperCase(),
   }).format(amount);
+}
+
+function PaymentStatusBadge({ status }: { status: string | null }) {
+  const styles: Record<string, string> = {
+    healthy: "bg-transparent text-green-700 border-green-400",
+    at_risk: "bg-transparent text-amber-700 border-amber-400",
+    failed: "bg-transparent text-red-700 border-red-400",
+    churned: "bg-transparent text-[#0A0A0A]/30 border-[#0A0A0A]/10",
+  };
+
+  const label = status ? status.replace("_", " ") : "unknown";
+
+  return (
+    <Badge
+      variant="outline"
+      className={`font-mono text-[10px] uppercase tracking-wider rounded-none px-2 py-0.5 ${
+        styles[status ?? ""] || "bg-transparent text-[#0A0A0A]/30 border-[#0A0A0A]/10"
+      }`}
+    >
+      {label}
+    </Badge>
+  );
+}
+
+function SubscriptionStatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    active: "bg-transparent text-green-700 border-green-400",
+    past_due: "bg-transparent text-amber-700 border-amber-400",
+    cancelled: "bg-transparent text-[#0A0A0A]/30 border-[#0A0A0A]/10",
+    trialing: "bg-transparent text-blue-700 border-blue-400",
+    paused: "bg-transparent text-[#0A0A0A]/50 border-[#0A0A0A]/20",
+    incomplete: "bg-transparent text-red-700 border-red-400",
+    unpaid: "bg-transparent text-red-700 border-red-400",
+  };
+
+  return (
+    <Badge
+      variant="outline"
+      className={`font-mono text-[10px] uppercase tracking-wider rounded-none px-2 py-0.5 ${
+        styles[status] || styles.cancelled
+      }`}
+    >
+      {status.replace("_", " ")}
+    </Badge>
+  );
+}
+
+function PaymentBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    succeeded: "bg-transparent text-green-700 border-green-400",
+    failed: "bg-transparent text-red-700 border-red-400",
+    refunded: "bg-transparent text-amber-700 border-amber-400",
+    pending: "bg-transparent text-[#0A0A0A]/50 border-[#0A0A0A]/20",
+    partially_refunded: "bg-transparent text-amber-700 border-amber-400",
+  };
+
+  return (
+    <Badge
+      variant="outline"
+      className={`font-mono text-[10px] uppercase tracking-wider rounded-none px-2 py-0.5 ${
+        styles[status] || styles.pending
+      }`}
+    >
+      {status.replace("_", " ")}
+    </Badge>
+  );
 }
 
 function EmptyTab({

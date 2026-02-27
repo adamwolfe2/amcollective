@@ -1,6 +1,13 @@
 import { db } from "@/lib/db";
-import { clients, clientProjects, engagements } from "@/lib/db/schema";
-import { eq, desc, ilike, or, sql, count } from "drizzle-orm";
+import {
+  clients,
+  clientProjects,
+  engagements,
+  subscriptions,
+  payments,
+  invoices,
+} from "@/lib/db/schema";
+import { eq, desc, ilike, or, sql, count, and } from "drizzle-orm";
 import { createAuditLog } from "./audit";
 
 export type Client = typeof clients.$inferSelect;
@@ -131,4 +138,61 @@ export async function linkClientToProject(
     metadata: { clientId: data.clientId, projectId: data.projectId },
   });
   return result[0];
+}
+
+export async function getClientSubscriptions(clientId: string) {
+  return db
+    .select()
+    .from(subscriptions)
+    .where(eq(subscriptions.clientId, clientId))
+    .orderBy(desc(subscriptions.createdAt));
+}
+
+export async function getClientPayments(clientId: string, limit = 20) {
+  return db
+    .select()
+    .from(payments)
+    .where(eq(payments.clientId, clientId))
+    .orderBy(desc(payments.paymentDate))
+    .limit(limit);
+}
+
+export async function getClientBillingSummary(clientId: string) {
+  const [invoiceStats, avgDaysToPay] = await Promise.all([
+    // Total paid + total invoiced
+    db
+      .select({
+        totalPaid: sql<number>`COALESCE(SUM(CASE WHEN ${invoices.status} = 'paid' THEN ${invoices.amount} ELSE 0 END), 0)`,
+        totalInvoiced: sql<number>`COALESCE(SUM(${invoices.amount}), 0)`,
+        invoiceCount: count(),
+        paidCount: sql<number>`COALESCE(SUM(CASE WHEN ${invoices.status} = 'paid' THEN 1 ELSE 0 END), 0)`,
+        outstandingCount: sql<number>`COALESCE(SUM(CASE WHEN ${invoices.status} IN ('open', 'sent', 'overdue') THEN 1 ELSE 0 END), 0)`,
+        outstandingAmount: sql<number>`COALESCE(SUM(CASE WHEN ${invoices.status} IN ('open', 'sent', 'overdue') THEN ${invoices.amount} ELSE 0 END), 0)`,
+      })
+      .from(invoices)
+      .where(eq(invoices.clientId, clientId)),
+    // Average days to pay (paid invoices with due date)
+    db
+      .select({
+        avgDays: sql<number>`COALESCE(AVG(EXTRACT(DAY FROM (${invoices.paidAt} - ${invoices.dueDate}::timestamp))), 0)`,
+      })
+      .from(invoices)
+      .where(
+        and(
+          eq(invoices.clientId, clientId),
+          eq(invoices.status, "paid"),
+          sql`${invoices.dueDate} IS NOT NULL AND ${invoices.paidAt} IS NOT NULL`
+        )
+      ),
+  ]);
+
+  return {
+    totalPaid: Number(invoiceStats[0]?.totalPaid ?? 0),
+    totalInvoiced: Number(invoiceStats[0]?.totalInvoiced ?? 0),
+    invoiceCount: invoiceStats[0]?.invoiceCount ?? 0,
+    paidCount: Number(invoiceStats[0]?.paidCount ?? 0),
+    outstandingCount: Number(invoiceStats[0]?.outstandingCount ?? 0),
+    outstandingAmount: Number(invoiceStats[0]?.outstandingAmount ?? 0),
+    avgDaysToPay: Math.round(Number(avgDaysToPay[0]?.avgDays ?? 0)),
+  };
 }
