@@ -16,6 +16,7 @@ import {
   morningBriefing,
   clientHealthCheck,
   weeklyCostAnalysis,
+  syncStripeFull,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -29,5 +30,6 @@ export const { GET, POST, PUT } = serve({
     morningBriefing,
     clientHealthCheck,
     weeklyCostAnalysis,
+    syncStripeFull,
   ],
 });

@@ -10,3 +10,4 @@ export { embedDocuments } from "./embed-documents";
 export { morningBriefing } from "./morning-briefing";
 export { clientHealthCheck } from "./client-health-check";
 export { weeklyCostAnalysis } from "./cost-analysis";
+export { syncStripeFull } from "./sync-stripe-full";
