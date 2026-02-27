@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { sendInvoiceAction, markPaid } from "@/lib/actions/invoices";
-import { Send, CheckCircle, Eye, Copy, RotateCcw } from "lucide-react";
+import { Send, CheckCircle, Eye, Copy, RotateCcw, Download } from "lucide-react";
 
 export function InvoiceActions({
   invoiceId,
@@ -56,6 +56,18 @@ export function InvoiceActions({
         <Eye className="h-3.5 w-3.5 mr-1.5" />
         Preview
       </Button>
+
+      {/* Download PDF — available for sent, paid, overdue */}
+      {(status === "sent" || status === "paid" || status === "overdue") && (
+        <Button
+          variant="outline"
+          className="border-[#0A0A0A] rounded-none font-mono text-xs"
+          onClick={() => window.open(`/api/invoices/${invoiceId}/pdf`, "_blank")}
+        >
+          <Download className="h-3.5 w-3.5 mr-1.5" />
+          PDF
+        </Button>
+      )}
 
       {/* Draft: Send */}
       {status === "draft" && (

@@ -13,6 +13,7 @@ import { eq, and, sql, lt } from "drizzle-orm";
 import { createAlert } from "@/lib/db/repositories/alerts";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { notifySlack } from "@/lib/webhooks/slack";
+import { notifyAdmins } from "@/lib/db/repositories/notifications";
 
 export const checkOverdueInvoices = inngest.createFunction(
   {
@@ -215,6 +216,27 @@ export const checkOverdueInvoices = inngest.createFunction(
 
       return updated;
     });
+
+    // Step 4: In-app notification for admins
+    if (overdueInvoices.length > 0 || escalations.critical > 0) {
+      await step.run("notify-admins", async () => {
+        if (escalations.critical > 0) {
+          await notifyAdmins({
+            type: "invoice_overdue",
+            title: `${escalations.critical} invoice(s) critically overdue (21+ days)`,
+            message: `Total overdue: ${allOverdue.length}. ${atRiskUpdates} client(s) flagged at-risk.`,
+            link: "/invoices?status=overdue",
+          });
+        } else if (overdueInvoices.length > 0) {
+          await notifyAdmins({
+            type: "invoice_overdue",
+            title: `${overdueInvoices.length} invoice(s) newly overdue`,
+            message: `Total overdue: ${allOverdue.length}. Review and follow up.`,
+            link: "/invoices?status=overdue",
+          });
+        }
+      });
+    }
 
     return {
       success: true,

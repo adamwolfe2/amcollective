@@ -103,7 +103,7 @@ export default async function TeamMemberDetailPage({
 
         {/* Projects Tab */}
         <TabsContent value="projects" className="mt-4">
-          <div className="border border-[#0A0A0A] bg-white">
+          <div className="border border-[#0A0A0A] bg-white overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="border-[#0A0A0A]/20">
@@ -175,7 +175,7 @@ export default async function TeamMemberDetailPage({
 
         {/* Activity Tab */}
         <TabsContent value="activity" className="mt-4">
-          <div className="border border-[#0A0A0A] bg-white">
+          <div className="border border-[#0A0A0A] bg-white overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow className="border-[#0A0A0A]/20">

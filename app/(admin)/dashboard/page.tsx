@@ -149,7 +149,7 @@ async function MetricsZone() {
     const activeProjects = projects.filter((p) => p.status === "active");
 
     return (
-      <div className="lg:col-span-3 space-y-4">
+      <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-3 lg:gap-4">
         <MetricCard
           label="MRR"
           value={formatCurrency(mrrData.mrr)}
@@ -457,7 +457,7 @@ async function ActionsZone() {
 
 function MetricsZoneSkeleton() {
   return (
-    <div className="lg:col-span-3 space-y-4">
+    <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-3 lg:gap-4">
       {Array.from({ length: 6 }).map((_, i) => (
         <div key={i} className="h-24 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
       ))}

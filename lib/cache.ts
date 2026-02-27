@@ -1,4 +1,34 @@
 import { Redis } from "@upstash/redis";
+import { unstable_cache } from "next/cache";
+
+// ─── Cache Duration Constants (seconds) ──────────────────────────────────────
+
+/** Frequently changing data — 60 seconds */
+export const CACHE_SHORT = 60;
+
+/** Moderate churn data — 5 minutes */
+export const CACHE_MEDIUM = 300;
+
+/** Low churn / expensive queries — 30 minutes */
+export const CACHE_LONG = 1800;
+
+/** Near-static data — 1 hour */
+export const CACHE_STATIC = 3600;
+
+/**
+ * Create a cached version of any async function using Next.js unstable_cache.
+ * Tags are used for on-demand revalidation via revalidateTag().
+ */
+export function cached<T>(
+  fn: () => Promise<T>,
+  keyParts: string[],
+  opts: { revalidate: number; tags?: string[] }
+): () => Promise<T> {
+  return unstable_cache(fn, keyParts, {
+    revalidate: opts.revalidate,
+    tags: opts.tags,
+  });
+}
 
 // If Upstash Redis is configured, use it. Otherwise fall back to in-memory.
 const redis =

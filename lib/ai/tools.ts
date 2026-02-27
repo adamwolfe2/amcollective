@@ -17,7 +17,7 @@ import * as vercelConnector from "@/lib/connectors/vercel";
 import { searchSimilar } from "./embeddings";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, desc, sql, count } from "drizzle-orm";
+import { eq, desc, sql, count, and } from "drizzle-orm";
 import {
   VERCEL_TOOL_DEFINITIONS,
   executeVercelTool,
@@ -30,6 +30,10 @@ import {
   MERCURY_TOOL_DEFINITIONS,
   executeMercuryTool,
 } from "@/lib/mcp/mercury";
+import {
+  LINEAR_TOOL_DEFINITIONS,
+  executeLinearTool,
+} from "@/lib/mcp/linear";
 
 // ─── Tool Definitions ────────────────────────────────────────────────────────
 
@@ -138,9 +142,116 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "get_proposals",
+    description: "Get proposal pipeline status. Use when asked about pending deals, proposals, or sales pipeline.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        status: {
+          type: "string",
+          enum: ["draft", "sent", "viewed", "approved", "rejected", "expired", "all"],
+          description: "Filter by status (default: all)",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_recurring_invoices",
+    description: "List recurring billing templates and their next billing dates. Use when asked about monthly revenue, recurring clients, or upcoming billing.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        status: {
+          type: "string",
+          enum: ["active", "paused", "cancelled", "all"],
+          description: "Filter by status (default: active)",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_scorecard",
+    description: "Get the EOS scorecard — weekly metrics with targets, owners, and recent values.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        weeks: {
+          type: "number",
+          description: "Number of trailing weeks to include (default 4)",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "log_time",
+    description: "Log a time entry for a client. Use when asked to log hours or track time.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        client_id: { type: "string", description: "Client UUID" },
+        hours: { type: "number", description: "Hours worked (e.g. 1.5)" },
+        description: { type: "string", description: "What was done" },
+        date: { type: "string", description: "Date YYYY-MM-DD (default today)" },
+        billable: { type: "boolean", description: "Whether billable (default true)" },
+        hourly_rate_dollars: { type: "number", description: "Hourly rate in dollars" },
+      },
+      required: ["client_id", "hours"],
+    },
+  },
+  {
+    name: "get_unbilled_time",
+    description: "Get unbilled billable time entries grouped by client. Use when asked about billable hours or time to invoice.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        client_id: { type: "string", description: "Filter by client UUID" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "draft_email",
+    description: "Create an email draft for admin review. Use when asked to compose, write, or draft an email.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        to: { type: "string", description: "Recipient email address(es), comma-separated" },
+        subject: { type: "string", description: "Email subject line" },
+        body: { type: "string", description: "Email body in HTML" },
+        client_id: { type: "string", description: "Associated client UUID (optional)" },
+        context: { type: "string", description: "Brief note on why this email was drafted" },
+      },
+      required: ["to", "subject", "body"],
+    },
+  },
+  {
+    name: "search_sent_emails",
+    description: "Search recently sent emails. Use when asked about past communications or email history.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        limit: { type: "number", description: "Max results (default 10)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_status_summary",
+    description: "Get a comprehensive business status summary in one call. Ideal for voice interactions. Returns active projects, open invoices, pending proposals, unresolved alerts, and recent activity counts.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
   ...VERCEL_TOOL_DEFINITIONS,
   ...POSTHOG_TOOL_DEFINITIONS,
   ...MERCURY_TOOL_DEFINITIONS,
+  ...LINEAR_TOOL_DEFINITIONS,
 ];
 
 // ─── Tool Executor ───────────────────────────────────────────────────────────
@@ -274,6 +385,187 @@ export async function executeTool(
         });
       }
 
+      case "get_proposals": {
+        const pStatus = (input.status as string) || "all";
+        const pConditions = [];
+        if (pStatus !== "all") {
+          pConditions.push(
+            eq(schema.proposals.status, pStatus as "draft" | "sent" | "viewed" | "approved" | "rejected" | "expired")
+          );
+        }
+        const pResults = await db
+          .select({
+            id: schema.proposals.id,
+            proposalNumber: schema.proposals.proposalNumber,
+            title: schema.proposals.title,
+            clientName: schema.clients.name,
+            total: schema.proposals.total,
+            status: schema.proposals.status,
+            viewCount: schema.proposals.viewCount,
+          })
+          .from(schema.proposals)
+          .leftJoin(schema.clients, eq(schema.proposals.clientId, schema.clients.id))
+          .where(pConditions.length > 0 ? and(...pConditions) : undefined)
+          .orderBy(desc(schema.proposals.createdAt));
+        return JSON.stringify(pResults);
+      }
+
+      case "get_recurring_invoices": {
+        const status = (input.status as string) || "active";
+        const conditions = [];
+        if (status !== "all") {
+          conditions.push(
+            eq(schema.recurringInvoices.status, status as "active" | "paused" | "cancelled")
+          );
+        }
+        const results = await db
+          .select({
+            id: schema.recurringInvoices.id,
+            clientName: schema.clients.name,
+            interval: schema.recurringInvoices.interval,
+            total: schema.recurringInvoices.total,
+            nextBillingDate: schema.recurringInvoices.nextBillingDate,
+            status: schema.recurringInvoices.status,
+            invoicesGenerated: schema.recurringInvoices.invoicesGenerated,
+          })
+          .from(schema.recurringInvoices)
+          .leftJoin(schema.clients, eq(schema.recurringInvoices.clientId, schema.clients.id))
+          .where(conditions.length > 0 ? and(...conditions) : undefined)
+          .orderBy(schema.recurringInvoices.nextBillingDate);
+        return JSON.stringify(results);
+      }
+
+      case "get_scorecard": {
+        const { getScorecardData } = await import("@/lib/db/repositories/scorecard");
+        const data = await getScorecardData((input.weeks as number) || 4);
+        return JSON.stringify(
+          data.metrics.map(({ metric, owner }) => {
+            const entries = data.entryMap.get(metric.id);
+            const weeklyValues = data.weekDates.map((date) => {
+              const weekKey =
+                date instanceof Date
+                  ? date.toISOString().split("T")[0]
+                  : String(date);
+              const entry = entries?.get(weekKey);
+              return { week: weekKey, value: entry?.value ?? null };
+            });
+            return {
+              name: metric.name,
+              owner: owner?.name ?? "Unassigned",
+              target: metric.targetValue,
+              direction: metric.targetDirection,
+              unit: metric.unit,
+              weeklyValues,
+            };
+          })
+        );
+      }
+
+      case "log_time": {
+        const [entry] = await db
+          .insert(schema.timeEntries)
+          .values({
+            clientId: input.client_id as string,
+            date: new Date((input.date as string) || new Date().toISOString().split("T")[0]),
+            hours: String(input.hours),
+            description: (input.description as string) || null,
+            billable: (input.billable as boolean) ?? true,
+            hourlyRate: input.hourly_rate_dollars ? Math.round((input.hourly_rate_dollars as number) * 100) : null,
+            createdBy: "agent",
+          })
+          .returning();
+        return JSON.stringify({ id: entry.id, hours: entry.hours, billable: entry.billable });
+      }
+
+      case "get_unbilled_time": {
+        const utConditions = [
+          eq(schema.timeEntries.billable, true),
+          sql`${schema.timeEntries.invoiceId} IS NULL`,
+        ];
+        if (input.client_id) utConditions.push(eq(schema.timeEntries.clientId, input.client_id as string));
+
+        const utEntries = await db
+          .select({
+            clientId: schema.timeEntries.clientId,
+            clientName: schema.clients.name,
+            hours: schema.timeEntries.hours,
+            hourlyRate: schema.timeEntries.hourlyRate,
+            description: schema.timeEntries.description,
+            date: schema.timeEntries.date,
+          })
+          .from(schema.timeEntries)
+          .leftJoin(schema.clients, eq(schema.timeEntries.clientId, schema.clients.id))
+          .where(and(...utConditions))
+          .orderBy(schema.timeEntries.date);
+
+        const utGrouped = new Map<string, { clientName: string; totalHours: number; totalValueCents: number; entryCount: number }>();
+        for (const e of utEntries) {
+          if (!utGrouped.has(e.clientId)) {
+            utGrouped.set(e.clientId, { clientName: e.clientName ?? "Unknown", totalHours: 0, totalValueCents: 0, entryCount: 0 });
+          }
+          const g = utGrouped.get(e.clientId)!;
+          const h = parseFloat(e.hours);
+          g.totalHours += h;
+          g.totalValueCents += Math.round(h * (e.hourlyRate ?? 0));
+          g.entryCount++;
+        }
+        return JSON.stringify(Array.from(utGrouped.entries()).map(([id, data]) => ({ clientId: id, ...data })));
+      }
+
+      case "draft_email": {
+        const [draft] = await db
+          .insert(schema.emailDrafts)
+          .values({
+            to: input.to as string,
+            subject: input.subject as string,
+            body: input.body as string,
+            clientId: (input.client_id as string) || null,
+            context: (input.context as string) || null,
+            generatedBy: "agent",
+            createdBy: "agent",
+          })
+          .returning();
+        return JSON.stringify({ id: draft.id, status: "draft", subject: draft.subject, to: draft.to });
+      }
+
+      case "search_sent_emails": {
+        const seLimit = (input.limit as number) || 10;
+        const seResults = await db
+          .select({
+            to: schema.sentEmails.to,
+            subject: schema.sentEmails.subject,
+            clientName: schema.clients.name,
+            sentAt: schema.sentEmails.createdAt,
+          })
+          .from(schema.sentEmails)
+          .leftJoin(schema.clients, eq(schema.sentEmails.clientId, schema.clients.id))
+          .orderBy(desc(schema.sentEmails.createdAt))
+          .limit(seLimit);
+        return JSON.stringify(seResults);
+      }
+
+      case "get_status_summary": {
+        const [projectCount, openInv, pendProp, unresAlerts, unbilledT, unreadMsg] = await Promise.all([
+          getActiveProjectCount(),
+          db.select({ count: count(), total: sql<number>`COALESCE(SUM(${schema.invoices.amount}), 0)` })
+            .from(schema.invoices).where(sql`${schema.invoices.status} IN ('draft', 'sent', 'overdue')`),
+          db.select({ count: count() }).from(schema.proposals)
+            .where(sql`${schema.proposals.status} IN ('sent', 'viewed')`),
+          db.select({ count: count() }).from(schema.alerts).where(eq(schema.alerts.isResolved, false)),
+          db.select({ totalHours: sql<number>`COALESCE(SUM(${schema.timeEntries.hours}), 0)` })
+            .from(schema.timeEntries).where(and(eq(schema.timeEntries.billable, true), sql`${schema.timeEntries.invoiceId} IS NULL`)),
+          db.select({ count: count() }).from(schema.messages).where(eq(schema.messages.isRead, false)),
+        ]);
+        return JSON.stringify({
+          activeProjects: projectCount,
+          openInvoices: { count: openInv[0]?.count ?? 0, totalCents: Number(openInv[0]?.total ?? 0) },
+          pendingProposals: pendProp[0]?.count ?? 0,
+          unresolvedAlerts: unresAlerts[0]?.count ?? 0,
+          unbilledHours: Number(unbilledT[0]?.totalHours ?? 0),
+          unreadMessages: unreadMsg[0]?.count ?? 0,
+        });
+      }
+
       default: {
         // Check Vercel tools
         if (name.startsWith("list_vercel_") || name.startsWith("get_vercel_") || name.startsWith("redeploy_vercel_") || name.startsWith("check_vercel_")) {
@@ -286,6 +578,10 @@ export async function executeTool(
         // Check Mercury tools
         if (name.startsWith("get_mercury_") || name.startsWith("get_cash_") || name.startsWith("search_mercury_")) {
           return executeMercuryTool(name, input);
+        }
+        // Check Linear tools
+        if (name.startsWith("get_linear_")) {
+          return executeLinearTool(name, input);
         }
         return JSON.stringify({ error: `Unknown tool: ${name}` });
       }

@@ -1,5 +1,8 @@
 import { format } from "date-fns";
 import { getScorecardData } from "@/lib/db/repositories/scorecard";
+import { getTeam } from "@/lib/db/repositories/team";
+import { AddMetricDialog } from "./add-metric-dialog";
+import { ScorecardCell } from "./scorecard-cell";
 
 function getValueColor(
   value: number,
@@ -32,25 +35,39 @@ function getDirectionArrow(direction: string): string {
 }
 
 export default async function ScorecardPage() {
-  const { metrics, weekDates, entryMap } = await getScorecardData(13);
+  const [{ metrics, weekDates, entryMap }, teamMembers] = await Promise.all([
+    getScorecardData(13),
+    getTeam(),
+  ]);
+
+  const teamForDialog = teamMembers.map((m) => ({
+    id: m.id,
+    name: m.name,
+  }));
 
   return (
     <div>
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold font-serif tracking-tight">
-          Scorecard
-        </h1>
-        <p className="text-xs font-mono uppercase tracking-wider text-[#0A0A0A]/40 mt-1">
-          13 Weeks
-        </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold font-serif tracking-tight">
+            Scorecard
+          </h1>
+          <p className="text-xs font-mono uppercase tracking-wider text-[#0A0A0A]/40 mt-1">
+            13-Week Trailing / Click any cell to edit
+          </p>
+        </div>
+        <AddMetricDialog teamMembers={teamForDialog} />
       </div>
 
       {/* Empty State */}
       {metrics.length === 0 ? (
         <div className="border border-[#0A0A0A]/10 bg-white p-12 text-center">
-          <p className="font-serif text-[#0A0A0A]/60">
+          <p className="font-serif text-[#0A0A0A]/60 mb-4">
             No scorecard metrics defined yet.
+          </p>
+          <p className="font-mono text-xs text-[#0A0A0A]/40">
+            Add your first metric to start tracking weekly numbers.
           </p>
         </div>
       ) : (
@@ -94,6 +111,11 @@ export default async function ScorecardPage() {
                       <div className="font-medium">{metric.name}</div>
                       <div className="text-xs text-[#0A0A0A]/40 mt-0.5">
                         {owner?.name ?? "Unassigned"}
+                        {metric.unit && (
+                          <span className="ml-1 text-[#0A0A0A]/30">
+                            ({metric.unit})
+                          </span>
+                        )}
                       </div>
                     </td>
 
@@ -103,14 +125,13 @@ export default async function ScorecardPage() {
                         <span>
                           {getDirectionArrow(metric.targetDirection!)}{" "}
                           {metric.targetValue}
-                          {metric.unit ? ` ${metric.unit}` : ""}
                         </span>
                       ) : (
                         <span className="text-[#0A0A0A]/20">&mdash;</span>
                       )}
                     </td>
 
-                    {/* Week cells */}
+                    {/* Week cells — clickable inline editing */}
                     {weekDates.map((date) => {
                       const weekKey =
                         date instanceof Date
@@ -138,17 +159,13 @@ export default async function ScorecardPage() {
                       }
 
                       return (
-                        <td
+                        <ScorecardCell
                           key={weekKey}
-                          className={`font-mono text-sm px-3 py-3 border-b border-[#0A0A0A]/5 text-center ${colorClass}`}
-                          title={entry?.notes ?? undefined}
-                        >
-                          {displayValue ?? (
-                            <span className="text-[#0A0A0A]/15">
-                              &mdash;
-                            </span>
-                          )}
-                        </td>
+                          metricId={metric.id}
+                          weekStart={weekKey}
+                          value={displayValue}
+                          colorClass={colorClass}
+                        />
                       );
                     })}
                   </tr>

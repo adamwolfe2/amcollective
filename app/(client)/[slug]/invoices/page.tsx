@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { format } from "date-fns";
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { getClientByClerkId } from "@/lib/db/repositories/clients";
 import { getClientInvoices } from "@/lib/db/repositories/invoices";
 import { Badge } from "@/components/ui/badge";
+import { Download } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -13,7 +15,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export default async function ClientInvoicesPage() {
+export default async function ClientInvoicesPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const { slug } = await params;
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
@@ -97,7 +104,12 @@ export default async function ClientInvoicesPage() {
                     className="border-[#0A0A0A]/10"
                   >
                     <TableCell className="font-mono text-sm font-medium text-[#0A0A0A]">
-                      {inv.number || "\u2014"}
+                      <Link
+                        href={`/${slug}/invoices/${inv.id}`}
+                        className="underline underline-offset-2 hover:text-[#0A0A0A]/70"
+                      >
+                        {inv.number || "\u2014"}
+                      </Link>
                     </TableCell>
                     <TableCell className="font-mono text-sm text-[#0A0A0A]/70">
                       ${(inv.amount / 100).toLocaleString("en-US", {
@@ -138,7 +150,16 @@ export default async function ClientInvoicesPage() {
                           Receipt
                         </a>
                       )}
-                      {!isPayable && !isPaid && (
+                      {(inv.status === "sent" || inv.status === "paid" || inv.status === "overdue") && (
+                        <a
+                          href={`/api/invoices/${inv.id}/pdf`}
+                          className="inline-flex items-center border border-[#0A0A0A]/20 text-[#0A0A0A]/60 px-2 py-1 font-mono text-[10px] uppercase tracking-wider hover:bg-[#0A0A0A]/5 transition-colors"
+                        >
+                          <Download className="h-3 w-3 mr-1" />
+                          PDF
+                        </a>
+                      )}
+                      {!isPayable && !isPaid && inv.status !== "sent" && inv.status !== "overdue" && (
                         <span className="text-[#0A0A0A]/20 font-mono text-[10px]">
                           {"\u2014"}
                         </span>

@@ -7,6 +7,7 @@ import {
   BarChart3,
   Receipt,
   FolderKanban,
+  FileCheck,
 } from "lucide-react";
 
 export default async function ClientPortalPage({
@@ -42,6 +43,11 @@ export default async function ClientPortalPage({
   ];
 
   const quickLinks = [
+    {
+      label: "View Proposals",
+      href: `/${slug}/proposals`,
+      icon: FileCheck,
+    },
     {
       label: "View Messages",
       href: `/${slug}/messages`,

@@ -22,18 +22,27 @@ const MEMBER_ROLES = ["owner", "admin", "member"] as const;
 
 /**
  * Super admin emails — these users ALWAYS get "owner" role.
- * This is the single source of truth for who owns everything.
+ * Configurable via SUPER_ADMIN_EMAILS env var (comma-separated).
+ * Falls back to hardcoded defaults if not set.
  */
-export const SUPER_ADMIN_EMAILS = [
+const DEFAULT_ADMIN_EMAILS = [
   "adamwolfe102@gmail.com",
-] as const;
+  "maggie@amcollectivecapital.com",
+];
+
+export const SUPER_ADMIN_EMAILS: readonly string[] = (
+  process.env.SUPER_ADMIN_EMAILS || DEFAULT_ADMIN_EMAILS.join(",")
+)
+  .split(",")
+  .map((e) => e.trim().toLowerCase())
+  .filter(Boolean);
 
 /**
  * Check if an email is a super admin.
  */
 export function isSuperAdmin(email: string | null | undefined): boolean {
   if (!email) return false;
-  return SUPER_ADMIN_EMAILS.includes(email.toLowerCase() as typeof SUPER_ADMIN_EMAILS[number]);
+  return SUPER_ADMIN_EMAILS.includes(email.toLowerCase());
 }
 
 /**

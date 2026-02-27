@@ -28,6 +28,7 @@ import {
   FileText,
   Search,
 } from "lucide-react";
+import { NotificationBell } from "@/components/notification-bell";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -66,7 +67,7 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             key={item.href}
             href={item.href}
             onClick={onNavigate}
-            className={`flex items-center gap-3 px-3 py-2.5 text-sm font-medium transition-colors ${
+            className={`flex items-center gap-3 px-3 py-3 md:py-2.5 text-sm font-medium transition-colors ${
               isActive
                 ? "bg-white/10 text-white"
                 : "text-white/50 hover:bg-white/[0.06] hover:text-white/80"
@@ -163,6 +164,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                 Cmd+K
               </span>
             </button>
+            <NotificationBell />
             <UserButton
               appearance={{
                 elements: {
@@ -172,7 +174,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             />
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6 bg-[#F3F3EF]">{children}</main>
+        <main className="flex-1 p-4 md:p-6 pb-safe bg-[#F3F3EF]">{children}</main>
       </div>
     </div>
   );

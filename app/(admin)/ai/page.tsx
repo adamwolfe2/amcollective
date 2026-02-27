@@ -16,6 +16,7 @@ import {
   Wrench,
   Square,
   Search,
+  Download,
 } from "lucide-react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -413,6 +414,17 @@ export default function AiPage() {
               <Search className="w-3 h-3" />
               Research
             </button>
+            {activeConvId && (
+              <a
+                href={`/api/ai/conversations/${activeConvId}/export`}
+                download
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono border border-[#0A0A0A]/20 bg-white text-[#0A0A0A] hover:border-[#0A0A0A] transition-colors"
+                title="Export conversation as markdown"
+              >
+                <Download className="w-3 h-3" />
+                Export
+              </a>
+            )}
           </div>
         </div>
 

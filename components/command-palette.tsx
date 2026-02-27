@@ -23,6 +23,8 @@ import {
   Upload,
   RefreshCw,
   Search,
+  Receipt,
+  Sparkles,
 } from "lucide-react";
 
 const PAGES = [
@@ -116,6 +118,10 @@ export function CommandPalette() {
         return <FileText className="h-4 w-4 text-[#0A0A0A]/40" />;
       case "project":
         return <FolderKanban className="h-4 w-4 text-[#0A0A0A]/40" />;
+      case "invoice":
+        return <Receipt className="h-4 w-4 text-[#0A0A0A]/40" />;
+      case "semantic":
+        return <Sparkles className="h-4 w-4 text-[#0A0A0A]/40" />;
       default:
         return <Search className="h-4 w-4 text-[#0A0A0A]/40" />;
     }

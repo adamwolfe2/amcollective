@@ -12,7 +12,7 @@ import * as stripeConnector from "@/lib/connectors/stripe";
 import { checkAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, and, gte, desc, sql } from "drizzle-orm";
+import { eq, and, gte, desc, sql, count } from "drizzle-orm";
 import { captureError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -41,6 +41,23 @@ interface FinanceSummary {
   runway: number | null;
   monthlySpend: number;
   calculatedAt: string;
+}
+
+async function getChurnedThisMonth(): Promise<number> {
+  const monthStart = new Date();
+  monthStart.setDate(1);
+  monthStart.setHours(0, 0, 0, 0);
+
+  const [result] = await db
+    .select({ value: count() })
+    .from(schema.subscriptions)
+    .where(
+      and(
+        eq(schema.subscriptions.status, "cancelled"),
+        gte(schema.subscriptions.cancelledAt, monthStart)
+      )
+    );
+  return result?.value ?? 0;
 }
 
 async function buildSummary(): Promise<FinanceSummary> {
@@ -127,7 +144,7 @@ async function buildSummary(): Promise<FinanceSummary> {
       arr: (mrr * 12) / 100,
       activeSubscriptions: activeSubs,
       failedPayments,
-      churnedThisMonth: 0, // TODO: implement churn tracking
+      churnedThisMonth: await getChurnedThisMonth(),
     },
     runway,
     monthlySpend,

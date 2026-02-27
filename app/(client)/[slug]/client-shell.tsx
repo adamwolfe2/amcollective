@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Columns3,
   FileText,
+  FileCheck,
   Menu,
   X,
 } from "lucide-react";
@@ -23,6 +24,7 @@ function useClientNav() {
     { label: "Dashboard", href: `/${slug}/dashboard`, icon: LayoutDashboard },
     { label: "Projects", href: `/${slug}/projects`, icon: FolderKanban },
     { label: "Board", href: `/${slug}/board`, icon: Columns3 },
+    { label: "Proposals", href: `/${slug}/proposals`, icon: FileCheck },
     { label: "Documents", href: `/${slug}/documents`, icon: FileText },
     { label: "Invoices", href: `/${slug}/invoices`, icon: Receipt },
     { label: "Reports", href: `/${slug}/reports`, icon: BarChart3 },

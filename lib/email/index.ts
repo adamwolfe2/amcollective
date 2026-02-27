@@ -10,7 +10,7 @@ function getResend() {
   return new Resend(process.env.RESEND_API_KEY);
 }
 
-const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "orders@truffleboys.com";
+const FROM_EMAIL = process.env.RESEND_FROM_EMAIL || "team@amcollectivecapital.com";
 const APP_URL = getSiteUrl();
 const OPS_NAME = process.env.OPS_NAME || "our team";
 
@@ -956,7 +956,7 @@ export async function sendLowStockAlert(
 ) {
   const r = getResend();
   if (!r) return null;
-  const from = process.env.RESEND_FROM_EMAIL || "orders@truffleboys.com";
+  const from = process.env.RESEND_FROM_EMAIL || "team@amcollectivecapital.com";
   const to = process.env.OPS_NOTIFICATION_EMAIL || from;
 
   const itemRowsHtml = items

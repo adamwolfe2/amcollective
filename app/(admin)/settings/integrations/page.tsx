@@ -65,6 +65,11 @@ function getIntegrations(): Integration[] {
       description: "Background jobs, cron tasks, webhook processing, and retry logic.",
       connected: !!process.env.INNGEST_EVENT_KEY,
     },
+    {
+      name: "Linear",
+      description: "Issue tracking, project management, and sprint cycle management.",
+      connected: !!process.env.LINEAR_API_KEY,
+    },
   ];
 }
 

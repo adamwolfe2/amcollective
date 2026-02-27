@@ -22,6 +22,11 @@ import {
   syncPosthogAnalytics,
   syncMercury,
   snapshotDailyMetrics,
+  invoiceReminders,
+  weeklyReport,
+  generateRecurringInvoices,
+  weeklyIntelligence,
+  deliverWebhooks,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -41,5 +46,10 @@ export const { GET, POST, PUT } = serve({
     syncPosthogAnalytics,
     syncMercury,
     snapshotDailyMetrics,
+    invoiceReminders,
+    weeklyReport,
+    generateRecurringInvoices,
+    weeklyIntelligence,
+    deliverWebhooks,
   ],
 });

@@ -15,6 +15,7 @@ export const syncStripeFull = inngest.createFunction(
   {
     id: "sync-stripe-full",
     name: "Full Stripe Data Sync",
+    retries: 3,
     onFailure: async ({ error }) => {
       captureError(error, {
         tags: { source: "inngest", job: "sync-stripe-full" },

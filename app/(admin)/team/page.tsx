@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getTeam } from "@/lib/db/repositories/team";
 import { format } from "date-fns";
+import { Shield } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -10,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { AddMemberDialog } from "./add-member-dialog";
+import { SUPER_ADMIN_EMAILS } from "@/lib/auth";
 
 export default async function TeamPage() {
   const members = await getTeam();
@@ -21,7 +23,30 @@ export default async function TeamPage() {
         <AddMemberDialog />
       </div>
 
-      <div className="border border-[#0A0A0A] bg-white">
+      {/* Admin Access Panel */}
+      <div className="border border-[#0A0A0A]/10 bg-white p-4 mb-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Shield className="h-4 w-4 text-[#0A0A0A]/60" />
+          <h2 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
+            Platform Admins
+          </h2>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {SUPER_ADMIN_EMAILS.map((email) => (
+            <span
+              key={email}
+              className="inline-flex items-center px-2.5 py-1 text-xs font-mono border border-[#0A0A0A] bg-[#0A0A0A] text-white"
+            >
+              {email}
+            </span>
+          ))}
+        </div>
+        <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-2">
+          Configured via SUPER_ADMIN_EMAILS environment variable.
+        </p>
+      </div>
+
+      <div className="border border-[#0A0A0A] bg-white overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="border-[#0A0A0A]/20">

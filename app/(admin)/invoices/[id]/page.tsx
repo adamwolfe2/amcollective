@@ -161,7 +161,7 @@ export default async function InvoiceDetailPage({
       <h2 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50 mb-3">
         Line Items
       </h2>
-      <div className="border border-[#0A0A0A] bg-white">
+      <div className="border border-[#0A0A0A] bg-white overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="border-[#0A0A0A]/20">

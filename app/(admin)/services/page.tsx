@@ -31,7 +31,7 @@ export default async function ServicesPage() {
         <AddServiceDialog />
       </div>
 
-      <div className="border border-[#0A0A0A] bg-white">
+      <div className="border border-[#0A0A0A] bg-white overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow className="border-[#0A0A0A]/20">

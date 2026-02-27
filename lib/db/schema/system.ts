@@ -5,6 +5,7 @@ import {
   text,
   boolean,
   timestamp,
+  integer,
   index,
   jsonb,
   date,
@@ -19,6 +20,19 @@ export const actorTypeEnum = pgEnum("actor_type", [
   "user",
   "system",
   "agent",
+]);
+
+export const notificationTypeEnum = pgEnum("notification_type", [
+  "invoice_paid",
+  "invoice_overdue",
+  "client_onboarded",
+  "system_alert",
+  "report_ready",
+  "task_assigned",
+  "health_warning",
+  "churn_alert",
+  "cost_anomaly",
+  "general",
 ]);
 
 export const sslStatusEnum = pgEnum("ssl_status", [
@@ -75,6 +89,31 @@ export const webhookRegistrations = pgTable(
   ]
 );
 
+export const webhookDeliveries = pgTable(
+  "webhook_deliveries",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    registrationId: uuid("registration_id")
+      .notNull()
+      .references(() => webhookRegistrations.id, { onDelete: "cascade" }),
+    eventType: varchar("event_type", { length: 255 }).notNull(),
+    payload: jsonb("payload").notNull(),
+    signature: varchar("signature", { length: 255 }),
+    httpStatus: integer("http_status"),
+    responseBody: text("response_body"),
+    error: text("error"),
+    attempts: integer("attempts").notNull().default(0),
+    succeededAt: timestamp("succeeded_at", { mode: "date" }),
+    failedAt: timestamp("failed_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("webhook_deliveries_registration_id_idx").on(table.registrationId),
+    index("webhook_deliveries_event_type_idx").on(table.eventType),
+    index("webhook_deliveries_created_at_idx").on(table.createdAt),
+  ]
+);
+
 export const domains = pgTable(
   "domains",
   {
@@ -120,14 +159,48 @@ export const webhookEvents = pgTable(
   ]
 );
 
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: varchar("user_id", { length: 255 }).notNull(), // Clerk user ID
+    type: notificationTypeEnum("type").default("general").notNull(),
+    title: varchar("title", { length: 500 }).notNull(),
+    message: text("message"),
+    link: varchar("link", { length: 1000 }), // optional URL to navigate to
+    isRead: boolean("is_read").default(false).notNull(),
+    readAt: timestamp("read_at", { mode: "date" }),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("notifications_user_id_idx").on(table.userId),
+    index("notifications_is_read_idx").on(table.isRead),
+    index("notifications_type_idx").on(table.type),
+    index("notifications_created_at_idx").on(table.createdAt),
+    index("notifications_user_unread_idx").on(table.userId, table.isRead),
+  ]
+);
+
 // ─── Relations ──────────────────────────────────────────────────────────────
 
 export const webhookRegistrationsRelations = relations(
   webhookRegistrations,
-  ({ one }) => ({
+  ({ one, many }) => ({
     project: one(portfolioProjects, {
       fields: [webhookRegistrations.projectId],
       references: [portfolioProjects.id],
+    }),
+    deliveries: many(webhookDeliveries),
+  })
+);
+
+export const webhookDeliveriesRelations = relations(
+  webhookDeliveries,
+  ({ one }) => ({
+    registration: one(webhookRegistrations, {
+      fields: [webhookDeliveries.registrationId],
+      references: [webhookRegistrations.id],
     }),
   })
 );

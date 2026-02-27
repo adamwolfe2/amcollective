@@ -13,6 +13,7 @@ import { getClients, getClient } from "@/lib/db/repositories/clients";
 import { getActiveProjectCount } from "@/lib/db/repositories/projects";
 import { getAlerts } from "@/lib/db/repositories/alerts";
 import { getRocks } from "@/lib/db/repositories/rocks";
+import { getScorecardData } from "@/lib/db/repositories/scorecard";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { searchSimilar } from "./embeddings";
@@ -21,6 +22,7 @@ import * as schema from "@/lib/db/schema";
 import { eq, desc, sql, count, and, gte, lte, isNotNull } from "drizzle-orm";
 import * as mercuryConnector from "@/lib/connectors/mercury";
 import * as posthogConnector from "@/lib/connectors/posthog";
+import * as linearConnector from "@/lib/connectors/linear";
 
 // ─── Helper Functions ─────────────────────────────────────────────────────────
 
@@ -267,6 +269,317 @@ export const coreTools = {
         totalInvoices: total?.count ?? 0,
         openInvoices: open[0]?.count ?? 0,
         outstandingCents: open[0]?.total ?? 0,
+      };
+    },
+  }),
+
+  get_proposals: tool({
+    description:
+      "Get proposal pipeline status. Use when asked about pending deals, proposals, or sales pipeline.",
+    inputSchema: z.object({
+      status: z
+        .enum([
+          "draft",
+          "sent",
+          "viewed",
+          "approved",
+          "rejected",
+          "expired",
+          "all",
+        ])
+        .optional()
+        .default("all"),
+    }),
+    execute: async ({ status }) => {
+      const conditions = [];
+      if (status !== "all") {
+        conditions.push(
+          eq(
+            schema.proposals.status,
+            status as
+              | "draft"
+              | "sent"
+              | "viewed"
+              | "approved"
+              | "rejected"
+              | "expired"
+          )
+        );
+      }
+      const results = await db
+        .select({
+          id: schema.proposals.id,
+          proposalNumber: schema.proposals.proposalNumber,
+          title: schema.proposals.title,
+          clientName: schema.clients.name,
+          total: schema.proposals.total,
+          status: schema.proposals.status,
+          viewCount: schema.proposals.viewCount,
+          validUntil: schema.proposals.validUntil,
+          sentAt: schema.proposals.sentAt,
+          approvedAt: schema.proposals.approvedAt,
+        })
+        .from(schema.proposals)
+        .leftJoin(
+          schema.clients,
+          eq(schema.proposals.clientId, schema.clients.id)
+        )
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(desc(schema.proposals.createdAt));
+      return results;
+    },
+  }),
+
+  get_recurring_invoices: tool({
+    description:
+      "List recurring billing templates and their next billing dates. Use when asked about monthly revenue, recurring clients, or upcoming billing.",
+    inputSchema: z.object({
+      status: z
+        .enum(["active", "paused", "cancelled", "all"])
+        .optional()
+        .default("active"),
+    }),
+    execute: async ({ status }) => {
+      const conditions = [];
+      if (status !== "all") {
+        conditions.push(
+          eq(
+            schema.recurringInvoices.status,
+            status as "active" | "paused" | "cancelled"
+          )
+        );
+      }
+      const results = await db
+        .select({
+          id: schema.recurringInvoices.id,
+          clientName: schema.clients.name,
+          interval: schema.recurringInvoices.interval,
+          total: schema.recurringInvoices.total,
+          nextBillingDate: schema.recurringInvoices.nextBillingDate,
+          status: schema.recurringInvoices.status,
+          invoicesGenerated: schema.recurringInvoices.invoicesGenerated,
+        })
+        .from(schema.recurringInvoices)
+        .leftJoin(
+          schema.clients,
+          eq(schema.recurringInvoices.clientId, schema.clients.id)
+        )
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
+        .orderBy(schema.recurringInvoices.nextBillingDate);
+      return results;
+    },
+  }),
+
+  get_scorecard: tool({
+    description:
+      "Get the EOS scorecard — weekly metrics tracking. Returns metrics with their target, owner, and recent weekly values.",
+    inputSchema: z.object({
+      weeks: z.number().optional().describe("Number of trailing weeks (default 4)"),
+    }),
+    execute: async ({ weeks }) => {
+      const data = await getScorecardData(weeks ?? 4);
+      return data.metrics.map(({ metric, owner }) => {
+        const entries = data.entryMap.get(metric.id);
+        const weeklyValues = data.weekDates.map((date) => {
+          const weekKey =
+            date instanceof Date
+              ? date.toISOString().split("T")[0]
+              : String(date);
+          const entry = entries?.get(weekKey);
+          return { week: weekKey, value: entry?.value ?? null };
+        });
+        return {
+          name: metric.name,
+          owner: owner?.name ?? "Unassigned",
+          target: metric.targetValue,
+          direction: metric.targetDirection,
+          unit: metric.unit,
+          weeklyValues,
+        };
+      });
+    },
+  }),
+
+  log_time: tool({
+    description:
+      "Log a time entry for a client. Returns the created entry. Use when asked to log hours or track time.",
+    inputSchema: z.object({
+      client_id: z.string().describe("Client UUID"),
+      hours: z.number().describe("Hours worked (e.g. 1.5)"),
+      description: z.string().optional().describe("What was done"),
+      date: z.string().optional().describe("Date in YYYY-MM-DD format (default today)"),
+      billable: z.boolean().optional().describe("Whether the time is billable (default true)"),
+      hourly_rate_dollars: z.number().optional().describe("Hourly rate in dollars (e.g. 150)"),
+    }),
+    execute: async ({ client_id, hours, description, date, billable, hourly_rate_dollars }) => {
+      const [entry] = await db
+        .insert(schema.timeEntries)
+        .values({
+          clientId: client_id,
+          date: new Date(date || new Date().toISOString().split("T")[0]),
+          hours: String(hours),
+          description: description || null,
+          billable: billable ?? true,
+          hourlyRate: hourly_rate_dollars ? Math.round(hourly_rate_dollars * 100) : null,
+          createdBy: "agent",
+        })
+        .returning();
+      return { id: entry.id, hours, description: entry.description, billable: entry.billable };
+    },
+  }),
+
+  get_unbilled_time: tool({
+    description:
+      "Get unbilled billable time entries, optionally filtered by client. Returns hours and value grouped by client.",
+    inputSchema: z.object({
+      client_id: z.string().optional().describe("Filter by client UUID"),
+    }),
+    execute: async ({ client_id }) => {
+      const conditions = [
+        eq(schema.timeEntries.billable, true),
+        sql`${schema.timeEntries.invoiceId} IS NULL`,
+      ];
+      if (client_id) conditions.push(eq(schema.timeEntries.clientId, client_id));
+
+      const entries = await db
+        .select({
+          clientId: schema.timeEntries.clientId,
+          clientName: schema.clients.name,
+          hours: schema.timeEntries.hours,
+          hourlyRate: schema.timeEntries.hourlyRate,
+          description: schema.timeEntries.description,
+          date: schema.timeEntries.date,
+        })
+        .from(schema.timeEntries)
+        .leftJoin(schema.clients, eq(schema.timeEntries.clientId, schema.clients.id))
+        .where(and(...conditions))
+        .orderBy(schema.timeEntries.date);
+
+      // Group by client
+      const grouped = new Map<string, { clientName: string; totalHours: number; totalValueCents: number; entries: { date: Date; hours: string; description: string | null }[] }>();
+      for (const e of entries) {
+        if (!grouped.has(e.clientId)) {
+          grouped.set(e.clientId, { clientName: e.clientName ?? "Unknown", totalHours: 0, totalValueCents: 0, entries: [] });
+        }
+        const g = grouped.get(e.clientId)!;
+        const h = parseFloat(e.hours);
+        g.totalHours += h;
+        g.totalValueCents += Math.round(h * (e.hourlyRate ?? 0));
+        g.entries.push({ date: e.date, hours: e.hours, description: e.description });
+      }
+      return Array.from(grouped.entries()).map(([id, data]) => ({ clientId: id, ...data }));
+    },
+  }),
+
+  draft_email: tool({
+    description:
+      "Create an email draft for admin review. Use when asked to compose, write, or draft an email.",
+    inputSchema: z.object({
+      to: z.string().describe("Recipient email address(es), comma-separated"),
+      subject: z.string().describe("Email subject line"),
+      body: z.string().describe("Email body in HTML"),
+      client_id: z.string().optional().describe("Associated client UUID"),
+      context: z.string().optional().describe("Why this email was drafted"),
+    }),
+    execute: async ({ to, subject, body, client_id, context }) => {
+      const [draft] = await db
+        .insert(schema.emailDrafts)
+        .values({
+          to,
+          subject,
+          body,
+          clientId: client_id || null,
+          context: context || null,
+          generatedBy: "agent",
+          createdBy: "agent",
+        })
+        .returning();
+      return { id: draft.id, status: "draft", subject: draft.subject, to: draft.to };
+    },
+  }),
+
+  search_sent_emails: tool({
+    description:
+      "Search recently sent emails. Use when asked about past communications or email history.",
+    inputSchema: z.object({
+      limit: z.number().optional().describe("Max results (default 10)"),
+    }),
+    execute: async ({ limit: seLimit }) => {
+      const results = await db
+        .select({
+          to: schema.sentEmails.to,
+          subject: schema.sentEmails.subject,
+          clientName: schema.clients.name,
+          sentAt: schema.sentEmails.createdAt,
+        })
+        .from(schema.sentEmails)
+        .leftJoin(schema.clients, eq(schema.sentEmails.clientId, schema.clients.id))
+        .orderBy(desc(schema.sentEmails.createdAt))
+        .limit(seLimit ?? 10);
+      return results;
+    },
+  }),
+
+  get_status_summary: tool({
+    description:
+      "Get a comprehensive business status summary in one call. Ideal for voice interactions. Returns active projects, open invoices, pending proposals, unresolved alerts, and recent activity counts.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      const [
+        projectCount,
+        openInvoiceStats,
+        pendingProposals,
+        unresolvedAlerts,
+        unbilledTime,
+        recentMessages,
+      ] = await Promise.all([
+        getActiveProjectCount(),
+        db
+          .select({
+            count: count(),
+            totalCents: sql<number>`COALESCE(SUM(${schema.invoices.amount}), 0)`,
+          })
+          .from(schema.invoices)
+          .where(
+            sql`${schema.invoices.status} IN ('draft', 'sent', 'overdue')`
+          ),
+        db
+          .select({ count: count() })
+          .from(schema.proposals)
+          .where(
+            sql`${schema.proposals.status} IN ('sent', 'viewed')`
+          ),
+        db
+          .select({ count: count() })
+          .from(schema.alerts)
+          .where(eq(schema.alerts.isResolved, false)),
+        db
+          .select({
+            totalHours: sql<number>`COALESCE(SUM(${schema.timeEntries.hours}), 0)`,
+          })
+          .from(schema.timeEntries)
+          .where(
+            and(
+              eq(schema.timeEntries.billable, true),
+              sql`${schema.timeEntries.invoiceId} IS NULL`
+            )
+          ),
+        db
+          .select({ count: count() })
+          .from(schema.messages)
+          .where(eq(schema.messages.isRead, false)),
+      ]);
+
+      return {
+        activeProjects: projectCount,
+        openInvoices: {
+          count: openInvoiceStats[0]?.count ?? 0,
+          totalCents: Number(openInvoiceStats[0]?.totalCents ?? 0),
+        },
+        pendingProposals: pendingProposals[0]?.count ?? 0,
+        unresolvedAlerts: unresolvedAlerts[0]?.count ?? 0,
+        unbilledHours: Number(unbilledTime[0]?.totalHours ?? 0),
+        unreadMessages: recentMessages[0]?.count ?? 0,
       };
     },
   }),
@@ -849,6 +1162,89 @@ export const mercuryTools = {
   }),
 };
 
+// ─── Linear Tools ─────────────────────────────────────────────────────────────
+
+export const linearTools = {
+  get_linear_issues: tool({
+    description:
+      "Search and filter Linear issues by team or status. Use to answer questions about what is in progress, blocked, or due soon.",
+    inputSchema: z.object({
+      teamId: z.string().optional().describe("Filter by team ID"),
+      stateTypes: z
+        .array(
+          z.enum([
+            "triage",
+            "backlog",
+            "unstarted",
+            "started",
+            "completed",
+            "cancelled",
+          ])
+        )
+        .optional()
+        .describe("Filter by issue state types"),
+      limit: z.number().optional().describe("Max results (default 15)"),
+    }),
+    execute: async ({ teamId, stateTypes, limit: lim }) => {
+      if (!linearConnector.isLinearConfigured())
+        return { error: "Linear not configured" };
+      return linearConnector.getIssues({
+        teamId,
+        stateTypes,
+        limit: lim ?? 15,
+      });
+    },
+  }),
+
+  get_linear_my_issues: tool({
+    description:
+      "Get issues assigned to the current Linear user that are active or unstarted.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      if (!linearConnector.isLinearConfigured())
+        return { error: "Linear not configured" };
+      return linearConnector.getMyIssues();
+    },
+  }),
+
+  get_linear_cycle: tool({
+    description:
+      "Get the active sprint/cycle for a Linear team, including progress and issue counts.",
+    inputSchema: z.object({
+      teamId: z.string().describe("The Linear team ID"),
+    }),
+    execute: async ({ teamId }) => {
+      if (!linearConnector.isLinearConfigured())
+        return { error: "Linear not configured" };
+      return linearConnector.getActiveCycle(teamId);
+    },
+  }),
+
+  get_linear_projects: tool({
+    description:
+      "Get Linear projects and their progress. Use when asked about project status, timelines, or roadmap.",
+    inputSchema: z.object({
+      teamId: z.string().optional().describe("Optional team ID filter"),
+    }),
+    execute: async ({ teamId }) => {
+      if (!linearConnector.isLinearConfigured())
+        return { error: "Linear not configured" };
+      return linearConnector.getProjects(teamId);
+    },
+  }),
+
+  get_linear_teams: tool({
+    description:
+      "List all Linear teams. Use to discover team IDs for other Linear tools.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      if (!linearConnector.isLinearConfigured())
+        return { error: "Linear not configured" };
+      return linearConnector.getTeams();
+    },
+  }),
+};
+
 // ─── All Tools Combined ───────────────────────────────────────────────────────
 
 export const allTools = {
@@ -856,4 +1252,5 @@ export const allTools = {
   ...vercelTools,
   ...posthogTools,
   ...mercuryTools,
+  ...linearTools,
 };

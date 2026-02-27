@@ -74,7 +74,9 @@ export const invoices = pgTable(
     pdfUrl: varchar("pdf_url", { length: 500 }),
     lineItems: jsonb("line_items"), // [{description, quantity, unitPrice}]
     reminderCount: integer("reminder_count").default(0).notNull(),
+    lastReminderAt: timestamp("last_reminder_at", { mode: "date" }),
     notes: text("notes"),
+    recurringInvoiceId: uuid("recurring_invoice_id"), // links back to recurring template
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -86,6 +88,8 @@ export const invoices = pgTable(
     index("invoices_client_id_idx").on(table.clientId),
     index("invoices_status_idx").on(table.status),
     index("invoices_created_at_idx").on(table.createdAt),
+    index("invoices_due_date_idx").on(table.dueDate),
+    index("invoices_paid_at_idx").on(table.paidAt),
     uniqueIndex("invoices_stripe_invoice_id_idx").on(table.stripeInvoiceId),
   ]
 );
@@ -119,6 +123,7 @@ export const subscriptions = pgTable(
       table.stripeSubscriptionId
     ),
     index("subscriptions_status_idx").on(table.status),
+    index("subscriptions_cancelled_at_idx").on(table.cancelledAt),
   ]
 );
 
