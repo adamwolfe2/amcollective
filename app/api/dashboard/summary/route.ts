@@ -12,7 +12,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, desc, and, sql, count, gte, lte } from "drizzle-orm";
+import { eq, desc, and, sql, count, gte, lte, asc } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 
 export async function GET() {
@@ -229,14 +229,35 @@ export async function GET() {
 
   const activeProjects = projects.filter((p) => p.status === "active");
 
+  // Compute deltas from daily snapshots (compare today vs 7 days ago)
+  const sevenDaySnapshots = await db
+    .select()
+    .from(schema.dailyMetricsSnapshots)
+    .where(gte(schema.dailyMetricsSnapshots.date, sevenDaysAgo))
+    .orderBy(asc(schema.dailyMetricsSnapshots.date))
+    .limit(2);
+
+  let mrrChange: number | null = null;
+  let cashChange: number | null = null;
+  if (sevenDaySnapshots.length >= 2) {
+    const oldest = sevenDaySnapshots[0];
+    const newest = sevenDaySnapshots[sevenDaySnapshots.length - 1];
+    if (oldest.mrr > 0) {
+      mrrChange = ((newest.mrr - oldest.mrr) / oldest.mrr) * 100;
+    }
+    if (oldest.totalCash > 0) {
+      cashChange = ((newest.totalCash - oldest.totalCash) / oldest.totalCash) * 100;
+    }
+  }
+
   const summary = {
     mrr: mrr / 100,
     arr: arr / 100,
-    mrrChange: null, // No historical MRR snapshot table yet — will be calculated when one exists
+    mrrChange,
     activeSubscriptions: activeSubsResult[0]?.value ?? 0,
     failedPayments: failedPaymentsResult[0]?.value ?? 0,
     totalCash,
-    cashChange: null, // No historical Mercury balance snapshots yet — will be calculated when one exists
+    cashChange,
     runway: 0,
     totalClients: totalClientsResult[0]?.value ?? 0,
     activeClients: Number(activeClientsResult?.value ?? 0),

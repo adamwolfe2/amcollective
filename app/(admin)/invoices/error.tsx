@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { captureError } from "@/lib/errors";
 
-export default function DashboardError({
+export default function InvoicesError({
   error,
   reset,
 }: {
@@ -11,14 +11,14 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    captureError(error, { tags: { route: "dashboard" } });
+    captureError(error, { tags: { route: "invoices" } });
   }, [error]);
 
   return (
     <div className="flex items-center justify-center h-64 border border-red-200 bg-red-50/50">
       <div className="text-center space-y-3">
         <p className="text-sm text-red-700 font-mono">
-          Failed to load dashboard data
+          Failed to load invoices
         </p>
         <p className="text-xs text-red-500/60 font-mono max-w-md">
           {error.message}

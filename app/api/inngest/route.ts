@@ -21,6 +21,7 @@ import {
   syncVercelFull,
   syncPosthogAnalytics,
   syncMercury,
+  snapshotDailyMetrics,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -39,5 +40,6 @@ export const { GET, POST, PUT } = serve({
     syncVercelFull,
     syncPosthogAnalytics,
     syncMercury,
+    snapshotDailyMetrics,
   ],
 });
