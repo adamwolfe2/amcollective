@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
-import Link from "next/link";
 import {
   Instagram,
   Linkedin,
@@ -134,14 +133,14 @@ export function MarketingPage() {
         ref={heroRef}
         className="relative w-full h-[55vh] sm:h-[65vh] md:h-[85vh] overflow-hidden bg-white"
       >
-        {/* Login link */}
+        {/* Login link — always routes to app subdomain */}
         <div className="absolute top-6 right-6 md:top-8 md:right-10 z-30">
-          <Link
-            href="/sign-in"
+          <a
+            href="https://app.amcollectivecapital.com/sign-in"
             className="font-serif text-sm text-[#0A0A0A]/40 hover:text-[#0A0A0A] transition-colors"
           >
             login
-          </Link>
+          </a>
         </div>
 
         {/* Base layer — full Portland image fills entire hero,
