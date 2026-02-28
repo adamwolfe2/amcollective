@@ -18,7 +18,7 @@ export async function getMessages(filters?: {
   const conditions = [];
   if (filters?.channel) {
     conditions.push(
-      eq(schema.messages.channel, filters.channel as "email" | "sms" | "blooio" | "slack")
+      eq(schema.messages.channel, filters.channel as "email" | "sms" | "blooio" | "slack" | "gmail")
     );
   }
   if (filters?.clientId) {
@@ -89,7 +89,7 @@ export async function createMessage(
   data: {
     threadId?: string;
     direction: "inbound" | "outbound";
-    channel: "email" | "sms" | "blooio" | "slack";
+    channel: "email" | "sms" | "blooio" | "slack" | "gmail";
     from: string;
     to: string;
     subject?: string;

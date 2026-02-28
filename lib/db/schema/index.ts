@@ -22,3 +22,4 @@ export * from "./leads";
 export * from "./contracts";
 export * from "./companies";
 export * from "./outreach";
+export * from "./integrations";

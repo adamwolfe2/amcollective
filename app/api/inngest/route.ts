@@ -27,6 +27,8 @@ import {
   generateRecurringInvoices,
   weeklyIntelligence,
   deliverWebhooks,
+  syncGmail,
+  syncGmailManual,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -51,5 +53,7 @@ export const { GET, POST, PUT } = serve({
     generateRecurringInvoices,
     weeklyIntelligence,
     deliverWebhooks,
+    syncGmail,
+    syncGmailManual,
   ],
 });

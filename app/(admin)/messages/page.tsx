@@ -1,23 +1,27 @@
+import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import {
   getMessageThreads,
   getUnreadCount,
 } from "@/lib/db/repositories/messages";
 import { Badge } from "@/components/ui/badge";
+import { SyncGmailButton } from "./sync-gmail-button";
 
 const CHANNELS = [
   { key: "all", label: "All" },
   { key: "email", label: "Email" },
+  { key: "gmail", label: "Gmail" },
   { key: "sms", label: "SMS" },
   { key: "blooio", label: "Bloo.io" },
   { key: "slack", label: "Slack" },
 ] as const;
 
-const CHANNEL_ICONS: Record<string, string> = {
-  email: "\u{1F4E7}",
-  sms: "\u{1F4AC}",
-  blooio: "\u{1F4F1}",
-  slack: "\u{1F4BB}",
+const CHANNEL_LABELS: Record<string, string> = {
+  email: "EMAIL",
+  gmail: "GMAIL",
+  sms: "SMS",
+  blooio: "BLOO.IO",
+  slack: "SLACK",
 };
 
 function truncate(text: string | null | undefined, max: number): string {
@@ -44,15 +48,18 @@ export default async function MessagesPage({
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-2xl font-bold font-serif tracking-tight">
-          Messages
-        </h1>
-        {unreadTotal > 0 && (
-          <Badge className="rounded-none bg-[#0A0A0A] text-white font-mono text-[10px] px-1.5 py-0.5">
-            {unreadTotal} unread
-          </Badge>
-        )}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold font-serif tracking-tight">
+            Messages
+          </h1>
+          {unreadTotal > 0 && (
+            <Badge className="rounded-none bg-[#0A0A0A] text-white font-mono text-[10px] px-1.5 py-0.5">
+              {unreadTotal} unread
+            </Badge>
+          )}
+        </div>
+        <SyncGmailButton />
       </div>
 
       {/* Channel filter tabs */}
@@ -96,15 +103,16 @@ export default async function MessagesPage({
           {filtered.map((thread) => {
             const hasUnread = thread.unreadCount > 0;
             return (
-              <div
+              <Link
                 key={thread.threadId}
-                className={`flex items-start gap-4 px-4 py-3 hover:bg-[#0A0A0A]/[0.02] transition-colors ${
+                href={`/messages/${encodeURIComponent(thread.threadId ?? "")}`}
+                className={`flex items-start gap-4 px-4 py-3 hover:bg-[#0A0A0A]/[0.02] transition-colors block ${
                   hasUnread ? "bg-[#0A0A0A]/[0.015]" : ""
                 }`}
               >
-                {/* Channel icon */}
-                <span className="text-lg mt-0.5 shrink-0" aria-hidden="true">
-                  {CHANNEL_ICONS[thread.channel] ?? "\u{1F4E8}"}
+                {/* Channel label */}
+                <span className="font-mono text-[10px] text-[#0A0A0A]/30 uppercase mt-1 shrink-0 w-12">
+                  {CHANNEL_LABELS[thread.channel] ?? thread.channel}
                 </span>
 
                 {/* Content */}
@@ -118,9 +126,6 @@ export default async function MessagesPage({
                       }`}
                     >
                       {thread.subject || "No subject"}
-                    </span>
-                    <span className="font-mono text-[10px] text-[#0A0A0A]/30 uppercase shrink-0">
-                      {thread.channel}
                     </span>
                   </div>
                   <p className="font-mono text-xs text-[#0A0A0A]/40 truncate mt-0.5">
@@ -143,7 +148,7 @@ export default async function MessagesPage({
                     </Badge>
                   )}
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

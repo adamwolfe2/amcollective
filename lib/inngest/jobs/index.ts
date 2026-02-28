@@ -21,3 +21,4 @@ export { weeklyReport } from "./weekly-report";
 export { generateRecurringInvoices } from "./generate-recurring-invoices";
 export { weeklyIntelligence } from "./weekly-intelligence";
 export { deliverWebhooks } from "./deliver-webhooks";
+export { syncGmail, syncGmailManual } from "./sync-gmail";

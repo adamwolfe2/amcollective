@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, and, eq } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
+import { isComposioConfigured } from "@/lib/integrations/composio";
+import { GmailConnectionCard } from "./gmail-connection-card";
 
 const TABS = [
   { label: "General", href: "/settings" },
@@ -76,6 +78,20 @@ function getIntegrations(): Integration[] {
 export default async function IntegrationsPage() {
   const integrations = getIntegrations();
   const connectedCount = integrations.filter((i) => i.connected).length;
+
+  // Get Gmail connection status
+  const gmailAccounts = await db
+    .select()
+    .from(schema.connectedAccounts)
+    .where(
+      and(
+        eq(schema.connectedAccounts.provider, "gmail"),
+        eq(schema.connectedAccounts.status, "active")
+      )
+    );
+
+  const gmailAccount = gmailAccounts[0] ?? null;
+  const composioReady = isComposioConfigured();
 
   // Get per-project PostHog config status
   const projects = await db
@@ -172,6 +188,30 @@ export default async function IntegrationsPage() {
             </p>
           </div>
         ))}
+      </div>
+
+      {/* Gmail OAuth Connection */}
+      <div className="mb-10">
+        <div className="flex items-center gap-3 mb-4">
+          <h2 className="font-serif text-lg font-bold text-[#0A0A0A]">
+            Gmail — OAuth Connection
+          </h2>
+          {gmailAccount && (
+            <span className="px-2 py-0.5 text-xs font-mono border border-emerald-600 text-emerald-600">
+              Connected
+            </span>
+          )}
+        </div>
+        <p className="font-serif text-sm text-[#0A0A0A]/50 mb-4">
+          Connect a Gmail account to sync all email conversations into the
+          unified Messages inbox. Emails sync every 15 minutes automatically.
+        </p>
+        <GmailConnectionCard
+          composioReady={composioReady}
+          connected={!!gmailAccount}
+          email={gmailAccount?.email ?? null}
+          lastSyncAt={gmailAccount?.lastSyncAt ?? null}
+        />
       </div>
 
       {/* PostHog Per-Project Config */}

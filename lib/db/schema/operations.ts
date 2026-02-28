@@ -51,6 +51,7 @@ export const messageChannelEnum = pgEnum("message_channel", [
   "sms",
   "blooio",
   "slack",
+  "gmail",
 ]);
 
 export const alertTypeEnum = pgEnum("alert_type", [

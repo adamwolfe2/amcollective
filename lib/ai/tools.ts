@@ -356,6 +356,43 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "search_gmail",
+    description: "Search connected Gmail account for emails matching a query. Returns matching messages with sender, subject, and snippet.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: { type: "string", description: "Gmail search query (same syntax as Gmail search bar)" },
+        limit: { type: "number", default: 10, description: "Max results to return" },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "read_gmail_thread",
+    description: "Read a full Gmail thread by thread ID. Returns all messages in the conversation chronologically.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        thread_id: { type: "string", description: "Gmail thread ID (with or without gmail_ prefix)" },
+      },
+      required: ["thread_id"],
+    },
+  },
+  {
+    name: "send_gmail",
+    description: "Send an email via the connected Gmail account. For replies, include the thread_id to keep messages in the same thread.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        to: { type: "string", description: "Recipient email address" },
+        subject: { type: "string", description: "Email subject line" },
+        body: { type: "string", description: "Email body text" },
+        thread_id: { type: "string", description: "Optional thread ID for replies" },
+      },
+      required: ["to", "subject", "body"],
+    },
+  },
   ...VERCEL_TOOL_DEFINITIONS,
   ...POSTHOG_TOOL_DEFINITIONS,
   ...MERCURY_TOOL_DEFINITIONS,
@@ -929,6 +966,66 @@ export async function executeTool(
           unbilledHours: Number(unbilledT[0]?.totalHours ?? 0),
           unreadMessages: unreadMsg[0]?.count ?? 0,
         });
+      }
+
+      case "search_gmail": {
+        const { searchGmail } = await import("@/lib/integrations/composio");
+        const gmailAccount = await db
+          .select({ composioAccountId: schema.connectedAccounts.composioAccountId, userId: schema.connectedAccounts.userId })
+          .from(schema.connectedAccounts)
+          .where(and(eq(schema.connectedAccounts.provider, "gmail"), eq(schema.connectedAccounts.status, "active")))
+          .limit(1);
+        if (!gmailAccount[0]?.composioAccountId) return JSON.stringify({ error: "No active Gmail connection" });
+        const gmailResult = await searchGmail({
+          connectedAccountId: gmailAccount[0].composioAccountId,
+          userId: gmailAccount[0].userId,
+          query: input.query as string,
+          maxResults: (input.limit as number) || 10,
+        });
+        if (gmailResult.error) return JSON.stringify({ error: gmailResult.error });
+        return JSON.stringify(gmailResult.messages.map(m => ({
+          id: m.id, threadId: m.threadId, from: m.from, to: m.to,
+          subject: m.subject, snippet: m.body.slice(0, 200), date: m.date,
+        })));
+      }
+
+      case "read_gmail_thread": {
+        const { getGmailThread } = await import("@/lib/integrations/composio");
+        const gmailAcct = await db
+          .select({ composioAccountId: schema.connectedAccounts.composioAccountId, userId: schema.connectedAccounts.userId })
+          .from(schema.connectedAccounts)
+          .where(and(eq(schema.connectedAccounts.provider, "gmail"), eq(schema.connectedAccounts.status, "active")))
+          .limit(1);
+        if (!gmailAcct[0]?.composioAccountId) return JSON.stringify({ error: "No active Gmail connection" });
+        const threadId = (input.thread_id as string).replace("gmail_", "");
+        const threadResult = await getGmailThread({
+          connectedAccountId: gmailAcct[0].composioAccountId,
+          userId: gmailAcct[0].userId,
+          threadId,
+        });
+        if (threadResult.error) return JSON.stringify({ error: threadResult.error });
+        return JSON.stringify(threadResult.messages.map(m => ({
+          id: m.id, from: m.from, to: m.to, subject: m.subject, body: m.body, date: m.date,
+        })));
+      }
+
+      case "send_gmail": {
+        const { sendGmailMessage: sendGmail } = await import("@/lib/integrations/composio");
+        const gmailSendAcct = await db
+          .select({ composioAccountId: schema.connectedAccounts.composioAccountId, userId: schema.connectedAccounts.userId })
+          .from(schema.connectedAccounts)
+          .where(and(eq(schema.connectedAccounts.provider, "gmail"), eq(schema.connectedAccounts.status, "active")))
+          .limit(1);
+        if (!gmailSendAcct[0]?.composioAccountId) return JSON.stringify({ error: "No active Gmail connection" });
+        const sendResult = await sendGmail({
+          connectedAccountId: gmailSendAcct[0].composioAccountId,
+          userId: gmailSendAcct[0].userId,
+          to: input.to as string,
+          subject: input.subject as string,
+          body: input.body as string,
+          threadId: input.thread_id as string | undefined,
+        });
+        return JSON.stringify(sendResult);
       }
 
       default: {
