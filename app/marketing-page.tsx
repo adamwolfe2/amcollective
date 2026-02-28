@@ -367,7 +367,7 @@ function VenturesTab() {
               href={venture.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 font-serif text-sm text-[#0A0A0A] border border-[#0A0A0A]/15 rounded-full px-4 py-2 hover:border-[#0A0A0A]/40 transition-colors group mb-8"
+              className="inline-flex items-center gap-2 font-serif text-sm text-[#0A0A0A] border border-[#0A0A0A]/15 rounded px-5 py-2 hover:border-[#0A0A0A]/40 transition-colors group mb-8"
             >
               Visit site
               <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
