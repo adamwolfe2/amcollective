@@ -57,7 +57,7 @@ const VENTURES = [
     name: "Hook",
     description:
       "GTM and viral content engine for brands that need Gen Z distribution. Built content systems for YC companies like ElevenLabs.",
-    logo: "/hook logo 2.png",
+    logo: "/hook logo.png",
     social: "/hook social.png",
     url: "https://hookugc.com",
   },
@@ -240,6 +240,7 @@ export function MarketingPage() {
           alt="Portland skyline with Mt. Hood"
           fill
           priority
+          unoptimized
           className="object-cover object-[center_25%] select-none pointer-events-none"
           sizes="100vw"
         />
