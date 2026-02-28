@@ -29,85 +29,44 @@ const hasClerk = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 const clerkAppearance = {
   variables: {
     colorPrimary: "#2A52BE",
+    colorDanger: "#DC2626",
     colorTextOnPrimaryBackground: "#FFFFFF",
     colorBackground: "#FFFFFF",
     colorText: "#0F1523",
     colorTextSecondary: "#3D4556",
     colorInputBackground: "#FFFFFF",
     colorInputText: "#0F1523",
-    borderRadius: "0px",
-    fontFamily: '"Newsreader", Georgia, "Times New Roman", serif',
-    fontFamilyButtons:
-      '"Geist Mono", ui-monospace, SFMono-Regular, monospace',
+    colorNeutral: "#0F1523",
+    borderRadius: "0",
+    spacingUnit: "1rem",
+    fontFamily: "Newsreader, Georgia, Times New Roman, serif",
+    fontFamilyButtons: "Geist Mono, ui-monospace, SFMono-Regular, monospace",
   },
   elements: {
-    card: {
-      border: "1px solid #E2DDD6",
-      boxShadow: "0 4px 24px rgba(15, 21, 35, 0.08)",
-    },
-    headerTitle: {
-      fontFamily: '"Newsreader", Georgia, serif',
-      fontWeight: "600",
-      color: "#0F1523",
-    },
-    headerSubtitle: {
-      fontFamily: '"Geist Mono", monospace',
-      color: "#8B92A5",
-      fontSize: "0.8rem",
-      textTransform: "uppercase" as const,
-      letterSpacing: "0.05em",
-    },
-    formButtonPrimary: {
-      backgroundColor: "#2A52BE",
-      fontFamily: '"Geist Mono", monospace',
-      fontSize: "0.85rem",
-      textTransform: "uppercase" as const,
-      letterSpacing: "0.05em",
-      borderRadius: "0px",
-      "&:hover": {
-        backgroundColor: "#1B3A6B",
-      },
-    },
-    formFieldInput: {
-      borderColor: "#E2DDD6",
-      borderRadius: "0px",
-      "&:focus": {
-        borderColor: "#2A52BE",
-        boxShadow: "0 0 0 2px rgba(42, 82, 190, 0.15)",
-      },
-    },
-    footerActionLink: {
-      color: "#2A52BE",
-      "&:hover": {
-        color: "#1B3A6B",
-      },
-    },
-    socialButtonsBlockButton: {
-      borderColor: "#E2DDD6",
-      borderRadius: "0px",
-      "&:hover": {
-        borderColor: "#C8C3BB",
-        backgroundColor: "#F5F3EE",
-      },
-    },
-    dividerLine: {
-      backgroundColor: "#E2DDD6",
-    },
-    dividerText: {
-      color: "#8B92A5",
-      fontFamily: '"Geist Mono", monospace',
-      fontSize: "0.75rem",
-      textTransform: "uppercase" as const,
-    },
-    userButtonPopoverCard: {
-      border: "1px solid #E2DDD6",
-      borderRadius: "0px",
-    },
-    userButtonPopoverActionButton: {
-      "&:hover": {
-        backgroundColor: "#EEF2FB",
-      },
-    },
+    rootBox: "w-full",
+    cardBox: "shadow-none",
+    card: "border border-[#E2DDD6] rounded-none shadow-[0_4px_24px_rgba(15,21,35,0.08)]",
+    headerTitle: "font-serif font-semibold text-[#0F1523]",
+    headerSubtitle:
+      "font-mono text-[#8B92A5] text-xs uppercase tracking-wider",
+    formButtonPrimary:
+      "bg-[#2A52BE] hover:bg-[#1B3A6B] font-mono text-sm uppercase tracking-wider rounded-none",
+    formFieldInput:
+      "border-[#E2DDD6] rounded-none focus:border-[#2A52BE] focus:ring-2 focus:ring-[#2A52BE]/15",
+    formFieldLabel: "text-[#0F1523] font-serif",
+    footerActionLink: "text-[#2A52BE] hover:text-[#1B3A6B]",
+    socialButtonsBlockButton:
+      "border-[#E2DDD6] rounded-none hover:border-[#C8C3BB] hover:bg-[#F5F3EE]",
+    dividerLine: "bg-[#E2DDD6]",
+    dividerText: "text-[#8B92A5] font-mono text-xs uppercase",
+    formFieldInputShowPasswordButton: "text-[#8B92A5] hover:text-[#0F1523]",
+    identityPreviewEditButton: "text-[#2A52BE] hover:text-[#1B3A6B]",
+    userButtonPopoverCard: "border border-[#E2DDD6] rounded-none",
+    userButtonPopoverActionButton: "hover:bg-[#EEF2FB]",
+    userPreviewMainIdentifier: "font-serif",
+    userPreviewSecondaryIdentifier: "font-mono text-xs text-[#8B92A5]",
+    badge: "font-mono text-xs rounded-none",
+    footer: "hidden",
   },
 };
 

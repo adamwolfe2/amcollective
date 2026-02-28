@@ -5,35 +5,47 @@ export const dynamic = "force-dynamic";
 export default function SignInPage() {
   return (
     <div
-      className="min-h-screen flex items-center justify-center px-4"
+      className="min-h-screen flex flex-col items-center justify-center px-4"
       style={{ backgroundColor: "#F5F3EE" }}
     >
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1
-            className="text-2xl font-semibold tracking-tight"
-            style={{
-              fontFamily: '"Newsreader", Georgia, serif',
-              color: "#0F1523",
-            }}
-          >
-            AM Collective
-          </h1>
-          <p
-            className="mt-1"
-            style={{
-              fontFamily: '"Geist Mono", monospace',
-              fontSize: "0.75rem",
-              color: "#8B92A5",
-              textTransform: "uppercase",
-              letterSpacing: "0.1em",
-            }}
-          >
-            Internal Operations
-          </p>
-        </div>
-        <SignIn />
+      <div className="mb-8 text-center">
+        <h1
+          style={{
+            fontFamily: "Newsreader, Georgia, serif",
+            fontSize: "1.75rem",
+            fontWeight: 600,
+            color: "#0F1523",
+            letterSpacing: "-0.02em",
+          }}
+        >
+          AM Collective
+        </h1>
+        <p
+          style={{
+            fontFamily: "Geist Mono, monospace",
+            fontSize: "0.7rem",
+            color: "#8B92A5",
+            textTransform: "uppercase",
+            letterSpacing: "0.15em",
+            marginTop: "0.25rem",
+          }}
+        >
+          Internal Operations
+        </p>
       </div>
+      <SignIn
+        appearance={{
+          elements: {
+            card: "border border-[#E2DDD6] rounded-none shadow-[0_4px_24px_rgba(15,21,35,0.08)]",
+            formButtonPrimary:
+              "bg-[#2A52BE] hover:bg-[#1B3A6B] font-mono text-sm uppercase tracking-wider rounded-none",
+            formFieldInput:
+              "border-[#E2DDD6] rounded-none focus:border-[#2A52BE]",
+            footerActionLink: "text-[#2A52BE] hover:text-[#1B3A6B]",
+            footer: "hidden",
+          },
+        }}
+      />
     </div>
   );
 }
