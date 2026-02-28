@@ -98,7 +98,8 @@ export function NewLeadForm() {
               </label>
               <input
                 name="email"
-                type="email"
+                type="text"
+                placeholder="Optional"
                 className="w-full px-3 py-2 border border-[#0A0A0A]/10 font-mono text-sm bg-[#F3F3EF] focus:outline-none focus:border-[#0A0A0A]/30"
               />
             </div>
@@ -108,6 +109,7 @@ export function NewLeadForm() {
               </label>
               <input
                 name="phone"
+                placeholder="Optional"
                 className="w-full px-3 py-2 border border-[#0A0A0A]/10 font-mono text-sm bg-[#F3F3EF] focus:outline-none focus:border-[#0A0A0A]/30"
               />
             </div>

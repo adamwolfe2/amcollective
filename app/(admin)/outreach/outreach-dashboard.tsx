@@ -365,7 +365,7 @@ export function OutreachDashboard() {
                   <tr>
                     <td colSpan={7} className="py-12 text-center">
                       <span className="font-mono text-xs text-[#0A0A0A]/30">
-                        No campaigns synced yet. Click "Sync Campaigns" to pull
+                        No campaigns synced yet. Click &ldquo;Sync Campaigns&rdquo; to pull
                         from EmailBison.
                       </span>
                     </td>

@@ -1,6 +1,6 @@
-// Data pattern: Server component with direct DB queries (consistent with Finance, Analytics, Clients pages)
-// Zone isolation: Each zone is an independent async component with try/catch — one failing doesn't blank the others
-// Caching: unstable_cache on expensive aggregation queries; Mercury balance + failed payments stay fresh
+// Command Center Dashboard
+// Layout: Compact metrics strip → AI Chat (primary) + Actions/Quick Access (side panel)
+// Charts live in their dedicated pages (Finance, Analytics) — 1 click away from sidebar
 
 import { Suspense } from "react";
 import Link from "next/link";
@@ -9,12 +9,21 @@ import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, and, sql, desc, gte, count } from "drizzle-orm";
-import * as stripeConnector from "@/lib/connectors/stripe";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { getRecentActivity } from "@/lib/db/repositories/activity";
-import { MrrChart } from "./mrr-chart";
-import { CashFlowMiniChart } from "./cash-flow-mini-chart";
-import { DauChart } from "./dau-chart";
+import { AiChat } from "@/components/ai-chat";
+import {
+  Users,
+  FolderKanban,
+  Receipt,
+  Landmark,
+  Crosshair,
+  ListTodo,
+  TrendingUp,
+  LineChart,
+  Send,
+  FileCheck,
+} from "lucide-react";
 
 function greeting() {
   const h = new Date().getHours();
@@ -34,22 +43,12 @@ function formatCurrency(amount: number) {
 
 // ─── Cached data fetchers ───────────────────────────────────────────────────
 
-/** MRR by company from Stripe connector — cached 5 min */
-const getCachedMrrByCompany = unstable_cache(
-  async () => {
-    const result = await stripeConnector.getMRRByCompany();
-    if (!result.success || !result.data) return [];
-    return result.data;
-  },
-  ["dashboard-mrr-by-company"],
-  { revalidate: 300 }
-);
-
-/** MRR from active subscriptions — cached 5 min */
 const getCachedMrr = unstable_cache(
   async () => {
     const [result] = await db
-      .select({ total: sql<string>`COALESCE(SUM(${schema.subscriptions.amount}), 0)` })
+      .select({
+        total: sql<string>`COALESCE(SUM(${schema.subscriptions.amount}), 0)`,
+      })
       .from(schema.subscriptions)
       .where(eq(schema.subscriptions.status, "active"));
     const [subsCount] = await db
@@ -65,38 +64,6 @@ const getCachedMrr = unstable_cache(
   { revalidate: 300 }
 );
 
-/** DAU aggregation — cached 5 min */
-const getCachedDau = unstable_cache(
-  async () => {
-    const posthogData = await db
-      .select({
-        projectId: schema.posthogSnapshots.projectId,
-        dau: schema.posthogSnapshots.dau,
-        projectName: schema.portfolioProjects.name,
-      })
-      .from(schema.posthogSnapshots)
-      .innerJoin(schema.portfolioProjects, eq(schema.posthogSnapshots.projectId, schema.portfolioProjects.id))
-      .orderBy(desc(schema.posthogSnapshots.snapshotDate))
-      .limit(20);
-
-    const latestByProject = new Map<string, { dau: number; name: string }>();
-    for (const snap of posthogData) {
-      if (!latestByProject.has(snap.projectId)) {
-        latestByProject.set(snap.projectId, { dau: snap.dau ?? 0, name: snap.projectName });
-      }
-    }
-    const dauByProduct = Array.from(latestByProject.values());
-    return {
-      totalDau: dauByProduct.reduce((s, p) => s + p.dau, 0),
-      dauProductCount: dauByProduct.length,
-      dauByProduct,
-    };
-  },
-  ["dashboard-dau"],
-  { revalidate: 300 }
-);
-
-/** Stale clients — cached 5 min (expensive GROUP BY + HAVING) */
 const getCachedStaleClients = unstable_cache(
   async () => {
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -107,7 +74,10 @@ const getCachedStaleClients = unstable_cache(
         lastCardUpdate: sql<Date>`MAX(${schema.kanbanCards.updatedAt})`,
       })
       .from(schema.clients)
-      .innerJoin(schema.kanbanCards, eq(schema.kanbanCards.clientId, schema.clients.id))
+      .innerJoin(
+        schema.kanbanCards,
+        eq(schema.kanbanCards.clientId, schema.clients.id)
+      )
       .groupBy(schema.clients.id, schema.clients.name)
       .having(sql`MAX(${schema.kanbanCards.updatedAt}) < ${sevenDaysAgo}`)
       .limit(5);
@@ -116,15 +86,13 @@ const getCachedStaleClients = unstable_cache(
   { revalidate: 300 }
 );
 
-// ─── Zone 1: Metric Cards ──────────────────────────────────────────────────
+// ─── Metrics Strip ──────────────────────────────────────────────────────────
 
-async function MetricsZone() {
+async function MetricsStrip() {
   try {
-    const [mrrData, dauData, mercuryAccounts, totalClientsResult, overdueResult, projects, activeClientsResult, spendResult] =
+    const [mrrData, mercuryAccounts, totalClientsResult, overdueResult, spendResult] =
       await Promise.all([
         getCachedMrr(),
-        getCachedDau(),
-        // Mercury balance — always fresh (no cache)
         db.select().from(schema.mercuryAccounts),
         db.select({ value: count() }).from(schema.clients),
         db
@@ -135,293 +103,99 @@ async function MetricsZone() {
           .from(schema.invoices)
           .where(eq(schema.invoices.status, "overdue")),
         db
-          .select({ id: schema.portfolioProjects.id, status: schema.portfolioProjects.status })
-          .from(schema.portfolioProjects),
-        db
-          .select({ value: sql<number>`COUNT(DISTINCT ${schema.kanbanCards.clientId})` })
-          .from(schema.kanbanCards)
-          .where(sql`${schema.kanbanCards.completedAt} IS NULL`),
-        db
-          .select({ totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)` })
+          .select({
+            totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)`,
+          })
           .from(schema.mercuryTransactions)
           .where(
             and(
               eq(schema.mercuryTransactions.direction, "debit"),
-              gte(schema.mercuryTransactions.postedAt, new Date(Date.now() - 60 * 24 * 60 * 60 * 1000))
+              gte(
+                schema.mercuryTransactions.postedAt,
+                new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
+              )
             )
           ),
       ]);
 
-    const totalCash = mercuryAccounts.reduce((s, a) => s + Number(a.balance), 0);
+    const totalCash = mercuryAccounts.reduce(
+      (s, a) => s + Number(a.balance),
+      0
+    );
     const monthlySpend = Number(spendResult[0]?.totalSpend ?? 0) / 2;
     const runway = monthlySpend > 0 ? totalCash / monthlySpend : null;
     const overdueCount = overdueResult[0]?.cnt ?? 0;
     const overdueTotal = Number(overdueResult[0]?.total ?? 0) / 100;
-    const activeProjects = projects.filter((p) => p.status === "active");
 
     return (
-      <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-3 lg:gap-4">
-        <MetricCard
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <MetricPill
           label="MRR"
           value={formatCurrency(mrrData.mrr)}
-          sub={`${mrrData.activeSubs} active sub${mrrData.activeSubs !== 1 ? "s" : ""}`}
+          sub={`${mrrData.activeSubs} subs`}
           href="/finance"
         />
-        <MetricCard
-          label="Cash Position"
+        <MetricPill
+          label="Cash"
           value={formatCurrency(totalCash)}
-          sub={runway ? `~${runway.toFixed(1)} mo runway` : "No spend data"}
+          sub={runway ? `${runway.toFixed(0)}mo runway` : ""}
           href="/finance"
         />
-        <MetricCard
-          label="Active Clients"
-          value={String(Number(activeClientsResult[0]?.value ?? 0))}
-          sub={`${totalClientsResult[0]?.value ?? 0} total`}
+        <MetricPill
+          label="Clients"
+          value={String(totalClientsResult[0]?.value ?? 0)}
           href="/clients"
         />
-        <MetricCard
-          label="Daily Active Users"
-          value={String(dauData.totalDau)}
-          sub={`across ${dauData.dauProductCount} product${dauData.dauProductCount !== 1 ? "s" : ""}`}
-          href="/analytics"
-        />
-        <MetricCard
-          label="Overdue Invoices"
-          value={formatCurrency(overdueTotal)}
-          sub={`${overdueCount} invoice${overdueCount !== 1 ? "s" : ""}`}
+        <MetricPill
+          label="Overdue"
+          value={overdueCount > 0 ? formatCurrency(overdueTotal) : "$0"}
+          sub={overdueCount > 0 ? `${overdueCount} inv` : ""}
           href="/invoices"
           alert={overdueCount > 0}
         />
-        <MetricCard
-          label="Vercel Projects"
-          value={`${activeProjects.length} active`}
-          sub="Portfolio"
-          href="/projects"
-        />
       </div>
     );
   } catch (err) {
-    console.error("[Dashboard] MetricsZone failed:", err);
+    console.error("[Dashboard] MetricsStrip failed:", err);
     return (
-      <div className="lg:col-span-3">
-        <div className="border border-[#0A0A0A]/10 bg-white p-6 text-center">
-          <p className="text-[#0A0A0A]/40 font-mono text-xs">
-            Failed to load metrics
-          </p>
-        </div>
+      <div className="grid grid-cols-4 gap-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-16 bg-[#0A0A0A]/5 border border-[#0A0A0A]/10"
+          />
+        ))}
       </div>
     );
   }
 }
 
-// ─── Zone 2: Charts ─────────────────────────────────────────────────────────
+// ─── Actions Panel ──────────────────────────────────────────────────────────
 
-async function ChartsZone() {
-  try {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-    const [revenueTrendResult, cashFlowData, dauData, mrrByCompany, portfolioActivity] = await Promise.all([
-      stripeConnector.getRevenueTrend(6),
-      db
-        .select({
-          date: sql<string>`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`,
-          credits: sql<string>`COALESCE(SUM(CASE WHEN ${schema.mercuryTransactions.direction} = 'credit' THEN ABS(${schema.mercuryTransactions.amount}) ELSE 0 END), 0)`,
-          debits: sql<string>`COALESCE(SUM(CASE WHEN ${schema.mercuryTransactions.direction} = 'debit' THEN ABS(${schema.mercuryTransactions.amount}) ELSE 0 END), 0)`,
-        })
-        .from(schema.mercuryTransactions)
-        .where(gte(schema.mercuryTransactions.postedAt, thirtyDaysAgo))
-        .groupBy(sql`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`)
-        .orderBy(sql`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`),
-      getCachedDau(),
-      getCachedMrrByCompany(),
-      vercelConnector.getPortfolioActivity(),
-    ]);
-
-    const revenueTrend = revenueTrendResult.success
-      ? (revenueTrendResult.data ?? []).map((p) => ({ month: p.month, revenue: p.revenue / 100 }))
-      : [];
-
-    let balance = 0;
-    const cashFlow = cashFlowData.map((d) => {
-      const credits = Number(d.credits);
-      const debits = Number(d.debits);
-      balance += credits - debits;
-      return { date: d.date ?? "", credits, debits, balance };
-    });
-
-    return (
-      <div className="lg:col-span-5 space-y-6">
-        <div className="border border-[#0A0A0A]/10 bg-white p-5">
-          <h2 className="font-serif font-bold text-[#0A0A0A] mb-4">
-            MRR Trend
-          </h2>
-          <MrrChart data={revenueTrend} />
-        </div>
-
-        <div className="border border-[#0A0A0A]/10 bg-white p-5">
-          <h2 className="font-serif font-bold text-[#0A0A0A] mb-4">
-            Cash Flow — 30 Days
-          </h2>
-          <CashFlowMiniChart data={cashFlow} />
-        </div>
-
-        <div className="border border-[#0A0A0A]/10 bg-white p-5">
-          <h2 className="font-serif font-bold text-[#0A0A0A] mb-4">
-            DAU by Product
-          </h2>
-          <DauChart data={dauData.dauByProduct.map((d) => ({ product: d.name, dau: d.dau }))} />
-        </div>
-
-        {mrrByCompany.length > 0 && (
-          <div className="border border-[#0A0A0A]/10 bg-white p-5">
-            <h2 className="font-serif font-bold text-[#0A0A0A] mb-4">
-              MRR by Company
-            </h2>
-            <div className="divide-y divide-[#0A0A0A]/5">
-              {mrrByCompany
-                .filter((c) => c.mrr > 0 || c.activeSubscriptions > 0)
-                .sort((a, b) => b.mrr - a.mrr)
-                .map((company) => (
-                  <div
-                    key={company.accountId}
-                    className="flex items-center justify-between py-2.5"
-                  >
-                    <div>
-                      <span className="font-mono text-xs font-medium text-[#0A0A0A]">
-                        {company.name}
-                      </span>
-                      <span className="font-mono text-[10px] text-[#0A0A0A]/40 ml-2">
-                        {company.activeSubscriptions} sub{company.activeSubscriptions !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                    <span className="font-mono text-sm font-bold text-[#0A0A0A]">
-                      {formatCurrency(company.mrr / 100)}
-                    </span>
-                  </div>
-                ))}
-              <div className="flex items-center justify-between py-2.5 pt-3">
-                <span className="font-mono text-xs font-bold text-[#0A0A0A]">
-                  Total
-                </span>
-                <span className="font-mono text-sm font-bold text-[#0A0A0A]">
-                  {formatCurrency(mrrByCompany.reduce((s, c) => s + c.mrr, 0) / 100)}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {portfolioActivity.success && portfolioActivity.data && (
-          <div className="border border-[#0A0A0A]/10 bg-white p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-serif font-bold text-[#0A0A0A]">
-                Vercel Portfolio — 30 Days
-              </h2>
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-[10px] text-[#0A0A0A]/40">
-                  {portfolioActivity.data.totalDeploys} deploys
-                </span>
-                <span className={`font-mono text-[10px] font-medium ${
-                  portfolioActivity.data.successRate >= 95
-                    ? "text-emerald-600"
-                    : portfolioActivity.data.successRate >= 80
-                      ? "text-amber-600"
-                      : "text-red-600"
-                }`}>
-                  {portfolioActivity.data.successRate}% success
-                </span>
-              </div>
-            </div>
-            <div className="divide-y divide-[#0A0A0A]/5">
-              {portfolioActivity.data.projects.map((project) => (
-                <div
-                  key={project.projectId}
-                  className="flex items-center justify-between py-2.5"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span
-                      className={`w-2 h-2 rounded-full shrink-0 ${
-                        project.lastDeployState === "ERROR"
-                          ? "bg-red-500"
-                          : project.lastDeployState === "READY"
-                            ? "bg-emerald-500"
-                            : project.lastDeployState === "BUILDING"
-                              ? "bg-amber-500"
-                              : "bg-[#0A0A0A]/20"
-                      }`}
-                    />
-                    <div className="min-w-0">
-                      <span className="font-mono text-xs font-medium text-[#0A0A0A]">
-                        {project.projectName}
-                      </span>
-                      {project.framework && (
-                        <span className="font-mono text-[10px] text-[#0A0A0A]/30 ml-2">
-                          {project.framework}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="font-mono text-[10px] text-[#0A0A0A]/40">
-                      {project.totalDeploys} deploy{project.totalDeploys !== 1 ? "s" : ""}
-                      {project.failedDeploys > 0 && (
-                        <span className="text-red-500 ml-1">
-                          ({project.failedDeploys} failed)
-                        </span>
-                      )}
-                    </span>
-                    {project.lastDeployAt && (
-                      <span className="font-mono text-[10px] text-[#0A0A0A]/30">
-                        {formatDistanceToNow(new Date(project.lastDeployAt), {
-                          addSuffix: true,
-                        })}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  } catch (err) {
-    console.error("[Dashboard] ChartsZone failed:", err);
-    return (
-      <div className="lg:col-span-5">
-        <div className="border border-[#0A0A0A]/10 bg-white p-6 text-center">
-          <p className="text-[#0A0A0A]/40 font-mono text-xs">
-            Failed to load charts
-          </p>
-        </div>
-      </div>
-    );
-  }
-}
-
-// ─── Zone 3: Action Items + Feed ────────────────────────────────────────────
-
-async function ActionsZone() {
+async function ActionsPanel() {
   try {
     const now = new Date();
-    const [overdueInvoices, staleClients, deploysResult, recentActivity] = await Promise.all([
-      db
-        .select({
-          id: schema.invoices.id,
-          clientName: schema.clients.name,
-          amount: schema.invoices.amount,
-          dueDate: schema.invoices.dueDate,
-        })
-        .from(schema.invoices)
-        .leftJoin(schema.clients, eq(schema.invoices.clientId, schema.clients.id))
-        .where(eq(schema.invoices.status, "overdue"))
-        .orderBy(schema.invoices.dueDate)
-        .limit(5),
-      getCachedStaleClients(),
-      vercelConnector.getRecentDeployments(5),
-      getRecentActivity(20),
-    ]);
+    const [overdueInvoices, staleClients, deploysResult, recentActivity] =
+      await Promise.all([
+        db
+          .select({
+            id: schema.invoices.id,
+            clientName: schema.clients.name,
+            amount: schema.invoices.amount,
+            dueDate: schema.invoices.dueDate,
+          })
+          .from(schema.invoices)
+          .leftJoin(
+            schema.clients,
+            eq(schema.invoices.clientId, schema.clients.id)
+          )
+          .where(eq(schema.invoices.status, "overdue"))
+          .orderBy(schema.invoices.dueDate)
+          .limit(5),
+        getCachedStaleClients(),
+        vercelConnector.getRecentDeployments(5),
+        getRecentActivity(10),
+      ]);
 
     const failedDeploys = deploysResult.success
       ? (deploysResult.data ?? []).filter((d) => d.state === "ERROR")
@@ -436,7 +210,10 @@ async function ActionsZone() {
 
     for (const inv of overdueInvoices) {
       const daysOverdue = inv.dueDate
-        ? Math.floor((now.getTime() - new Date(inv.dueDate).getTime()) / (1000 * 60 * 60 * 24))
+        ? Math.floor(
+            (now.getTime() - new Date(inv.dueDate).getTime()) /
+              (1000 * 60 * 60 * 24)
+          )
         : 0;
       actionItems.push({
         severity: daysOverdue > 10 ? "critical" : "warning",
@@ -457,7 +234,8 @@ async function ActionsZone() {
 
     for (const c of staleClients) {
       const days = Math.floor(
-        (now.getTime() - new Date(c.lastCardUpdate).getTime()) / (1000 * 60 * 60 * 24)
+        (now.getTime() - new Date(c.lastCardUpdate).getTime()) /
+          (1000 * 60 * 60 * 24)
       );
       actionItems.push({
         severity: days > 10 ? "critical" : "warning",
@@ -473,28 +251,22 @@ async function ActionsZone() {
     });
 
     return (
-      <div className="lg:col-span-4 space-y-6">
+      <div className="space-y-4">
         {/* Action Required */}
-        <div>
-          <h2 className="font-serif font-bold text-[#0A0A0A] mb-3">
-            Action Required
-          </h2>
-          {actionItems.length === 0 ? (
-            <div className="border border-[#0A0A0A]/10 bg-white py-8 text-center">
-              <p className="text-[#0A0A0A]/40 font-serif text-sm">
-                All clear — nothing needs attention.
-              </p>
-            </div>
-          ) : (
+        {actionItems.length > 0 && (
+          <div>
+            <h3 className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-2">
+              Action Required
+            </h3>
             <div className="border border-[#0A0A0A]/10 bg-white divide-y divide-[#0A0A0A]/5">
-              {actionItems.slice(0, 8).map((item, i) => (
+              {actionItems.slice(0, 5).map((item, i) => (
                 <Link
                   key={i}
                   href={item.url}
-                  className="px-4 py-3 flex items-start gap-3 hover:bg-[#0A0A0A]/[0.02] transition-colors block"
+                  className="px-3 py-2.5 flex items-start gap-2.5 hover:bg-[#0A0A0A]/[0.02] transition-colors block"
                 >
                   <span
-                    className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${
+                    className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${
                       item.severity === "critical"
                         ? "bg-red-500"
                         : item.severity === "warning"
@@ -503,56 +275,75 @@ async function ActionsZone() {
                     }`}
                   />
                   <div className="min-w-0 flex-1">
-                    <p className="font-mono text-xs font-medium text-[#0A0A0A]">
+                    <p className="font-mono text-[11px] font-medium text-[#0A0A0A]">
                       {item.label}
                     </p>
-                    <p className="font-serif text-xs text-[#0A0A0A]/50 truncate">
+                    <p className="font-serif text-[11px] text-[#0A0A0A]/50 truncate">
                       {item.detail}
                     </p>
                   </div>
                 </Link>
               ))}
             </div>
-          )}
+          </div>
+        )}
+
+        {/* Quick Access */}
+        <div>
+          <h3 className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-2">
+            Quick Access
+          </h3>
+          <div className="grid grid-cols-2 gap-1.5">
+            <QuickLink href="/leads" icon={Crosshair} label="Leads" />
+            <QuickLink href="/clients" icon={Users} label="Clients" />
+            <QuickLink href="/projects" icon={FolderKanban} label="Projects" />
+            <QuickLink href="/tasks" icon={ListTodo} label="Tasks" />
+            <QuickLink href="/invoices" icon={Receipt} label="Invoices" />
+            <QuickLink href="/contracts" icon={FileCheck} label="Contracts" />
+            <QuickLink href="/finance" icon={Landmark} label="Finance" />
+            <QuickLink href="/forecast" icon={TrendingUp} label="Forecast" />
+            <QuickLink href="/analytics" icon={LineChart} label="Analytics" />
+            <QuickLink href="/outreach" icon={Send} label="Outreach" />
+          </div>
         </div>
 
         {/* Recent Activity */}
         <div>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-serif font-bold text-[#0A0A0A]">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
               Recent Activity
-            </h2>
+            </h3>
             <Link
               href="/activity"
-              className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 hover:text-[#0A0A0A]/60"
+              className="font-mono text-[10px] text-[#0A0A0A]/40 hover:text-[#0A0A0A]/60"
             >
               View all
             </Link>
           </div>
           {recentActivity.length === 0 ? (
-            <div className="border border-[#0A0A0A]/10 bg-white py-8 text-center">
-              <p className="text-[#0A0A0A]/40 font-serif text-sm">
+            <div className="border border-[#0A0A0A]/10 bg-white py-6 text-center">
+              <p className="text-[#0A0A0A]/40 font-serif text-xs">
                 No activity yet.
               </p>
             </div>
           ) : (
             <div className="border border-[#0A0A0A]/10 bg-white divide-y divide-[#0A0A0A]/5">
-              {recentActivity.map((entry) => (
+              {recentActivity.slice(0, 8).map((entry) => (
                 <div
                   key={entry.id}
-                  className="px-4 py-3 flex items-center justify-between gap-3"
+                  className="px-3 py-2 flex items-center justify-between gap-2"
                 >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="px-1.5 py-0.5 font-mono text-[8px] uppercase tracking-wider bg-[#0A0A0A]/5 text-[#0A0A0A]/50 shrink-0">
-                      {entry.action.length > 12
-                        ? entry.action.slice(0, 12)
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="px-1 py-0.5 font-mono text-[7px] uppercase tracking-wider bg-[#0A0A0A]/5 text-[#0A0A0A]/50 shrink-0">
+                      {entry.action.length > 10
+                        ? entry.action.slice(0, 10)
                         : entry.action}
                     </span>
-                    <span className="font-serif text-xs text-[#0A0A0A]/60 truncate">
+                    <span className="font-serif text-[11px] text-[#0A0A0A]/60 truncate">
                       {entry.entityType}
                     </span>
                   </div>
-                  <span className="font-mono text-[10px] text-[#0A0A0A]/30 shrink-0">
+                  <span className="font-mono text-[9px] text-[#0A0A0A]/30 shrink-0">
                     {formatDistanceToNow(new Date(entry.createdAt), {
                       addSuffix: true,
                     })}
@@ -565,46 +356,38 @@ async function ActionsZone() {
       </div>
     );
   } catch (err) {
-    console.error("[Dashboard] ActionsZone failed:", err);
+    console.error("[Dashboard] ActionsPanel failed:", err);
     return (
-      <div className="lg:col-span-4">
-        <div className="border border-[#0A0A0A]/10 bg-white p-6 text-center">
-          <p className="text-[#0A0A0A]/40 font-mono text-xs">
-            Failed to load action items
-          </p>
-        </div>
+      <div className="border border-[#0A0A0A]/10 bg-white p-6 text-center">
+        <p className="text-[#0A0A0A]/40 font-mono text-xs">
+          Failed to load actions
+        </p>
       </div>
     );
   }
 }
 
-// ─── Zone loading fallbacks ─────────────────────────────────────────────────
+// ─── Loading Skeletons ──────────────────────────────────────────────────────
 
-function MetricsZoneSkeleton() {
+function MetricsStripSkeleton() {
   return (
-    <div className="lg:col-span-3 grid grid-cols-2 lg:grid-cols-1 gap-3 lg:gap-4">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <div key={i} className="h-24 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div
+          key={i}
+          className="h-16 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10"
+        />
       ))}
     </div>
   );
 }
 
-function ChartsZoneSkeleton() {
+function ActionsPanelSkeleton() {
   return (
-    <div className="lg:col-span-5 space-y-6">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <div key={i} className="h-[268px] bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
-      ))}
-    </div>
-  );
-}
-
-function ActionsZoneSkeleton() {
-  return (
-    <div className="lg:col-span-4 space-y-6">
-      <div className="h-64 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
-      <div className="h-80 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
+    <div className="space-y-4">
+      <div className="h-32 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
+      <div className="h-48 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
+      <div className="h-40 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
     </div>
   );
 }
@@ -615,30 +398,37 @@ export default function DashboardPage() {
   const now = new Date();
 
   return (
-    <div>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold font-serif tracking-tight">
-            {greeting()}, Adam
-          </h1>
-          <p className="text-[#0A0A0A]/40 font-mono text-xs mt-1">
-            {format(now, "EEEE, MMMM d, yyyy")}
-          </p>
+    <div className="flex flex-col h-[calc(100vh-7rem)]">
+      {/* Header + Metrics */}
+      <div className="shrink-0 space-y-3 mb-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-xl font-bold font-serif tracking-tight">
+              {greeting()}, Adam
+            </h1>
+            <p className="text-[#0A0A0A]/40 font-mono text-[10px] mt-0.5">
+              {format(now, "EEEE, MMMM d, yyyy")}
+            </p>
+          </div>
         </div>
+        <Suspense fallback={<MetricsStripSkeleton />}>
+          <MetricsStrip />
+        </Suspense>
       </div>
 
-      {/* 3-Zone Layout — each zone streams independently */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <Suspense fallback={<MetricsZoneSkeleton />}>
-          <MetricsZone />
-        </Suspense>
-        <Suspense fallback={<ChartsZoneSkeleton />}>
-          <ChartsZone />
-        </Suspense>
-        <Suspense fallback={<ActionsZoneSkeleton />}>
-          <ActionsZone />
-        </Suspense>
+      {/* Main: AI Chat + Side Panel */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">
+        {/* AI Chat — primary interface */}
+        <div className="lg:col-span-7 xl:col-span-8 min-h-0 flex flex-col">
+          <AiChat className="flex-1 min-h-0" />
+        </div>
+
+        {/* Side Panel — actions, quick access, activity */}
+        <div className="lg:col-span-5 xl:col-span-4 overflow-y-auto min-h-0">
+          <Suspense fallback={<ActionsPanelSkeleton />}>
+            <ActionsPanel />
+          </Suspense>
+        </div>
       </div>
     </div>
   );
@@ -646,7 +436,7 @@ export default function DashboardPage() {
 
 // ─── Components ──────────────────────────────────────────────────────────────
 
-function MetricCard({
+function MetricPill({
   label,
   value,
   sub,
@@ -655,24 +445,50 @@ function MetricCard({
 }: {
   label: string;
   value: string;
-  sub: string;
+  sub?: string;
   href: string;
   alert?: boolean;
 }) {
   return (
     <Link
       href={href}
-      className={`block border bg-white p-5 hover:bg-[#0A0A0A]/[0.02] transition-colors ${
+      className={`block border bg-white px-3 py-2.5 hover:bg-[#0A0A0A]/[0.02] transition-colors ${
         alert
-          ? "border-red-300 border-l-4 border-l-red-500"
+          ? "border-red-300 border-l-2 border-l-red-500"
           : "border-[#0A0A0A]/10"
       }`}
     >
-      <span className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
+      <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40">
         {label}
       </span>
-      <div className="font-mono text-2xl font-bold mt-1">{value}</div>
-      <span className="font-mono text-xs text-[#0A0A0A]/40">{sub}</span>
+      <div className="flex items-baseline gap-1.5">
+        <span className="font-mono text-lg font-bold">{value}</span>
+        {sub && (
+          <span className="font-mono text-[9px] text-[#0A0A0A]/40">
+            {sub}
+          </span>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+function QuickLink({
+  href,
+  icon: Icon,
+  label,
+}: {
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex items-center gap-2 px-3 py-2 border border-[#0A0A0A]/10 bg-white hover:bg-[#0A0A0A]/[0.02] hover:border-[#0A0A0A]/20 transition-colors"
+    >
+      <Icon className="w-3.5 h-3.5 text-[#0A0A0A]/50" />
+      <span className="font-mono text-[11px] text-[#0A0A0A]/70">{label}</span>
     </Link>
   );
 }
