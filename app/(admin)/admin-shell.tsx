@@ -18,7 +18,7 @@ import {
   TrendingUp,
   CalendarDays,
   MessageSquare,
-  Bot,
+  Sparkles,
   Bell,
   Activity,
   Settings,
@@ -33,6 +33,7 @@ import {
   LineChart,
   BookOpen,
   ShieldCheck,
+  Send,
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { CompanySwitcher } from "@/components/company-switcher";
@@ -58,7 +59,8 @@ const NAV_ITEMS = [
   { label: "Scorecard", href: "/scorecard", icon: BarChart3 },
   { label: "Meetings", href: "/meetings", icon: CalendarDays },
   { label: "Messages", href: "/messages", icon: MessageSquare },
-  { label: "AI", href: "/ai", icon: Bot },
+  { label: "Outreach", href: "/outreach", icon: Send },
+  { label: "AI", href: "/ai", icon: Sparkles },
   { label: "Alerts", href: "/alerts", icon: Bell },
   { label: "Compliance", href: "/compliance", icon: ShieldCheck },
   { label: "Activity", href: "/activity", icon: Activity },

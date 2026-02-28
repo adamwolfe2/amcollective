@@ -12,4 +12,5 @@ export * as clerk from "./clerk";
 export * as posthog from "./posthog";
 export * as mercury from "./mercury";
 export * as linear from "./linear";
+export * as emailbison from "./emailbison";
 export { type ConnectorResult, invalidateCache } from "./base";
