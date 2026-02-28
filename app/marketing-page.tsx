@@ -131,7 +131,8 @@ export function MarketingPage() {
       {/* ─── Hero ──────────────────────────────────────────────────────── */}
       <section
         ref={heroRef}
-        className="relative w-full h-[55vh] sm:h-[65vh] md:h-[85vh] overflow-hidden bg-white"
+        className="relative w-full h-[55vh] sm:h-[65vh] md:h-[85vh] overflow-hidden"
+        style={{ backgroundColor: "#b8c4d1" }}
       >
         {/* Login link — always routes to app subdomain */}
         <div className="absolute top-6 right-6 md:top-8 md:right-10 z-30">
@@ -142,15 +143,6 @@ export function MarketingPage() {
             login
           </a>
         </div>
-
-        {/* Base layer — full Portland image fills entire hero,
-             guarantees zero white gaps behind parallax layers */}
-        <img
-          src="/portland.avif"
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover object-bottom select-none pointer-events-none"
-          draggable={false}
-        />
 
         {/* Parallax layers — each wrapped in an oversized div so
              translate never exposes gaps. translate3d for GPU compositing. */}
