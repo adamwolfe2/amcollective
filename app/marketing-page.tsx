@@ -144,6 +144,15 @@ export function MarketingPage() {
           </Link>
         </div>
 
+        {/* Base layer — full Portland image fills entire hero,
+             guarantees zero white gaps behind parallax layers */}
+        <img
+          src="/portland.avif"
+          alt=""
+          className="absolute inset-0 w-full h-full object-cover object-bottom select-none pointer-events-none"
+          draggable={false}
+        />
+
         {/* Parallax layers — each wrapped in an oversized div so
              translate never exposes gaps. translate3d for GPU compositing. */}
         <div className="absolute inset-0">
