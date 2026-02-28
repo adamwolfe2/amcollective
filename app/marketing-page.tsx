@@ -94,8 +94,8 @@ type Tab = (typeof TABS)[number];
 // ─── Intro Animation ────────────────────────────────────────────────────────
 
 const INTRO_TEXT = "AM Collective";
-const LETTER_STAGGER_MS = 55; // delay between each letter
-const LETTER_DURATION_MS = 400; // each letter's slide-up duration
+const LETTER_STAGGER_MS = 50; // delay between each letter
+const LETTER_DURATION_MS = 300; // each letter's slide-up duration
 const HOLD_MS = 350; // pause after all letters land
 const SLIDE_DURATION_MS = 700; // white panel slides up
 
@@ -133,7 +133,7 @@ function IntroOverlay({ onComplete }: { onComplete: () => void }) {
             : "none",
       }}
     >
-      <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-medium text-[#0A0A0A] flex overflow-hidden">
+      <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-light text-[#0A0A0A] flex overflow-hidden">
         {INTRO_TEXT.split("").map((char, i) => (
           <span
             key={i}
@@ -349,7 +349,7 @@ export function MarketingPage() {
       <section className="relative z-20 bg-white">
         <div className="max-w-2xl mx-auto px-5 sm:px-6 pt-10 sm:pt-16 pb-8 sm:pb-12 text-center">
           <h1
-            className="font-serif text-3xl sm:text-4xl md:text-5xl font-medium text-[#0A0A0A] mb-6 sm:mb-8 opacity-0"
+            className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-[#0A0A0A] mb-6 sm:mb-8 opacity-0"
             data-animate
           >
             Welcome.
