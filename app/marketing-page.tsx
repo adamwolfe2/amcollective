@@ -149,7 +149,7 @@ export function MarketingPage() {
         <div className="absolute inset-0">
           {/* Layer 3: Mountain + sky (back, slowest) — slight blur for depth */}
           <div
-            className="absolute inset-x-0 -top-[15%] bottom-0 will-change-transform"
+            className="absolute inset-x-0 -top-[20%] -bottom-[10%] will-change-transform"
             style={{
               transform: `translate3d(0, ${scrollY * 0.02}px, 0)`,
               filter: "blur(1.5px)",
@@ -158,7 +158,8 @@ export function MarketingPage() {
             <img
               src="/3.png"
               alt=""
-              className="w-full h-full object-cover object-bottom select-none pointer-events-none"
+              className="w-full h-full object-cover select-none pointer-events-none"
+              style={{ objectPosition: "center 30%" }}
               draggable={false}
             />
           </div>
@@ -216,7 +217,7 @@ export function MarketingPage() {
 
           {/* Layer 2: Mid-ground trees & buildings — very slight blur */}
           <div
-            className="absolute inset-x-0 -top-[10%] bottom-0 will-change-transform"
+            className="absolute inset-x-0 -top-[15%] -bottom-[5%] will-change-transform"
             style={{
               transform: `translate3d(0, ${scrollY * 0.06}px, 0)`,
               filter: "blur(0.5px)",
@@ -225,7 +226,8 @@ export function MarketingPage() {
             <img
               src="/2.png"
               alt=""
-              className="w-full h-full object-cover object-bottom select-none pointer-events-none"
+              className="w-full h-full object-cover select-none pointer-events-none"
+              style={{ objectPosition: "center 40%" }}
               draggable={false}
             />
           </div>
@@ -241,13 +243,14 @@ export function MarketingPage() {
 
           {/* Layer 1: Foreground buildings (front, sharpest) */}
           <div
-            className="absolute inset-x-0 -top-[5%] bottom-0 will-change-transform"
+            className="absolute inset-x-0 -top-[10%] -bottom-[5%] will-change-transform"
             style={{ transform: `translate3d(0, ${scrollY * 0.12}px, 0)` }}
           >
             <img
               src="/1.png"
               alt=""
-              className="w-full h-full object-cover object-bottom select-none pointer-events-none"
+              className="w-full h-full object-cover select-none pointer-events-none"
+              style={{ objectPosition: "center 50%" }}
               draggable={false}
             />
           </div>
@@ -345,36 +348,42 @@ function VenturesTab() {
           data-animate
           style={{ animationDelay: `${i * 0.08}s` }}
         >
-          <div className="flex flex-col items-center text-center max-w-2xl mx-auto">
-            {/* Info */}
-            <div className="mb-4">
-              <Image
-                src={venture.logo}
-                alt={`${venture.name} logo`}
-                width={36}
-                height={36}
-                className="object-contain mx-auto"
-                unoptimized
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-start">
+            {/* Left: Info */}
+            <div className="flex flex-col justify-between min-h-0 md:min-h-[200px]">
+              <div>
+                <div className="mb-4">
+                  <Image
+                    src={venture.logo}
+                    alt={`${venture.name} logo`}
+                    width={36}
+                    height={36}
+                    className="object-contain"
+                    unoptimized
+                  />
+                </div>
+                <h3 className="font-serif text-xl font-medium text-[#0A0A0A] mb-3">
+                  {venture.name}
+                </h3>
+                <p className="font-serif text-sm leading-relaxed text-[#0A0A0A]/55">
+                  {venture.description}
+                </p>
+              </div>
+              <div className="mt-6">
+                <a
+                  href={venture.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 font-serif text-sm text-[#0A0A0A] border border-[#0A0A0A]/15 rounded px-5 py-2 hover:border-[#0A0A0A]/40 transition-colors group"
+                >
+                  Visit site
+                  <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+                </a>
+              </div>
             </div>
-            <h3 className="font-serif text-xl font-medium text-[#0A0A0A] mb-3">
-              {venture.name}
-            </h3>
-            <p className="font-serif text-sm leading-relaxed text-[#0A0A0A]/55 mb-6">
-              {venture.description}
-            </p>
-            <a
-              href={venture.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 font-serif text-sm text-[#0A0A0A] border border-[#0A0A0A]/15 rounded px-5 py-2 hover:border-[#0A0A0A]/40 transition-colors group mb-8"
-            >
-              Visit site
-              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-            </a>
 
-            {/* Screenshot */}
-            <div className="relative overflow-hidden rounded-sm border border-[#0A0A0A]/5 w-full">
+            {/* Right: Screenshot */}
+            <div className="relative overflow-hidden rounded-sm border border-[#0A0A0A]/5">
               <Image
                 src={venture.social}
                 alt={`${venture.name} screenshot`}
@@ -462,7 +471,7 @@ function TeamTab() {
               alt={person.name}
               width={56}
               height={56}
-              className="rounded-full object-cover w-14 h-14"
+              className="rounded object-cover w-14 h-14"
               unoptimized
             />
           </div>
