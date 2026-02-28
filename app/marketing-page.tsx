@@ -147,10 +147,13 @@ export function MarketingPage() {
         {/* Parallax layers — each wrapped in an oversized div so
              translate never exposes gaps. translate3d for GPU compositing. */}
         <div className="absolute inset-0">
-          {/* Layer 3: Mountain + sky (back, slowest) */}
+          {/* Layer 3: Mountain + sky (back, slowest) — slight blur for depth */}
           <div
             className="absolute inset-x-0 -top-[15%] bottom-0 will-change-transform"
-            style={{ transform: `translate3d(0, ${scrollY * 0.02}px, 0)` }}
+            style={{
+              transform: `translate3d(0, ${scrollY * 0.02}px, 0)`,
+              filter: "blur(1.5px)",
+            }}
           >
             <img
               src="/3.png"
@@ -160,17 +163,27 @@ export function MarketingPage() {
             />
           </div>
 
-          {/* Clouds — sized to stay in the sky zone, no CSS animation
-               (CSS keyframe transforms conflict with inline scroll transforms) */}
+          {/* Atmospheric haze between back and mid layers */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "linear-gradient(to bottom, rgba(220,225,235,0.25) 0%, rgba(255,255,255,0.1) 40%, transparent 65%)",
+            }}
+          />
+
+          {/* Clouds — mix-blend-mode:darken makes the white background
+               invisible while keeping cloud texture visible against the sky */}
           <img
             src="/cloud.png"
             alt=""
             className="absolute w-[55%] md:w-[45%] h-auto select-none pointer-events-none will-change-transform"
             style={{
-              top: "2%",
+              top: "0%",
               left: "-5%",
               transform: `translate3d(${scrollY * 0.01}px, ${scrollY * 0.03}px, 0)`,
-              opacity: 0.85,
+              opacity: 0.9,
+              mixBlendMode: "darken",
             }}
             draggable={false}
           />
@@ -179,10 +192,11 @@ export function MarketingPage() {
             alt=""
             className="absolute w-[50%] md:w-[40%] h-auto select-none pointer-events-none will-change-transform"
             style={{
-              top: "5%",
+              top: "3%",
               right: "-5%",
               transform: `translate3d(${scrollY * -0.015}px, ${scrollY * 0.025}px, 0) scaleX(-1)`,
-              opacity: 0.6,
+              opacity: 0.7,
+              mixBlendMode: "darken",
             }}
             draggable={false}
           />
@@ -191,18 +205,22 @@ export function MarketingPage() {
             alt=""
             className="absolute w-[40%] md:w-[30%] h-auto select-none pointer-events-none will-change-transform"
             style={{
-              top: "10%",
+              top: "8%",
               left: "20%",
               transform: `translate3d(${scrollY * 0.02}px, ${scrollY * 0.015}px, 0)`,
-              opacity: 0.4,
+              opacity: 0.5,
+              mixBlendMode: "darken",
             }}
             draggable={false}
           />
 
-          {/* Layer 2: Mid-ground trees & buildings */}
+          {/* Layer 2: Mid-ground trees & buildings — very slight blur */}
           <div
             className="absolute inset-x-0 -top-[10%] bottom-0 will-change-transform"
-            style={{ transform: `translate3d(0, ${scrollY * 0.06}px, 0)` }}
+            style={{
+              transform: `translate3d(0, ${scrollY * 0.06}px, 0)`,
+              filter: "blur(0.5px)",
+            }}
           >
             <img
               src="/2.png"
@@ -212,7 +230,16 @@ export function MarketingPage() {
             />
           </div>
 
-          {/* Layer 1: Foreground buildings (front, fastest) */}
+          {/* Warm haze between mid and foreground — softens layer edges */}
+          <div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background:
+                "linear-gradient(to bottom, transparent 30%, rgba(245,243,238,0.15) 55%, rgba(255,255,255,0.25) 80%, transparent 100%)",
+            }}
+          />
+
+          {/* Layer 1: Foreground buildings (front, sharpest) */}
           <div
             className="absolute inset-x-0 -top-[5%] bottom-0 will-change-transform"
             style={{ transform: `translate3d(0, ${scrollY * 0.12}px, 0)` }}
@@ -226,8 +253,15 @@ export function MarketingPage() {
           </div>
         </div>
 
-        {/* Gradient fade to white at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-white via-white/80 to-transparent z-10" />
+        {/* Gradient fade to white at bottom — tall and smooth */}
+        <div
+          className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none"
+          style={{
+            height: "45%",
+            background:
+              "linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.95) 15%, rgba(255,255,255,0.6) 40%, rgba(255,255,255,0.2) 70%, transparent 100%)",
+          }}
+        />
       </section>
 
       {/* ─── Welcome ───────────────────────────────────────────────────── */}
