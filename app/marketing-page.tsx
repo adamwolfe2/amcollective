@@ -144,80 +144,86 @@ export function MarketingPage() {
           </Link>
         </div>
 
-        {/* Parallax layers */}
+        {/* Parallax layers — each wrapped in an oversized div so
+             translate never exposes gaps. translate3d for GPU compositing. */}
         <div className="absolute inset-0">
           {/* Layer 3: Mountain + sky (back, slowest) */}
-          <img
-            src="/3.png"
-            alt=""
-            className="absolute w-full h-auto bottom-0 left-0 will-change-transform select-none pointer-events-none"
-            style={{
-              transform: `translateY(${scrollY * 0.05}px)`,
-              minWidth: "100%",
-            }}
-            draggable={false}
-          />
+          <div
+            className="absolute inset-x-0 -top-[15%] bottom-0 will-change-transform"
+            style={{ transform: `translate3d(0, ${scrollY * 0.02}px, 0)` }}
+          >
+            <img
+              src="/3.png"
+              alt=""
+              className="w-full h-full object-cover object-bottom select-none pointer-events-none"
+              draggable={false}
+            />
+          </div>
 
-          {/* Cloud layers: multiple at different positions, speeds, and sizes */}
+          {/* Clouds — sized to stay in the sky zone, no CSS animation
+               (CSS keyframe transforms conflict with inline scroll transforms) */}
           <img
             src="/cloud.png"
             alt=""
-            className="absolute w-[160%] md:w-[110%] h-auto select-none pointer-events-none will-change-transform animate-cloud-drift"
+            className="absolute w-[55%] md:w-[45%] h-auto select-none pointer-events-none will-change-transform"
             style={{
               top: "2%",
-              left: "-15%",
-              transform: `translateX(${scrollY * 0.02}px) translateY(${scrollY * 0.06}px)`,
-              opacity: 0.9,
+              left: "-5%",
+              transform: `translate3d(${scrollY * 0.01}px, ${scrollY * 0.03}px, 0)`,
+              opacity: 0.85,
             }}
             draggable={false}
           />
           <img
             src="/cloud.png"
             alt=""
-            className="absolute w-[140%] md:w-[80%] h-auto select-none pointer-events-none will-change-transform animate-cloud-drift-reverse"
+            className="absolute w-[50%] md:w-[40%] h-auto select-none pointer-events-none will-change-transform"
             style={{
-              top: "8%",
-              right: "-20%",
-              transform: `translateX(${scrollY * -0.03}px) translateY(${scrollY * 0.04}px) scaleX(-1)`,
-              opacity: 0.7,
+              top: "5%",
+              right: "-5%",
+              transform: `translate3d(${scrollY * -0.015}px, ${scrollY * 0.025}px, 0) scaleX(-1)`,
+              opacity: 0.6,
             }}
             draggable={false}
           />
           <img
             src="/cloud.png"
             alt=""
-            className="absolute w-[120%] md:w-[70%] h-auto select-none pointer-events-none will-change-transform animate-cloud-drift-slow"
+            className="absolute w-[40%] md:w-[30%] h-auto select-none pointer-events-none will-change-transform"
             style={{
-              top: "15%",
-              left: "5%",
-              transform: `translateX(${scrollY * 0.04}px) translateY(${scrollY * 0.03}px)`,
-              opacity: 0.5,
+              top: "10%",
+              left: "20%",
+              transform: `translate3d(${scrollY * 0.02}px, ${scrollY * 0.015}px, 0)`,
+              opacity: 0.4,
             }}
             draggable={false}
           />
 
           {/* Layer 2: Mid-ground trees & buildings */}
-          <img
-            src="/2.png"
-            alt=""
-            className="absolute w-full h-auto bottom-0 left-0 will-change-transform select-none pointer-events-none"
-            style={{
-              transform: `translateY(${scrollY * 0.15}px)`,
-              minWidth: "100%",
-            }}
-            draggable={false}
-          />
+          <div
+            className="absolute inset-x-0 -top-[10%] bottom-0 will-change-transform"
+            style={{ transform: `translate3d(0, ${scrollY * 0.06}px, 0)` }}
+          >
+            <img
+              src="/2.png"
+              alt=""
+              className="w-full h-full object-cover object-bottom select-none pointer-events-none"
+              draggable={false}
+            />
+          </div>
+
           {/* Layer 1: Foreground buildings (front, fastest) */}
-          <img
-            src="/1.png"
-            alt=""
-            className="absolute w-full h-auto bottom-0 left-0 will-change-transform select-none pointer-events-none"
-            style={{
-              transform: `translateY(${scrollY * 0.3}px)`,
-              minWidth: "100%",
-            }}
-            draggable={false}
-          />
+          <div
+            className="absolute inset-x-0 -top-[5%] bottom-0 will-change-transform"
+            style={{ transform: `translate3d(0, ${scrollY * 0.12}px, 0)` }}
+          >
+            <img
+              src="/1.png"
+              alt=""
+              className="w-full h-full object-cover object-bottom select-none pointer-events-none"
+              draggable={false}
+            />
+          </div>
         </div>
 
         {/* Gradient fade to white at bottom */}
