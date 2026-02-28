@@ -169,9 +169,14 @@ export default async function ProjectDetailPage({
             </Badge>
           </div>
           {project.domain && (
-            <p className="text-sm font-mono text-[#0A0A0A]/50">
+            <a
+              href={`https://${project.domain}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm font-mono text-[#0A0A0A]/50 hover:text-[#0A0A0A] hover:underline underline-offset-2 transition-colors"
+            >
               {project.domain}
-            </p>
+            </a>
           )}
         </div>
         <span className="text-xs font-mono text-[#0A0A0A]/30">

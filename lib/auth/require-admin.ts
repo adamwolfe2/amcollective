@@ -28,6 +28,7 @@ const MEMBER_ROLES = ["owner", "admin", "member"] as const;
 const DEFAULT_ADMIN_EMAILS = [
   "adamwolfe102@gmail.com",
   "maggie@amcollectivecapital.com",
+  "maggiebyrne78@gmail.com",
 ];
 
 export const SUPER_ADMIN_EMAILS: readonly string[] = (
