@@ -9,6 +9,7 @@ import {
   Send,
   ArrowRight,
 } from "lucide-react";
+import { ParallaxHero } from "@/components/ParallaxHero";
 
 // ─── Ventures Data ──────────────────────────────────────────────────────────
 
@@ -160,13 +161,13 @@ function IntroOverlay({
 export function MarketingPage() {
   const [activeTab, setActiveTab] = useState<Tab>("ventures");
   const [introComplete, setIntroComplete] = useState(false);
-  const heroRef = useRef<HTMLDivElement>(null);
+  const [heroAnimateIn, setHeroAnimateIn] = useState(false);
   const welcomeRef = useRef<HTMLDivElement>(null);
 
-  // Panel slides up revealing skyline, then after a beat the page
-  // smooth-scrolls past the mountains to Welcome — one fluid sequence.
+  // Panel slides up → mountains rise in → page auto-scrolls to Welcome.
   const handleSlideStart = useCallback(() => {
     document.body.style.overflow = "";
+    setHeroAnimateIn(true); // trigger parallax layer rise
     setTimeout(() => {
       if (welcomeRef.current) {
         welcomeRef.current.scrollIntoView({ behavior: "smooth" });
@@ -220,41 +221,19 @@ export function MarketingPage() {
         />
       )}
       {/* ─── Hero ──────────────────────────────────────────────────────── */}
-      <section
-        ref={heroRef}
-        className="relative w-full h-[50vh] sm:h-[60vh] md:h-[80vh] overflow-hidden"
-      >
-        {/* Login link — always routes to app subdomain */}
-        <div className="absolute top-6 right-6 md:top-8 md:right-10 z-20">
-          <a
-            href="https://app.amcollectivecapital.com/sign-in"
-            className="font-serif text-sm text-white/50 hover:text-white transition-colors"
-          >
-            login
-          </a>
-        </div>
-
-        {/* Single clean Portland skyline — priority load for instant display */}
-        <Image
-          src="/portland.avif"
-          alt="Portland skyline with Mt. Hood"
-          fill
-          priority
-          unoptimized
-          className="object-cover object-[center_25%] select-none pointer-events-none"
-          sizes="100vw"
-        />
-
-        {/* Gradient fade to white at bottom */}
-        <div
-          className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none"
-          style={{
-            height: "40%",
-            background:
-              "linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.9) 20%, rgba(255,255,255,0.4) 50%, transparent 100%)",
-          }}
-        />
-      </section>
+      <ParallaxHero
+        animateIn={heroAnimateIn}
+        overlay={
+          <div className="absolute top-6 right-6 md:top-8 md:right-10">
+            <a
+              href="https://app.amcollectivecapital.com/sign-in"
+              className="font-serif text-sm text-white/50 hover:text-white transition-colors"
+            >
+              login
+            </a>
+          </div>
+        }
+      />
 
       {/* ─── Welcome ───────────────────────────────────────────────────── */}
       <section ref={welcomeRef} className="relative z-20 bg-white">

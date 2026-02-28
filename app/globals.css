@@ -170,6 +170,18 @@ html {
   animation: fade-up 0.5s ease-out both;
 }
 
+/* ── Parallax layer rise (synced with intro panel slide-up) ───────── */
+@keyframes parallax-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 80px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
 /* ── Intro letter cascade ─────────────────────────────────────────── */
 @keyframes intro-letter-in {
   0% {
