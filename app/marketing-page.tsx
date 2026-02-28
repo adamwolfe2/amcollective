@@ -132,7 +132,7 @@ export function MarketingPage() {
       {/* ─── Hero ──────────────────────────────────────────────────────── */}
       <section
         ref={heroRef}
-        className="relative w-full h-[70vh] md:h-[85vh] overflow-hidden bg-white"
+        className="relative w-full h-[55vh] sm:h-[65vh] md:h-[85vh] overflow-hidden bg-white"
       >
         {/* Login link */}
         <div className="absolute top-6 right-6 md:top-8 md:right-10 z-30">
@@ -157,6 +157,45 @@ export function MarketingPage() {
             }}
             draggable={false}
           />
+
+          {/* Cloud layers: multiple at different positions, speeds, and sizes */}
+          <img
+            src="/cloud.png"
+            alt=""
+            className="absolute w-[160%] md:w-[110%] h-auto select-none pointer-events-none will-change-transform animate-cloud-drift"
+            style={{
+              top: "2%",
+              left: "-15%",
+              transform: `translateX(${scrollY * 0.02}px) translateY(${scrollY * 0.06}px)`,
+              opacity: 0.9,
+            }}
+            draggable={false}
+          />
+          <img
+            src="/cloud.png"
+            alt=""
+            className="absolute w-[140%] md:w-[80%] h-auto select-none pointer-events-none will-change-transform animate-cloud-drift-reverse"
+            style={{
+              top: "8%",
+              right: "-20%",
+              transform: `translateX(${scrollY * -0.03}px) translateY(${scrollY * 0.04}px) scaleX(-1)`,
+              opacity: 0.7,
+            }}
+            draggable={false}
+          />
+          <img
+            src="/cloud.png"
+            alt=""
+            className="absolute w-[120%] md:w-[70%] h-auto select-none pointer-events-none will-change-transform animate-cloud-drift-slow"
+            style={{
+              top: "15%",
+              left: "5%",
+              transform: `translateX(${scrollY * 0.04}px) translateY(${scrollY * 0.03}px)`,
+              opacity: 0.5,
+            }}
+            draggable={false}
+          />
+
           {/* Layer 2: Mid-ground trees & buildings */}
           <img
             src="/2.png"
@@ -182,20 +221,20 @@ export function MarketingPage() {
         </div>
 
         {/* Gradient fade to white at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-white to-transparent z-10" />
+        <div className="absolute bottom-0 left-0 right-0 h-40 bg-gradient-to-t from-white via-white/80 to-transparent z-10" />
       </section>
 
       {/* ─── Welcome ───────────────────────────────────────────────────── */}
       <section className="relative z-20 bg-white">
-        <div className="max-w-2xl mx-auto px-6 pt-16 pb-12 text-center">
+        <div className="max-w-2xl mx-auto px-5 sm:px-6 pt-10 sm:pt-16 pb-8 sm:pb-12 text-center">
           <h1
-            className="font-serif text-4xl md:text-5xl font-medium text-[#0A0A0A] mb-8 opacity-0"
+            className="font-serif text-3xl sm:text-4xl md:text-5xl font-medium text-[#0A0A0A] mb-6 sm:mb-8 opacity-0"
             data-animate
           >
             Welcome.
           </h1>
           <p
-            className="font-serif text-base md:text-lg leading-relaxed text-[#0A0A0A]/70 opacity-0"
+            className="font-serif text-sm sm:text-base md:text-lg leading-relaxed text-[#0A0A0A]/70 opacity-0"
             data-animate
             style={{ animationDelay: "0.1s" }}
           >
@@ -210,9 +249,9 @@ export function MarketingPage() {
         </div>
 
         {/* ─── Tab Navigation ────────────────────────────────────────── */}
-        <div className="max-w-2xl mx-auto px-6 pb-2">
+        <div className="max-w-2xl mx-auto px-5 sm:px-6 pb-2">
           <div
-            className="flex items-center gap-6 opacity-0"
+            className="flex items-center gap-5 sm:gap-6 opacity-0"
             data-animate
             style={{ animationDelay: "0.2s" }}
           >
@@ -234,8 +273,8 @@ export function MarketingPage() {
       </section>
 
       {/* ─── Tab Content ───────────────────────────────────────────────── */}
-      <section className="relative z-20 bg-white pb-32">
-        <div className="max-w-5xl mx-auto px-6">
+      <section className="relative z-20 bg-white pb-16 sm:pb-32">
+        <div className="max-w-5xl mx-auto px-5 sm:px-6">
           {activeTab === "ventures" && <VenturesTab />}
           {activeTab === "team" && <TeamTab />}
           {activeTab === "contact" && <ContactTab />}
@@ -243,8 +282,8 @@ export function MarketingPage() {
       </section>
 
       {/* ─── Footer ────────────────────────────────────────────────────── */}
-      <footer className="bg-white border-t border-[#0A0A0A]/5 py-8">
-        <div className="max-w-5xl mx-auto px-6 text-center">
+      <footer className="bg-white border-t border-[#0A0A0A]/5 py-6 sm:py-8">
+        <div className="max-w-5xl mx-auto px-5 sm:px-6 text-center">
           <p className="font-serif text-xs text-[#0A0A0A]/25">
             AM Collective Capital &middot; Portland, OR
           </p>
@@ -262,13 +301,13 @@ function VenturesTab() {
       {VENTURES.map((venture, i) => (
         <div
           key={venture.name}
-          className="border-t border-[#0A0A0A]/5 py-12 md:py-16 opacity-0"
+          className="border-t border-[#0A0A0A]/5 py-8 sm:py-12 md:py-16 opacity-0"
           data-animate
           style={{ animationDelay: `${i * 0.08}s` }}
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 items-start">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-start">
             {/* Left: Info */}
-            <div className="flex flex-col justify-between min-h-[200px]">
+            <div className="flex flex-col justify-between min-h-0 md:min-h-[200px]">
               <div>
                 <div className="mb-4">
                   <Image
@@ -322,9 +361,9 @@ function VenturesTab() {
 
 function TeamTab() {
   return (
-    <div className="pt-10 max-w-2xl mx-auto">
+    <div className="pt-8 sm:pt-10 max-w-2xl mx-auto">
       {/* Narrative */}
-      <div className="space-y-6 mb-16">
+      <div className="space-y-5 sm:space-y-6 mb-10 sm:mb-16">
         <p
           className="font-serif text-sm leading-relaxed text-[#0A0A0A]/70 opacity-0"
           data-animate
@@ -473,9 +512,9 @@ function ContactTab() {
   }
 
   return (
-    <div className="pt-10 max-w-lg mx-auto">
+    <div className="pt-8 sm:pt-10 max-w-lg mx-auto">
       <h2
-        className="font-serif text-xl text-center text-[#0A0A0A]/80 mb-10 opacity-0"
+        className="font-serif text-lg sm:text-xl text-center text-[#0A0A0A]/80 mb-8 sm:mb-10 opacity-0"
         data-animate
       >
         Explore How We Can Work Together
@@ -554,7 +593,7 @@ function ContactTab() {
 
       {/* Cal.com Embed */}
       <div
-        className="mt-16 opacity-0"
+        className="mt-10 sm:mt-16 opacity-0"
         data-animate
         style={{ animationDelay: "0.15s" }}
       >
