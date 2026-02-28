@@ -164,13 +164,16 @@ export function MarketingPage() {
   const heroRef = useRef<HTMLDivElement>(null);
   const welcomeRef = useRef<HTMLDivElement>(null);
 
-  // Panel slide + scroll to Welcome happen simultaneously.
-  // User sees the mountains mid-scroll as one fluid motion.
+  // Panel slides up revealing skyline, then after a beat the page
+  // smooth-scrolls past the mountains to Welcome — one fluid sequence.
   const handleSlideStart = useCallback(() => {
     document.body.style.overflow = "";
-    if (welcomeRef.current) {
-      welcomeRef.current.scrollIntoView({ behavior: "smooth" });
-    }
+    // Short delay so the skyline is visible before scroll begins
+    setTimeout(() => {
+      if (welcomeRef.current) {
+        welcomeRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    }, 800);
   }, []);
 
   const handleIntroComplete = useCallback(() => {
@@ -558,10 +561,11 @@ function TeamTab() {
       </div>
 
       {/* Bios */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-12">
       {TEAM.map((person, i) => (
         <div
           key={person.name}
-          className="mb-12 opacity-0"
+          className="opacity-0"
           data-animate
           style={{ animationDelay: `${0.25 + i * 0.1}s` }}
         >
@@ -617,6 +621,7 @@ function TeamTab() {
           </div>
         </div>
       ))}
+      </div>
     </div>
   );
 }
