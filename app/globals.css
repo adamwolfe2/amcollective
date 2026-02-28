@@ -36,6 +36,10 @@
   --cream: #F5F3EE;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* ── Selection ──────────────────────────────────────────────────────────── */
 ::selection {
   background: var(--blue);

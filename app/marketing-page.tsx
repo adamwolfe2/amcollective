@@ -101,14 +101,21 @@ const SLIDE_DURATION_MS = 700; // white panel slides up
 
 // Total: ~55*13 + 350 + 700 ≈ 1.76s
 
-function IntroOverlay({ onComplete }: { onComplete: () => void }) {
+function IntroOverlay({
+  onSlideStart,
+  onComplete,
+}: {
+  onSlideStart: () => void;
+  onComplete: () => void;
+}) {
   const [phase, setPhase] = useState<"letters" | "slide" | "done">("letters");
 
   useEffect(() => {
-    // After all letters land + hold, start the slide
     const lettersTotal = INTRO_TEXT.length * LETTER_STAGGER_MS + LETTER_DURATION_MS;
-    const slideTimer = setTimeout(() => setPhase("slide"), lettersTotal + HOLD_MS);
-    // After slide completes, mark done
+    const slideTimer = setTimeout(() => {
+      setPhase("slide");
+      onSlideStart();
+    }, lettersTotal + HOLD_MS);
     const doneTimer = setTimeout(() => {
       setPhase("done");
       onComplete();
@@ -118,7 +125,7 @@ function IntroOverlay({ onComplete }: { onComplete: () => void }) {
       clearTimeout(slideTimer);
       clearTimeout(doneTimer);
     };
-  }, [onComplete]);
+  }, [onSlideStart, onComplete]);
 
   if (phase === "done") return null;
 
@@ -155,6 +162,17 @@ export function MarketingPage() {
   const [scrollY, setScrollY] = useState(0);
   const [introComplete, setIntroComplete] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
+  const welcomeRef = useRef<HTMLDivElement>(null);
+
+  // When the white panel starts sliding up, auto-scroll to Welcome
+  const handleSlideStart = useCallback(() => {
+    // Unlock scroll first so scrollTo works
+    document.body.style.overflow = "";
+    // Scroll smoothly to the Welcome section
+    if (welcomeRef.current) {
+      welcomeRef.current.scrollIntoView({ behavior: "smooth" });
+    }
+  }, []);
 
   const handleIntroComplete = useCallback(() => {
     setIntroComplete(true);
@@ -205,7 +223,12 @@ export function MarketingPage() {
   return (
     <div className="bg-white min-h-screen">
       {/* ─── Intro Animation Overlay ─────────────────────────────────── */}
-      {!introComplete && <IntroOverlay onComplete={handleIntroComplete} />}
+      {!introComplete && (
+        <IntroOverlay
+          onSlideStart={handleSlideStart}
+          onComplete={handleIntroComplete}
+        />
+      )}
       {/* ─── Hero ──────────────────────────────────────────────────────── */}
       <section
         ref={heroRef}
@@ -346,7 +369,7 @@ export function MarketingPage() {
       </section>
 
       {/* ─── Welcome ───────────────────────────────────────────────────── */}
-      <section className="relative z-20 bg-white">
+      <section ref={welcomeRef} className="relative z-20 bg-white">
         <div className="max-w-2xl mx-auto px-5 sm:px-6 pt-10 sm:pt-16 pb-8 sm:pb-12 text-center">
           <h1
             className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-[#0A0A0A] mb-6 sm:mb-8 opacity-0"
