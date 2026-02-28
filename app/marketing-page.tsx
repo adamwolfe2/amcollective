@@ -291,7 +291,7 @@ export function MarketingPage() {
         {/* ─── Tab Navigation ────────────────────────────────────────── */}
         <div className="max-w-2xl mx-auto px-5 sm:px-6 pb-2">
           <div
-            className="flex items-center gap-5 sm:gap-6 opacity-0"
+            className="flex items-center justify-center gap-5 sm:gap-6 opacity-0"
             data-animate
             style={{ animationDelay: "0.2s" }}
           >
@@ -345,42 +345,36 @@ function VenturesTab() {
           data-animate
           style={{ animationDelay: `${i * 0.08}s` }}
         >
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 md:gap-12 items-start">
-            {/* Left: Info */}
-            <div className="flex flex-col justify-between min-h-0 md:min-h-[200px]">
-              <div>
-                <div className="mb-4">
-                  <Image
-                    src={venture.logo}
-                    alt={`${venture.name} logo`}
-                    width={36}
-                    height={36}
-                    className="object-contain"
-                    unoptimized
-                  />
-                </div>
-                <h3 className="font-serif text-xl font-medium text-[#0A0A0A] mb-3">
-                  {venture.name}
-                </h3>
-                <p className="font-serif text-sm leading-relaxed text-[#0A0A0A]/55">
-                  {venture.description}
-                </p>
-              </div>
-              <div className="mt-6">
-                <a
-                  href={venture.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 font-serif text-sm text-[#0A0A0A] border border-[#0A0A0A]/15 rounded-full px-4 py-2 hover:border-[#0A0A0A]/40 transition-colors group"
-                >
-                  Visit site
-                  <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-                </a>
-              </div>
+          <div className="flex flex-col items-center text-center max-w-2xl mx-auto">
+            {/* Info */}
+            <div className="mb-4">
+              <Image
+                src={venture.logo}
+                alt={`${venture.name} logo`}
+                width={36}
+                height={36}
+                className="object-contain mx-auto"
+                unoptimized
+              />
             </div>
+            <h3 className="font-serif text-xl font-medium text-[#0A0A0A] mb-3">
+              {venture.name}
+            </h3>
+            <p className="font-serif text-sm leading-relaxed text-[#0A0A0A]/55 mb-6">
+              {venture.description}
+            </p>
+            <a
+              href={venture.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 font-serif text-sm text-[#0A0A0A] border border-[#0A0A0A]/15 rounded-full px-4 py-2 hover:border-[#0A0A0A]/40 transition-colors group mb-8"
+            >
+              Visit site
+              <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
+            </a>
 
-            {/* Right: Screenshot */}
-            <div className="relative overflow-hidden rounded-sm border border-[#0A0A0A]/5">
+            {/* Screenshot */}
+            <div className="relative overflow-hidden rounded-sm border border-[#0A0A0A]/5 w-full">
               <Image
                 src={venture.social}
                 alt={`${venture.name} screenshot`}
@@ -401,7 +395,7 @@ function VenturesTab() {
 
 function TeamTab() {
   return (
-    <div className="pt-8 sm:pt-10 max-w-2xl mx-auto">
+    <div className="pt-8 sm:pt-10 max-w-2xl mx-auto text-center">
       {/* Narrative */}
       <div className="space-y-5 sm:space-y-6 mb-10 sm:mb-16">
         <p
@@ -462,7 +456,7 @@ function TeamTab() {
           data-animate
           style={{ animationDelay: `${0.25 + i * 0.1}s` }}
         >
-          <div className="mb-3">
+          <div className="mb-3 flex justify-center">
             <Image
               src={person.headshot}
               alt={person.name}
@@ -478,7 +472,7 @@ function TeamTab() {
           <p className="font-serif text-sm leading-relaxed text-[#0A0A0A]/55 mb-4">
             {person.bio}
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center gap-3">
             <a
               href={person.instagram}
               target="_blank"
