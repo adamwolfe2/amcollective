@@ -159,7 +159,6 @@ function IntroOverlay({
 
 export function MarketingPage() {
   const [activeTab, setActiveTab] = useState<Tab>("ventures");
-  const [scrollY, setScrollY] = useState(0);
   const [introComplete, setIntroComplete] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
   const welcomeRef = useRef<HTMLDivElement>(null);
@@ -168,7 +167,6 @@ export function MarketingPage() {
   // smooth-scrolls past the mountains to Welcome — one fluid sequence.
   const handleSlideStart = useCallback(() => {
     document.body.style.overflow = "";
-    // Short delay so the skyline is visible before scroll begins
     setTimeout(() => {
       if (welcomeRef.current) {
         welcomeRef.current.scrollIntoView({ behavior: "smooth" });
@@ -179,16 +177,6 @@ export function MarketingPage() {
   const handleIntroComplete = useCallback(() => {
     setIntroComplete(true);
   }, []);
-
-  // Smooth parallax via scroll listener
-  const handleScroll = useCallback(() => {
-    setScrollY(window.scrollY);
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, [handleScroll]);
 
   // Prevent scroll during intro
   useEffect(() => {
@@ -234,138 +222,35 @@ export function MarketingPage() {
       {/* ─── Hero ──────────────────────────────────────────────────────── */}
       <section
         ref={heroRef}
-        className="relative w-full h-[55vh] sm:h-[65vh] md:h-[85vh] overflow-hidden"
-        style={{ backgroundColor: "#b8c4d1" }}
+        className="relative w-full h-[50vh] sm:h-[60vh] md:h-[80vh] overflow-hidden"
       >
         {/* Login link — always routes to app subdomain */}
-        <div className="absolute top-6 right-6 md:top-8 md:right-10 z-30">
+        <div className="absolute top-6 right-6 md:top-8 md:right-10 z-20">
           <a
             href="https://app.amcollectivecapital.com/sign-in"
-            className="font-serif text-sm text-[#0A0A0A]/40 hover:text-[#0A0A0A] transition-colors"
+            className="font-serif text-sm text-white/50 hover:text-white transition-colors"
           >
             login
           </a>
         </div>
 
-        {/* Parallax layers — each wrapped in an oversized div so
-             translate never exposes gaps. translate3d for GPU compositing. */}
-        <div className="absolute inset-0">
-          {/* Layer 3: Mountain + sky (back, slowest) — slight blur for depth */}
-          <div
-            className="absolute inset-x-0 -top-[20%] -bottom-[10%] will-change-transform"
-            style={{
-              transform: `translate3d(0, ${scrollY * 0.02}px, 0)`,
-              filter: "blur(1.5px)",
-            }}
-          >
-            <img
-              src="/3.png"
-              alt=""
-              className="w-full h-full object-cover select-none pointer-events-none"
-              style={{ objectPosition: "center 30%" }}
-              draggable={false}
-            />
-          </div>
+        {/* Single clean Portland skyline — priority load for instant display */}
+        <Image
+          src="/portland.avif"
+          alt="Portland skyline with Mt. Hood"
+          fill
+          priority
+          className="object-cover object-[center_25%] select-none pointer-events-none"
+          sizes="100vw"
+        />
 
-          {/* Atmospheric haze between back and mid layers */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                "linear-gradient(to bottom, rgba(220,225,235,0.25) 0%, rgba(255,255,255,0.1) 40%, transparent 65%)",
-            }}
-          />
-
-          {/* Clouds — mix-blend-mode:darken makes the white background
-               invisible while keeping cloud texture visible against the sky */}
-          <img
-            src="/cloud.png"
-            alt=""
-            className="absolute w-[55%] md:w-[45%] h-auto select-none pointer-events-none will-change-transform"
-            style={{
-              top: "0%",
-              left: "-5%",
-              transform: `translate3d(${scrollY * 0.01}px, ${scrollY * 0.03}px, 0)`,
-              opacity: 0.9,
-              mixBlendMode: "darken",
-            }}
-            draggable={false}
-          />
-          <img
-            src="/cloud.png"
-            alt=""
-            className="absolute w-[50%] md:w-[40%] h-auto select-none pointer-events-none will-change-transform"
-            style={{
-              top: "3%",
-              right: "-5%",
-              transform: `translate3d(${scrollY * -0.015}px, ${scrollY * 0.025}px, 0) scaleX(-1)`,
-              opacity: 0.7,
-              mixBlendMode: "darken",
-            }}
-            draggable={false}
-          />
-          <img
-            src="/cloud.png"
-            alt=""
-            className="absolute w-[40%] md:w-[30%] h-auto select-none pointer-events-none will-change-transform"
-            style={{
-              top: "8%",
-              left: "20%",
-              transform: `translate3d(${scrollY * 0.02}px, ${scrollY * 0.015}px, 0)`,
-              opacity: 0.5,
-              mixBlendMode: "darken",
-            }}
-            draggable={false}
-          />
-
-          {/* Layer 2: Mid-ground trees & buildings — very slight blur */}
-          <div
-            className="absolute inset-x-0 -top-[15%] -bottom-[5%] will-change-transform"
-            style={{
-              transform: `translate3d(0, ${scrollY * 0.06}px, 0)`,
-              filter: "blur(0.5px)",
-            }}
-          >
-            <img
-              src="/2.png"
-              alt=""
-              className="w-full h-full object-cover select-none pointer-events-none"
-              style={{ objectPosition: "center 40%" }}
-              draggable={false}
-            />
-          </div>
-
-          {/* Warm haze between mid and foreground — softens layer edges */}
-          <div
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              background:
-                "linear-gradient(to bottom, transparent 30%, rgba(245,243,238,0.15) 55%, rgba(255,255,255,0.25) 80%, transparent 100%)",
-            }}
-          />
-
-          {/* Layer 1: Foreground buildings (front, sharpest) */}
-          <div
-            className="absolute inset-x-0 -top-[10%] -bottom-[5%] will-change-transform"
-            style={{ transform: `translate3d(0, ${scrollY * 0.12}px, 0)` }}
-          >
-            <img
-              src="/1.png"
-              alt=""
-              className="w-full h-full object-cover select-none pointer-events-none"
-              style={{ objectPosition: "center 50%" }}
-              draggable={false}
-            />
-          </div>
-        </div>
-
-        {/* Gradient fade to white at bottom — tall and smooth */}
+        {/* Gradient fade to white at bottom */}
         <div
           className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none"
           style={{
-            height: "45%",
+            height: "40%",
             background:
-              "linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.95) 15%, rgba(255,255,255,0.6) 40%, rgba(255,255,255,0.2) 70%, transparent 100%)",
+              "linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.9) 20%, rgba(255,255,255,0.4) 50%, transparent 100%)",
           }}
         />
       </section>
