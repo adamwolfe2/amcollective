@@ -91,10 +91,74 @@ type Tab = (typeof TABS)[number];
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
+// ─── Intro Animation ────────────────────────────────────────────────────────
+
+const INTRO_TEXT = "AM Collective";
+const LETTER_STAGGER_MS = 55; // delay between each letter
+const LETTER_DURATION_MS = 400; // each letter's slide-up duration
+const HOLD_MS = 350; // pause after all letters land
+const SLIDE_DURATION_MS = 700; // white panel slides up
+
+// Total: ~55*13 + 350 + 700 ≈ 1.76s
+
+function IntroOverlay({ onComplete }: { onComplete: () => void }) {
+  const [phase, setPhase] = useState<"letters" | "slide" | "done">("letters");
+
+  useEffect(() => {
+    // After all letters land + hold, start the slide
+    const lettersTotal = INTRO_TEXT.length * LETTER_STAGGER_MS + LETTER_DURATION_MS;
+    const slideTimer = setTimeout(() => setPhase("slide"), lettersTotal + HOLD_MS);
+    // After slide completes, mark done
+    const doneTimer = setTimeout(() => {
+      setPhase("done");
+      onComplete();
+    }, lettersTotal + HOLD_MS + SLIDE_DURATION_MS);
+
+    return () => {
+      clearTimeout(slideTimer);
+      clearTimeout(doneTimer);
+    };
+  }, [onComplete]);
+
+  if (phase === "done") return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-white flex items-center justify-center pointer-events-none"
+      style={{
+        transform: phase === "slide" ? "translateY(-100%)" : "translateY(0)",
+        transition:
+          phase === "slide"
+            ? `transform ${SLIDE_DURATION_MS}ms cubic-bezier(0.76, 0, 0.24, 1)`
+            : "none",
+      }}
+    >
+      <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-medium text-[#0A0A0A] flex overflow-hidden">
+        {INTRO_TEXT.split("").map((char, i) => (
+          <span
+            key={i}
+            className="inline-block"
+            style={{
+              animation: `intro-letter-in ${LETTER_DURATION_MS}ms cubic-bezier(0.16, 1, 0.3, 1) ${i * LETTER_STAGGER_MS}ms both`,
+            }}
+          >
+            {char === " " ? "\u00A0" : char}
+          </span>
+        ))}
+      </h1>
+    </div>
+  );
+}
+
 export function MarketingPage() {
   const [activeTab, setActiveTab] = useState<Tab>("ventures");
   const [scrollY, setScrollY] = useState(0);
+  const [introComplete, setIntroComplete] = useState(false);
   const heroRef = useRef<HTMLDivElement>(null);
+
+  const handleIntroComplete = useCallback(() => {
+    setIntroComplete(true);
+  }, []);
 
   // Smooth parallax via scroll listener
   const handleScroll = useCallback(() => {
@@ -105,6 +169,18 @@ export function MarketingPage() {
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => window.removeEventListener("scroll", handleScroll);
   }, [handleScroll]);
+
+  // Prevent scroll during intro
+  useEffect(() => {
+    if (!introComplete) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [introComplete]);
 
   // Fade-in on scroll observer
   useEffect(() => {
@@ -128,6 +204,8 @@ export function MarketingPage() {
 
   return (
     <div className="bg-white min-h-screen">
+      {/* ─── Intro Animation Overlay ─────────────────────────────────── */}
+      {!introComplete && <IntroOverlay onComplete={handleIntroComplete} />}
       {/* ─── Hero ──────────────────────────────────────────────────────── */}
       <section
         ref={heroRef}
