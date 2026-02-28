@@ -164,18 +164,21 @@ export function MarketingPage() {
   const heroRef = useRef<HTMLDivElement>(null);
   const welcomeRef = useRef<HTMLDivElement>(null);
 
-  // When the white panel starts sliding up, auto-scroll to Welcome
+  // When the white panel starts sliding up, unlock scroll but wait
+  // for the skyline to be visible before auto-scrolling to Welcome
   const handleSlideStart = useCallback(() => {
-    // Unlock scroll first so scrollTo works
     document.body.style.overflow = "";
-    // Scroll smoothly to the Welcome section
-    if (welcomeRef.current) {
-      welcomeRef.current.scrollIntoView({ behavior: "smooth" });
-    }
   }, []);
 
   const handleIntroComplete = useCallback(() => {
     setIntroComplete(true);
+    // After overlay is gone and skyline is visible, pause to let the
+    // user see the mountains, then gently scroll to Welcome
+    setTimeout(() => {
+      if (welcomeRef.current) {
+        welcomeRef.current.scrollIntoView({ behavior: "smooth" });
+      }
+    }, 1500);
   }, []);
 
   // Smooth parallax via scroll listener
