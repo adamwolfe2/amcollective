@@ -1,9 +1,19 @@
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { desc, eq, sql, and, gte } from "drizzle-orm";
+import { desc, eq, sql, and, gte, asc } from "drizzle-orm";
 import { formatCents } from "@/lib/stripe/format";
 import { CostTrendChart } from "./cost-trend-chart";
 import { SyncButton } from "./sync-button";
+
+async function getSubscriptionCosts() {
+  const subscriptions = await db
+    .select()
+    .from(schema.subscriptionCosts)
+    .where(eq(schema.subscriptionCosts.isActive, true))
+    .orderBy(asc(schema.subscriptionCosts.nextRenewal));
+
+  return subscriptions;
+}
 
 async function getCostSummary() {
   const now = new Date();
@@ -127,18 +137,25 @@ async function getCostTrend() {
 }
 
 export default async function CostsPage() {
-  const [costSummary, projectCosts, clientMargins, costTrend] =
+  const [costSummary, projectCosts, clientMargins, costTrend, subscriptionCosts] =
     await Promise.all([
       getCostSummary(),
       getPerProjectCosts(),
       getClientMargins(),
       getCostTrend(),
+      getSubscriptionCosts(),
     ]);
+
+  // Calculate subscription monthly total (normalize annual → monthly)
+  const subscriptionMonthlyTotal = subscriptionCosts.reduce((sum, sub) => {
+    const monthly = sub.billingCycle === "annual" ? Math.round(sub.amount / 12) : sub.amount;
+    return sum + monthly;
+  }, 0);
 
   const totalMonthlySpend = costSummary.reduce(
     (sum, a) => sum + Number(a.totalCost),
     0
-  );
+  ) + subscriptionMonthlyTotal;
 
   return (
     <div>
@@ -223,6 +240,88 @@ export default async function CostsPage() {
                   </tr>
                 ))}
               </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Subscriptions Table */}
+      {subscriptionCosts.length > 0 && (
+        <div className="mb-10">
+          <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
+            Subscriptions ({subscriptionCosts.length})
+          </h2>
+          <div className="border border-[#0A0A0A]/10 bg-white">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-[#0A0A0A]/10">
+                  <th className="text-left px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
+                    Name
+                  </th>
+                  <th className="text-left px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
+                    Project
+                  </th>
+                  <th className="text-left px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
+                    Category
+                  </th>
+                  <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
+                    Monthly
+                  </th>
+                  <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
+                    Cycle
+                  </th>
+                  <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
+                    Next Renewal
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#0A0A0A]/5">
+                {subscriptionCosts.map((sub) => {
+                  const monthlyCost = sub.billingCycle === "annual" ? Math.round(sub.amount / 12) : sub.amount;
+                  const now = new Date();
+                  const renewalSoon = sub.nextRenewal && (sub.nextRenewal.getTime() - now.getTime()) < 30 * 24 * 60 * 60 * 1000;
+
+                  return (
+                    <tr key={sub.id}>
+                      <td className="px-5 py-3 font-serif text-sm">
+                        {sub.name}
+                      </td>
+                      <td className="px-5 py-3">
+                        <span className="font-mono text-xs px-2 py-0.5 bg-[#0A0A0A]/5 text-[#0A0A0A]/60">
+                          {sub.companyTag}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 font-mono text-xs text-[#0A0A0A]/50">
+                        {sub.category ?? "--"}
+                      </td>
+                      <td className="px-5 py-3 text-right font-mono text-sm">
+                        {formatCents(monthlyCost)}
+                      </td>
+                      <td className="px-5 py-3 text-right font-mono text-xs text-[#0A0A0A]/50">
+                        {sub.billingCycle}
+                      </td>
+                      <td className={`px-5 py-3 text-right font-mono text-xs ${renewalSoon ? "text-amber-600 font-bold" : "text-[#0A0A0A]/50"}`}>
+                        {sub.nextRenewal
+                          ? sub.nextRenewal.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                          : "--"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="border-t border-[#0A0A0A]/10 bg-[#0A0A0A]/[0.02]">
+                  <td colSpan={3} className="px-5 py-3 font-serif text-sm font-bold">
+                    Subscription Total
+                  </td>
+                  <td className="px-5 py-3 text-right font-mono text-sm font-bold">
+                    {formatCents(subscriptionMonthlyTotal)}
+                  </td>
+                  <td colSpan={2} className="px-5 py-3 text-right font-mono text-xs text-[#0A0A0A]/50">
+                    /month
+                  </td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </div>

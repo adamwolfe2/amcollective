@@ -319,9 +319,8 @@ export async function syncAllSubscriptions(): Promise<number> {
 // ─── syncAllInvoices ────────────────────────────────────────────────────────
 
 /**
- * Pull all Stripe invoices from the last 12 months and upsert them into the
- * local `invoices` table. After syncing, recalculates `lifetimeValue` and
- * `lastPaymentDate` per client.
+ * Pull ALL Stripe invoices and upsert them into the local `invoices` table.
+ * After syncing, recalculates `lifetimeValue` and `lastPaymentDate` per client.
  *
  * @returns Number of invoices synced.
  */
@@ -329,13 +328,11 @@ export async function syncAllInvoices(): Promise<number> {
   const stripe = getStripeClient();
   let count = 0;
 
-  const twelveMonthsAgo = Math.floor(Date.now() / 1000) - 365 * 24 * 60 * 60;
-
   for (const account of STRIPE_ACCOUNTS) {
     const opts = { stripeAccount: account.accountId };
 
     for await (const invoice of stripe.invoices
-      .list({ limit: 100, created: { gte: twelveMonthsAgo } }, opts)) {
+      .list({ limit: 100 }, opts)) {
       // Resolve customer ID
       const stripeCustomerId =
         typeof invoice.customer === "string"
@@ -470,9 +467,8 @@ export async function syncAllInvoices(): Promise<number> {
 // ─── syncAllCharges ─────────────────────────────────────────────────────────
 
 /**
- * Pull all Stripe charges from the last 90 days and insert new ones into the
- * local `payments` table. Existing charges (by stripeChargeId) are skipped
- * since charges are immutable.
+ * Pull ALL Stripe charges and insert new ones into the local `payments` table.
+ * Existing charges (by stripeChargeId) are skipped since charges are immutable.
  *
  * @returns Number of new charges inserted.
  */
@@ -480,13 +476,11 @@ export async function syncAllCharges(): Promise<number> {
   const stripe = getStripeClient();
   let count = 0;
 
-  const ninetyDaysAgo = Math.floor(Date.now() / 1000) - 90 * 24 * 60 * 60;
-
   for (const account of STRIPE_ACCOUNTS) {
     const opts = { stripeAccount: account.accountId };
 
     for await (const charge of stripe.charges
-      .list({ limit: 100, created: { gte: ninetyDaysAgo } }, opts)) {
+      .list({ limit: 100 }, opts)) {
       // Resolve customer ID
       const stripeCustomerId =
         typeof charge.customer === "string"

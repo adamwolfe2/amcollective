@@ -9,7 +9,7 @@ import { serve } from "inngest/next";
 import { inngest } from "@/lib/inngest/client";
 import {
   syncVercelCosts,
-  syncStripeMrr,
+  backfillMercury,
   syncNeonUsage,
   sendClientReports,
   embedDocuments,
@@ -36,7 +36,7 @@ export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
     syncVercelCosts,
-    syncStripeMrr,
+    backfillMercury,
     syncNeonUsage,
     sendClientReports,
     embedDocuments,

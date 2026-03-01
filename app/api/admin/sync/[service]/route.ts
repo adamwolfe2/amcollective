@@ -75,6 +75,14 @@ const SERVICES: Record<string, ServiceConfig> = {
       return { metadata: { triggeredVia: "inngest" } };
     },
   },
+  "mercury-backfill": {
+    name: "Mercury Backfill",
+    envKey: "MERCURY_API_KEY",
+    sync: async () => {
+      await inngest.send({ name: "mercury/backfill", data: {} });
+      return { metadata: { triggeredVia: "inngest" } };
+    },
+  },
 };
 
 export async function POST(

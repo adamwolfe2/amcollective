@@ -3,7 +3,7 @@
  */
 
 export { syncVercelCosts } from "./sync-vercel-costs";
-export { syncStripeMrr } from "./sync-stripe-mrr";
+export { backfillMercury } from "./backfill-mercury";
 export { syncNeonUsage } from "./sync-neon-usage";
 export { sendClientReports } from "./send-client-reports";
 export { embedDocuments } from "./embed-documents";
