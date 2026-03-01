@@ -156,9 +156,12 @@ export async function getSnapshot(): Promise<ConnectorResult<WholesailSnapshot>>
         stuckProjects++;
       }
 
+      const launchDate = p.targetLaunchDate
+        ? new Date(p.targetLaunchDate).toISOString().split("T")[0]
+        : null;
       const isOverdue = !!(
-        p.targetLaunchDate &&
-        p.targetLaunchDate.split("T")[0] < today &&
+        launchDate &&
+        launchDate < today &&
         p.status !== "LIVE" &&
         p.status !== "CHURNED"
       );
@@ -176,7 +179,7 @@ export async function getSnapshot(): Promise<ConnectorResult<WholesailSnapshot>>
         totalCostCents,
         marginPct,
         daysInStatus,
-        targetLaunchDate: p.targetLaunchDate ? p.targetLaunchDate.split("T")[0] : null,
+        targetLaunchDate: launchDate,
         isOverdue,
         lastActivityAt: lastActivity,
       };
