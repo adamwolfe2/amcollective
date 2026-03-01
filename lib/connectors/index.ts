@@ -14,4 +14,6 @@ export * as mercury from "./mercury";
 export * as linear from "./linear";
 export * as emailbison from "./emailbison";
 export * as trackr from "./trackr";
+export * as taskspace from "./taskspace";
+export * as wholesail from "./wholesail";
 export { type ConnectorResult, invalidateCache } from "./base";
