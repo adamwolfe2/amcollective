@@ -31,148 +31,91 @@ export const embedDocuments = inngest.createFunction(
       return { success: false, message: "OPENAI_API_KEY not configured" };
     }
 
+    // Use 2-hour lookback — embedding every document touched in 24h is wasteful
+    // for slow-changing entities. Recent messages still use 24h lookback.
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    let embedded = 0;
 
-    // Step 1: Embed client profiles
-    const clients = await step.run("fetch-clients", async () => {
-      return db
-        .select()
-        .from(schema.clients)
-        .where(gt(schema.clients.updatedAt, oneDayAgo));
-    });
+    // Step 1: Fetch all entities in one step (5 parallel DB queries)
+    const { clients, projects, rocks, meetings, recentMessages } = await step.run(
+      "fetch-all-entities",
+      async () => {
+        const [c, p, r, m, msg] = await Promise.all([
+          db.select().from(schema.clients).where(gt(schema.clients.updatedAt, twoHoursAgo)),
+          db.select().from(schema.portfolioProjects).where(gt(schema.portfolioProjects.updatedAt, twoHoursAgo)),
+          db.select().from(schema.rocks).where(gt(schema.rocks.updatedAt, twoHoursAgo)),
+          db.select().from(schema.meetings).where(gt(schema.meetings.updatedAt, twoHoursAgo)),
+          db.select().from(schema.messages).where(gt(schema.messages.createdAt, oneDayAgo)).limit(50),
+        ]);
+        return { clients: c, projects: p, rocks: r, meetings: m, recentMessages: msg };
+      }
+    );
 
-    for (const client of clients) {
-      await step.run(`embed-client-${client.id}`, async () => {
+    // Step 2: Embed all entities in one step (sequential within, not N separate steps)
+    const embedded = await step.run("embed-all-entities", async () => {
+      let count = 0;
+
+      for (const client of clients) {
         const text = [
           `Client: ${client.name}`,
           client.companyName ? `Company: ${client.companyName}` : "",
           client.email ? `Email: ${client.email}` : "",
           client.notes ? `Notes: ${client.notes}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n");
+        ].filter(Boolean).join("\n");
+        await storeEmbedding(text, "client_note", client.id, { name: client.name, type: "client_profile" });
+        count++;
+      }
 
-        await storeEmbedding(text, "client_note", client.id, {
-          name: client.name,
-          type: "client_profile",
-        });
-        embedded++;
-      });
-    }
-
-    // Step 2: Embed project descriptions
-    const projects = await step.run("fetch-projects", async () => {
-      return db
-        .select()
-        .from(schema.portfolioProjects)
-        .where(gt(schema.portfolioProjects.updatedAt, oneDayAgo));
-    });
-
-    for (const project of projects) {
-      await step.run(`embed-project-${project.id}`, async () => {
+      for (const project of projects) {
         const text = [
           `Project: ${project.name}`,
           `Status: ${project.status}`,
           `Slug: ${project.slug}`,
           project.githubRepo ? `Repo: ${project.githubRepo}` : "",
-        ]
-          .filter(Boolean)
-          .join("\n");
+        ].filter(Boolean).join("\n");
+        await storeEmbedding(text, "project_doc", project.id, { name: project.name, type: "project_profile" });
+        count++;
+      }
 
-        await storeEmbedding(text, "project_doc", project.id, {
-          name: project.name,
-          type: "project_profile",
-        });
-        embedded++;
-      });
-    }
-
-    // Step 3: Embed rocks (quarterly goals)
-    const rocks = await step.run("fetch-rocks", async () => {
-      return db
-        .select()
-        .from(schema.rocks)
-        .where(gt(schema.rocks.updatedAt, oneDayAgo));
-    });
-
-    for (const rock of rocks) {
-      await step.run(`embed-rock-${rock.id}`, async () => {
+      for (const rock of rocks) {
         const text = [
           `Rock (Quarterly Goal): ${rock.title}`,
           rock.description ? `Description: ${rock.description}` : "",
           `Status: ${rock.status}`,
           `Quarter: ${rock.quarter}`,
           `Due: ${rock.dueDate ? String(rock.dueDate) : "not set"}`,
-        ]
-          .filter(Boolean)
-          .join("\n");
+        ].filter(Boolean).join("\n");
+        await storeEmbedding(text, "project_doc", rock.id, { title: rock.title, type: "rock" });
+        count++;
+      }
 
-        await storeEmbedding(text, "project_doc", rock.id, {
-          title: rock.title,
-          type: "rock",
-        });
-        embedded++;
-      });
-    }
-
-    // Step 4: Embed recent meeting notes
-    const meetings = await step.run("fetch-meetings", async () => {
-      return db
-        .select()
-        .from(schema.meetings)
-        .where(gt(schema.meetings.updatedAt, oneDayAgo));
-    });
-
-    for (const meeting of meetings) {
-      await step.run(`embed-meeting-${meeting.id}`, async () => {
+      for (const meeting of meetings) {
         const notes = meeting.notes as string | null;
-        if (!notes || notes.length < 20) return;
-
+        if (!notes || notes.length < 20) continue;
         const text = [
           `Meeting: ${meeting.title}`,
           `Status: ${meeting.status}`,
           meeting.scheduledAt ? `Scheduled: ${String(meeting.scheduledAt)}` : "",
           `Notes: ${notes.slice(0, 2000)}`,
         ].filter(Boolean).join("\n");
+        await storeEmbedding(text, "project_doc", meeting.id, { title: meeting.title, type: "meeting_notes" });
+        count++;
+      }
 
-        await storeEmbedding(text, "project_doc", meeting.id, {
-          title: meeting.title,
-          type: "meeting_notes",
-        });
-        embedded++;
-      });
-    }
-
-    // Step 5: Embed recent messages for context
-    const recentMessages = await step.run("fetch-messages", async () => {
-      return db
-        .select()
-        .from(schema.messages)
-        .where(gt(schema.messages.createdAt, oneDayAgo))
-        .limit(50);
-    });
-
-    for (const msg of recentMessages) {
-      await step.run(`embed-msg-${msg.id}`, async () => {
-        if (!msg.body || msg.body.length < 30) return;
-
+      for (const msg of recentMessages) {
+        if (!msg.body || msg.body.length < 30) continue;
         const text = [
           `Message (${msg.direction}) via ${msg.channel}`,
           msg.subject ? `Subject: ${msg.subject}` : "",
           `From: ${msg.from} → To: ${msg.to}`,
           `Content: ${msg.body.slice(0, 1500)}`,
-        ]
-          .filter(Boolean)
-          .join("\n");
+        ].filter(Boolean).join("\n");
+        await storeEmbedding(text, "client_note", msg.id, { type: "message", channel: msg.channel });
+        count++;
+      }
 
-        await storeEmbedding(text, "client_note", msg.id, {
-          type: "message",
-          channel: msg.channel,
-        });
-        embedded++;
-      });
-    }
+      return count;
+    });
 
     return {
       success: true,

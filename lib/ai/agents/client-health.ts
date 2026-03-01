@@ -110,64 +110,93 @@ export async function calculateClientHealth(clientId: string): Promise<{
 
   score = Math.max(0, Math.min(100, score));
 
-  // Generate summary
-  const summary = await generateHealthSummary(score, factors);
-
-  return { score, summary, factors };
+  return { score, summary: defaultSummary(score), factors };
 }
 
-async function generateHealthSummary(
-  score: number,
-  factors: HealthFactors
-): Promise<string> {
-  const anthropic = getAnthropicClient();
-  if (!anthropic) {
-    if (score >= 80) return "Client is healthy and engaged.";
-    if (score >= 60) return "Client needs attention — check communication.";
-    return "Client at risk — immediate action needed.";
-  }
-
-  const response = await anthropic.messages.create({
-    model: MODEL_HAIKU,
-    max_tokens: 60,
-    messages: [
-      {
-        role: "user",
-        content: `Generate a single sentence health summary for a client with score ${score}/100. Factors: ${factors.daysSinceLastMessage} days since last message, ${factors.overdueInvoices} overdue invoices, ${factors.activeProjects} active projects, ${factors.unresolvedAlerts} alerts. Be specific and actionable.`,
-      },
-    ],
-  });
-
-  return response.content[0].type === "text"
-    ? response.content[0].text
-    : "Health assessment unavailable.";
-}
 
 export async function scoreAllClients(): Promise<
   Array<{ clientId: string; score: number; summary: string }>
 > {
   const clients = await db.select({ id: schema.clients.id }).from(schema.clients);
+
+  // Compute all scores in parallel (no AI calls yet)
+  const healthData = await Promise.all(
+    clients.map(async (client) => {
+      const { score, factors } = await calculateClientHealth(client.id);
+      return { clientId: client.id, score, factors };
+    })
+  );
+
+  // Single batched AI call for all summaries instead of N individual calls
+  const summaryMap = await generateBatchedHealthSummaries(healthData);
+
   const results = [];
+  for (const { clientId, score, factors } of healthData) {
+    const summary = summaryMap.get(clientId) ?? defaultSummary(score);
 
-  for (const client of clients) {
-    const health = await calculateClientHealth(client.id);
-
-    // Update client health in DB (we'll add these columns)
-    // For now store in metadata via audit log
-
-    // Create alert if score drops below 60
-    if (health.score < 60) {
+    if (score < 60) {
       await createAlert({
         type: "health_drop",
-        severity: health.score < 40 ? "critical" : "warning",
-        title: `Client health dropped to ${health.score}`,
-        message: health.summary,
-        metadata: { clientId: client.id, score: health.score, factors: health.factors },
+        severity: score < 40 ? "critical" : "warning",
+        title: `Client health dropped to ${score}`,
+        message: summary,
+        metadata: { clientId, score, factors },
       });
     }
 
-    results.push({ clientId: client.id, score: health.score, summary: health.summary });
+    results.push({ clientId, score, summary });
   }
 
   return results;
+}
+
+function defaultSummary(score: number): string {
+  if (score >= 80) return "Client is healthy and engaged.";
+  if (score >= 60) return "Client needs attention — check communication.";
+  return "Client at risk — immediate action needed.";
+}
+
+async function generateBatchedHealthSummaries(
+  clients: Array<{ clientId: string; score: number; factors: HealthFactors }>
+): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (clients.length === 0) return map;
+
+  const anthropic = getAnthropicClient();
+  if (!anthropic) {
+    clients.forEach(({ clientId, score }) => map.set(clientId, defaultSummary(score)));
+    return map;
+  }
+
+  const clientList = clients
+    .map((c) =>
+      `ID:${c.clientId} score:${c.score} daysSinceMsg:${c.factors.daysSinceLastMessage} overdue:${c.factors.overdueInvoices} projects:${c.factors.activeProjects} alerts:${c.factors.unresolvedAlerts}`
+    )
+    .join("\n");
+
+  try {
+    const response = await anthropic.messages.create({
+      model: MODEL_HAIKU,
+      max_tokens: 80 * clients.length,
+      messages: [
+        {
+          role: "user",
+          content: `Generate a one-sentence health summary for each client. Return ONLY a JSON object mapping client ID to summary string. Be specific and actionable.
+
+Clients:
+${clientList}
+
+Return format: {"<id>": "<one sentence>", ...}`,
+        },
+      ],
+    });
+
+    const text = response.content[0].type === "text" ? response.content[0].text : "{}";
+    const parsed = JSON.parse(text) as Record<string, string>;
+    Object.entries(parsed).forEach(([id, summary]) => map.set(id, summary));
+  } catch {
+    clients.forEach(({ clientId, score }) => map.set(clientId, defaultSummary(score)));
+  }
+
+  return map;
 }

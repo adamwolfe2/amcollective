@@ -26,67 +26,40 @@ export const snapshotDailyMetrics = inngest.createFunction(
   },
   { cron: "0 4 * * *" }, // 4 AM UTC daily
   async ({ step }) => {
-    // Step 1: Compute MRR from active subscriptions
-    const mrrData = await step.run("compute-mrr", async () => {
-      const [result] = await db
-        .select({
-          total: sql<string>`COALESCE(SUM(${schema.subscriptions.amount}), 0)`,
-        })
-        .from(schema.subscriptions)
-        .where(eq(schema.subscriptions.status, "active"));
+    // Step 1: Compute all metrics in one step (4 parallel DB queries — fewer Inngest step executions)
+    const { mrrData, cashData, countData, overdueData } = await step.run("compute-all-metrics", async () => {
+      const [mrrResult, subsCount, accounts, activeClientsResult, overdueRows] = await Promise.all([
+        db.select({ total: sql<string>`COALESCE(SUM(${schema.subscriptions.amount}), 0)` })
+          .from(schema.subscriptions)
+          .where(eq(schema.subscriptions.status, "active")),
+        db.select({ value: count() })
+          .from(schema.subscriptions)
+          .where(eq(schema.subscriptions.status, "active")),
+        db.select({ balance: schema.mercuryAccounts.balance }).from(schema.mercuryAccounts),
+        db.select({ value: sql<number>`COUNT(DISTINCT ${schema.kanbanCards.clientId})` })
+          .from(schema.kanbanCards)
+          .where(sql`${schema.kanbanCards.completedAt} IS NULL`),
+        db.select({ amount: schema.invoices.amount, status: schema.portfolioProjects.status })
+          .from(schema.invoices)
+          .where(eq(schema.invoices.status, "overdue")),
+      ]);
 
-      const [subsCount] = await db
-        .select({ value: count() })
-        .from(schema.subscriptions)
-        .where(eq(schema.subscriptions.status, "active"));
+      const [projectRows] = await Promise.all([
+        db.select({ status: schema.portfolioProjects.status }).from(schema.portfolioProjects),
+      ]);
 
-      const mrr = Number(result?.total ?? 0);
+      const mrr = Number(mrrResult[0]?.total ?? 0);
       return {
-        mrr,
-        arr: mrr * 12,
-        activeSubscriptions: subsCount?.value ?? 0,
-      };
-    });
-
-    // Step 2: Compute cash from Mercury accounts
-    const cashData = await step.run("compute-cash", async () => {
-      const accounts = await db.select().from(schema.mercuryAccounts);
-      return accounts.reduce((s, a) => s + Number(a.balance), 0);
-    });
-
-    // Step 3: Compute client + project counts
-    const countData = await step.run("compute-counts", async () => {
-      const [activeClients] = await db
-        .select({
-          value: sql<number>`COUNT(DISTINCT ${schema.kanbanCards.clientId})`,
-        })
-        .from(schema.kanbanCards)
-        .where(sql`${schema.kanbanCards.completedAt} IS NULL`);
-
-      const projects = await db
-        .select({ status: schema.portfolioProjects.status })
-        .from(schema.portfolioProjects);
-
-      const activeProjects = projects.filter(
-        (p) => p.status === "active"
-      ).length;
-
-      return {
-        activeClients: Number(activeClients?.value ?? 0),
-        activeProjects,
-      };
-    });
-
-    // Step 4: Compute overdue invoice stats
-    const overdueData = await step.run("compute-overdue", async () => {
-      const overdue = await db
-        .select({ amount: schema.invoices.amount })
-        .from(schema.invoices)
-        .where(eq(schema.invoices.status, "overdue"));
-
-      return {
-        overdueInvoices: overdue.length,
-        overdueAmount: overdue.reduce((s, inv) => s + inv.amount, 0),
+        mrrData: { mrr, arr: mrr * 12, activeSubscriptions: subsCount[0]?.value ?? 0 },
+        cashData: accounts.reduce((s, a) => s + Number(a.balance), 0),
+        countData: {
+          activeClients: Number(activeClientsResult[0]?.value ?? 0),
+          activeProjects: projectRows.filter((p) => p.status === "active").length,
+        },
+        overdueData: {
+          overdueInvoices: overdueRows.length,
+          overdueAmount: overdueRows.reduce((s, inv) => s + inv.amount, 0),
+        },
       };
     });
 

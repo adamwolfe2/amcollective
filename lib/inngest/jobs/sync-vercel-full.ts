@@ -25,7 +25,7 @@ export const syncVercelFull = inngest.createFunction(
       });
     },
   },
-  { cron: "0 9 * * *" },
+  { cron: "0 9 * * 1,3,5" }, // MWF — Vercel project data changes infrequently
   async ({ step }) => {
     // Step 1: Fetch all Vercel projects
     const projectsResult = await step.run("fetch-vercel-projects", async () => {

@@ -5,7 +5,7 @@
  * uses Claude Sonnet to generate strategic insights and recommendations.
  */
 
-import { getAnthropicClient, MODEL_SONNET } from "../client";
+import { getAnthropicClient, MODEL_HAIKU } from "../client";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import { getUnresolvedCount } from "@/lib/db/repositories/alerts";
 import { getRocks } from "@/lib/db/repositories/rocks";
@@ -227,8 +227,8 @@ Rules:
 
   try {
     const response = await anthropic.messages.create({
-      model: MODEL_SONNET,
-      max_tokens: 1500,
+      model: MODEL_HAIKU,
+      max_tokens: 1000,
       messages: [{ role: "user", content: prompt }],
     });
 

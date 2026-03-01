@@ -39,7 +39,7 @@ export const syncGmail = inngest.createFunction(
       });
     },
   },
-  { cron: "*/15 * * * *" },
+  { cron: "0 * * * *" }, // hourly — reduces Composio API calls 4x vs every-15-min
   async ({ step }) => {
     // Step 1: Get all active Gmail accounts
     const accounts = await step.run("get-active-accounts", async () => {

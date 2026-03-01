@@ -28,8 +28,8 @@ function getPostHog(): PostHog | null {
 
   posthogInstance = new PostHog(key, {
     host,
-    flushAt: 1,
-    flushInterval: 0,
+    flushAt: 30,
+    flushInterval: 5000,
   });
 
   return posthogInstance;

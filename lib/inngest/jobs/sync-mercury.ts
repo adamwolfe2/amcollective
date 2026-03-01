@@ -17,7 +17,7 @@ export const syncMercury = inngest.createFunction(
   {
     id: "sync-mercury",
     name: "Sync Mercury Banking",
-    retries: 3,
+    retries: 2,
     onFailure: async ({ error }) => {
       captureError(error, {
         tags: { source: "inngest", job: "sync-mercury" },
@@ -25,7 +25,7 @@ export const syncMercury = inngest.createFunction(
       });
     },
   },
-  { cron: "*/15 * * * *" }, // every 15 minutes for near-real-time balance visibility
+  { cron: "0 */6 * * *" }, // every 6 hours — bank balances don't change faster than this
   async ({ step }) => {
     // Step 1: Fetch all Mercury accounts
     const accountsResult = await step.run("fetch-accounts", async () => {

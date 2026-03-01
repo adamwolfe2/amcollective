@@ -4,7 +4,7 @@
  * Uses Claude Sonnet to analyze infrastructure spending patterns.
  */
 
-import { getAnthropicClient, MODEL_SONNET } from "../client";
+import { getAnthropicClient, MODEL_HAIKU } from "../client";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { sql, gte, eq } from "drizzle-orm";
@@ -89,8 +89,8 @@ export async function analyzeCosts(): Promise<{
     });
 
     const response = await anthropic.messages.create({
-      model: MODEL_SONNET,
-      max_tokens: 500,
+      model: MODEL_HAIKU,
+      max_tokens: 400,
       messages: [
         {
           role: "user",
