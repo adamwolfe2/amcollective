@@ -8,7 +8,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, MODEL_SONNET, isAIConfigured } from "../client";
+import { getAnthropicClient, MODEL_SONNET, isAIConfigured, trackAIUsage } from "../client";
 import { TOOL_DEFINITIONS, executeTool } from "../tools";
 import { searchSimilar } from "../embeddings";
 import { db } from "@/lib/db";
@@ -129,6 +129,9 @@ export async function chat(
       messages: anthropicMessages,
     });
   }
+
+  // Track total usage across all iterations
+  trackAIUsage({ model: MODEL_SONNET, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, agent: "chat" });
 
   // Extract text response
   const textBlocks = response.content.filter(

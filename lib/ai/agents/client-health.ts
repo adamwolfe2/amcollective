@@ -6,7 +6,7 @@
  * Uses Claude Haiku for a one-line health summary.
  */
 
-import { getAnthropicClient, MODEL_HAIKU } from "../client";
+import { getAnthropicClient, MODEL_HAIKU, trackAIUsage } from "../client";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc, sql, and, gte } from "drizzle-orm";
@@ -190,6 +190,8 @@ Return format: {"<id>": "<one sentence>", ...}`,
         },
       ],
     });
+
+    trackAIUsage({ model: MODEL_HAIKU, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, agent: "client-health" });
 
     const text = response.content[0].type === "text" ? response.content[0].text : "{}";
     const parsed = JSON.parse(text) as Record<string, string>;

@@ -5,7 +5,7 @@
  * a concise 3-5 bullet point briefing.
  */
 
-import { getAnthropicClient, MODEL_HAIKU } from "../client";
+import { getAnthropicClient, MODEL_HAIKU, trackAIUsage } from "../client";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { getUnresolvedCount } from "@/lib/db/repositories/alerts";
@@ -117,6 +117,8 @@ Rules:
     max_tokens: 300,
     messages: [{ role: "user", content: prompt }],
   });
+
+  trackAIUsage({ model: MODEL_HAIKU, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, agent: "morning-briefing" });
 
   return response.content[0].type === "text" ? response.content[0].text : formatFallbackBriefing(data);
 }

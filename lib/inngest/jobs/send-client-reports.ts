@@ -10,6 +10,7 @@
 import { inngest } from "../client";
 import { captureError } from "@/lib/errors";
 import Anthropic from "@anthropic-ai/sdk";
+import { trackAIUsage } from "@/lib/ai/client";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -108,6 +109,8 @@ Return format: {"<CLIENT_ID>": "<html>", ...}`,
           },
         ],
       });
+
+      trackAIUsage({ model: "claude-haiku-4-5-20251001", inputTokens: completion.usage.input_tokens, outputTokens: completion.usage.output_tokens, agent: "send-client-reports" });
 
       try {
         const text = completion.content[0].type === "text" ? completion.content[0].text : "{}";
