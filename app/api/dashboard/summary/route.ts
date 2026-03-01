@@ -14,6 +14,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc, and, sql, count, gte, lte, asc } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
+import { captureError } from "@/lib/errors";
 
 export async function GET() {
   const userId = await checkAdmin();
@@ -21,6 +22,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  try {
   const now = new Date();
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const fourteenDaysAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
@@ -290,6 +292,16 @@ export async function GET() {
   };
 
   return NextResponse.json(summary);
+  } catch (error) {
+    captureError(error, {
+      tags: { route: "dashboard-summary" },
+      level: "error",
+    });
+    return NextResponse.json(
+      { error: "Failed to load dashboard summary" },
+      { status: 500 }
+    );
+  }
 }
 
 function mapActionToType(action: string): string {

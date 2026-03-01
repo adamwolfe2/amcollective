@@ -227,7 +227,8 @@ export function MarketingPage() {
           <div className="absolute top-6 right-6 md:top-8 md:right-10">
             <a
               href="https://app.amcollectivecapital.com/sign-in"
-              className="font-serif text-sm text-white/50 hover:text-white transition-colors"
+              className="font-serif text-sm text-white/80 hover:text-white transition-colors"
+              style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}
             >
               login
             </a>
@@ -238,12 +239,12 @@ export function MarketingPage() {
       {/* ─── Welcome ───────────────────────────────────────────────────── */}
       <section ref={welcomeRef} className="relative z-20 bg-white">
         <div className="max-w-2xl mx-auto px-5 sm:px-6 pt-10 sm:pt-16 pb-8 sm:pb-12 text-center">
-          <h1
+          <h2
             className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-[#0A0A0A] mb-6 sm:mb-8 opacity-0"
             data-animate
           >
             Welcome.
-          </h1>
+          </h2>
           <p
             className="font-serif text-sm sm:text-base md:text-lg leading-relaxed text-[#0A0A0A]/70 opacity-0"
             data-animate
@@ -262,6 +263,8 @@ export function MarketingPage() {
         {/* ─── Tab Navigation ────────────────────────────────────────── */}
         <div className="max-w-2xl mx-auto px-5 sm:px-6 pb-2">
           <div
+            role="tablist"
+            aria-label="Page sections"
             className="flex items-center justify-center gap-5 sm:gap-6 opacity-0"
             data-animate
             style={{ animationDelay: "0.2s" }}
@@ -269,6 +272,10 @@ export function MarketingPage() {
             {TABS.map((tab) => (
               <button
                 key={tab}
+                role="tab"
+                aria-selected={activeTab === tab}
+                aria-controls={`tabpanel-${tab}`}
+                id={`tab-${tab}`}
                 onClick={() => setActiveTab(tab)}
                 className={`font-serif text-sm pb-1 transition-all duration-300 ${
                   activeTab === tab
@@ -285,7 +292,12 @@ export function MarketingPage() {
 
       {/* ─── Tab Content ───────────────────────────────────────────────── */}
       <section className="relative z-20 bg-white pb-16 sm:pb-32">
-        <div className="max-w-5xl mx-auto px-5 sm:px-6">
+        <div
+          className="max-w-5xl mx-auto px-5 sm:px-6"
+          role="tabpanel"
+          id={`tabpanel-${activeTab}`}
+          aria-labelledby={`tab-${activeTab}`}
+        >
           {activeTab === "ventures" && <VenturesTab />}
           {activeTab === "team" && <TeamTab />}
           {activeTab === "contact" && <ContactTab />}
@@ -553,10 +565,11 @@ function ContactTab() {
           style={{ animationDelay: "0.05s" }}
         >
           <div>
-            <label className="block font-serif text-sm text-[#0A0A0A]/70 mb-1.5">
+            <label htmlFor="contact-name" className="block font-serif text-sm text-[#0A0A0A]/70 mb-1.5">
               Name
             </label>
             <input
+              id="contact-name"
               type="text"
               required
               value={formState.name}
@@ -567,10 +580,11 @@ function ContactTab() {
             />
           </div>
           <div>
-            <label className="block font-serif text-sm text-[#0A0A0A]/70 mb-1.5">
+            <label htmlFor="contact-email" className="block font-serif text-sm text-[#0A0A0A]/70 mb-1.5">
               Email
             </label>
             <input
+              id="contact-email"
               type="email"
               required
               value={formState.email}
@@ -581,10 +595,11 @@ function ContactTab() {
             />
           </div>
           <div>
-            <label className="block font-serif text-sm text-[#0A0A0A]/70 mb-1.5">
+            <label htmlFor="contact-message" className="block font-serif text-sm text-[#0A0A0A]/70 mb-1.5">
               Message
             </label>
             <textarea
+              id="contact-message"
               required
               rows={5}
               value={formState.message}

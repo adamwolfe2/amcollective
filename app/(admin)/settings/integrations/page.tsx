@@ -79,18 +79,25 @@ export default async function IntegrationsPage() {
   const integrations = getIntegrations();
   const connectedCount = integrations.filter((i) => i.connected).length;
 
-  // Get Gmail connection status
-  const gmailAccounts = await db
-    .select()
-    .from(schema.connectedAccounts)
-    .where(
-      and(
-        eq(schema.connectedAccounts.provider, "gmail"),
-        eq(schema.connectedAccounts.status, "active")
-      )
-    );
-
-  const gmailAccount = gmailAccounts[0] ?? null;
+  // Get Gmail connection status — gracefully handle missing table
+  let gmailAccount: {
+    email: string | null;
+    lastSyncAt: Date | null;
+  } | null = null;
+  try {
+    const gmailAccounts = await db
+      .select()
+      .from(schema.connectedAccounts)
+      .where(
+        and(
+          eq(schema.connectedAccounts.provider, "gmail"),
+          eq(schema.connectedAccounts.status, "active")
+        )
+      );
+    gmailAccount = gmailAccounts[0] ?? null;
+  } catch {
+    // Table may not exist yet — migration pending
+  }
   const composioReady = isComposioConfigured();
 
   // Get per-project PostHog config status

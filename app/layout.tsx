@@ -2,8 +2,6 @@ import type { Metadata } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
-export const dynamic = "force-dynamic";
-
 export const metadata: Metadata = {
   title: {
     template: "AM Collective | %s",
@@ -78,6 +76,12 @@ export default function RootLayout({
   const content = (
     <html lang="en" className="scroll-smooth">
       <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin="anonymous"
+        />
         <link
           href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,200..800;1,6..72,200..800&display=swap"
           rel="stylesheet"

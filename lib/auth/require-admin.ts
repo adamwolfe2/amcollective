@@ -55,8 +55,12 @@ export function resolveRole(
   email: string | null | undefined
 ): string {
   if (isSuperAdmin(email)) return "owner";
-  const metadata = sessionClaims?.metadata as Record<string, unknown> | undefined;
-  return (metadata?.role as string) || "member";
+  // Check both publicMetadata and metadata — Clerk session token template
+  // may use either key depending on configuration.
+  const publicMeta = sessionClaims?.publicMetadata as Record<string, unknown> | undefined;
+  const meta = sessionClaims?.metadata as Record<string, unknown> | undefined;
+  const role = (publicMeta?.role as string) || (meta?.role as string);
+  return role || "member";
 }
 
 /**

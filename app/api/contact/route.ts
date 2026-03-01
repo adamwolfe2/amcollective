@@ -9,6 +9,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { captureError } from "@/lib/errors";
 
 export async function POST(request: Request) {
   try {
@@ -45,7 +46,11 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (error) {
+    captureError(error, {
+      tags: { route: "contact-form" },
+      level: "error",
+    });
     return NextResponse.json(
       { error: "Failed to submit" },
       { status: 500 }

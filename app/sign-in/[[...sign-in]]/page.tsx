@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { SignIn } from "@clerk/nextjs";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,22 @@ export default function SignInPage() {
           },
         }}
       />
+      <p
+        className="mt-6 text-center"
+        style={{
+          fontFamily: "Newsreader, Georgia, serif",
+          fontSize: "0.875rem",
+          color: "#8B92A5",
+        }}
+      >
+        Don&apos;t have an account?{" "}
+        <Link
+          href="/sign-up"
+          style={{ color: "#2A52BE", textDecoration: "underline" }}
+        >
+          Sign up
+        </Link>
+      </p>
     </div>
   );
 }
