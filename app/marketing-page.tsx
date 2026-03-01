@@ -326,7 +326,7 @@ function VenturesTab() {
                     alt={`${venture.name} logo`}
                     width={36}
                     height={36}
-                    className="object-contain"
+                    className="object-contain rounded-lg"
                     unoptimized
                   />
                 </div>
@@ -351,7 +351,7 @@ function VenturesTab() {
             </div>
 
             {/* Right: Screenshot */}
-            <div className="relative overflow-hidden rounded-sm border border-[#0A0A0A]/5">
+            <div className="relative overflow-hidden rounded-xl border border-[#0A0A0A]/5">
               <Image
                 src={venture.social}
                 alt={`${venture.name} screenshot`}
