@@ -29,6 +29,7 @@ import {
   deliverWebhooks,
   syncGmail,
   syncGmailManual,
+  triageLinearIssue,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -55,5 +56,6 @@ export const { GET, POST, PUT } = serve({
     deliverWebhooks,
     syncGmail,
     syncGmailManual,
+    triageLinearIssue,
   ],
 });

@@ -12,6 +12,9 @@ import {
   getProjects,
   getMyIssues,
   isLinearConfigured,
+  createIssue,
+  updateIssue,
+  addComment,
 } from "@/lib/connectors/linear";
 import { captureError } from "@/lib/errors";
 
@@ -85,6 +88,65 @@ export const LINEAR_TOOL_DEFINITIONS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  {
+    name: "create_linear_issue",
+    description:
+      "Create a new Linear issue. Requires teamId and title. Returns the issue URL.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        teamId: { type: "string", description: "The Linear team ID" },
+        title: { type: "string", description: "Issue title" },
+        description: { type: "string", description: "Markdown description" },
+        priority: {
+          type: "number",
+          description: "Priority 0=none, 1=urgent, 2=high, 3=medium, 4=low",
+        },
+        labelIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "Label IDs to attach",
+        },
+        assigneeId: { type: "string", description: "Assignee user ID" },
+      },
+      required: ["teamId", "title"],
+    },
+  },
+  {
+    name: "update_linear_issue",
+    description:
+      "Update an existing Linear issue — set priority, labels, state, or assignee.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        issueId: { type: "string", description: "The Linear issue ID" },
+        priority: {
+          type: "number",
+          description: "Priority 0=none, 1=urgent, 2=high, 3=medium, 4=low",
+        },
+        labelIds: {
+          type: "array",
+          items: { type: "string" },
+          description: "Label IDs to set",
+        },
+        stateId: { type: "string", description: "Workflow state ID" },
+        assigneeId: { type: "string", description: "Assignee user ID" },
+      },
+      required: ["issueId"],
+    },
+  },
+  {
+    name: "add_linear_comment",
+    description: "Post a comment on a Linear issue.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        issueId: { type: "string", description: "The Linear issue ID" },
+        body: { type: "string", description: "Comment body (Markdown)" },
+      },
+      required: ["issueId", "body"],
+    },
+  },
 ];
 
 export async function executeLinearTool(
@@ -127,6 +189,36 @@ export async function executeLinearTool(
       case "get_linear_teams": {
         const teams = await getTeams();
         return JSON.stringify(teams);
+      }
+
+      case "create_linear_issue": {
+        const result = await createIssue({
+          teamId: input.teamId as string,
+          title: input.title as string,
+          description: input.description as string | undefined,
+          priority: input.priority as number | undefined,
+          labelIds: input.labelIds as string[] | undefined,
+          assigneeId: input.assigneeId as string | undefined,
+        });
+        return JSON.stringify(result);
+      }
+
+      case "update_linear_issue": {
+        const result = await updateIssue(input.issueId as string, {
+          priority: input.priority as number | undefined,
+          labelIds: input.labelIds as string[] | undefined,
+          stateId: input.stateId as string | undefined,
+          assigneeId: input.assigneeId as string | undefined,
+        });
+        return JSON.stringify(result);
+      }
+
+      case "add_linear_comment": {
+        const result = await addComment(
+          input.issueId as string,
+          input.body as string
+        );
+        return JSON.stringify(result);
       }
 
       default:

@@ -136,3 +136,59 @@ export async function getMyIssues() {
     return [];
   }
 }
+
+// ─── Write Methods ────────────────────────────────────────────────────────────
+
+export async function updateIssue(
+  issueId: string,
+  input: {
+    priority?: number;
+    labelIds?: string[];
+    stateId?: string;
+    assigneeId?: string;
+  }
+) {
+  const client = getClient();
+  const result = await client.updateIssue(issueId, input);
+  return { success: result.success };
+}
+
+export async function addComment(issueId: string, body: string) {
+  const client = getClient();
+  const result = await client.createComment({ issueId, body });
+  const comment = await result.comment;
+  return { success: result.success, commentId: comment?.id ?? null };
+}
+
+export async function createIssue(input: {
+  teamId: string;
+  title: string;
+  description?: string;
+  priority?: number;
+  labelIds?: string[];
+  assigneeId?: string;
+  stateId?: string;
+}) {
+  const client = getClient();
+  const result = await client.createIssue(input);
+  const issue = await result.issue;
+  return {
+    success: result.success,
+    issueId: issue?.id ?? null,
+    identifier: issue?.identifier ?? null,
+    url: issue?.url ?? null,
+  };
+}
+
+export async function getLabels(teamId?: string) {
+  const client = getClient();
+  const labels = await client.issueLabels({
+    filter: teamId ? { team: { id: { eq: teamId } } } : undefined,
+    first: 100,
+  } as Parameters<typeof client.issueLabels>[0]);
+  return labels.nodes.map((l) => ({
+    id: l.id,
+    name: l.name,
+    color: l.color,
+  }));
+}

@@ -1653,6 +1653,70 @@ export const linearTools = {
       return linearConnector.getTeams();
     },
   }),
+
+  create_linear_issue: tool({
+    description:
+      "Create a new Linear issue. Requires teamId and title. Returns the issue URL.",
+    inputSchema: z.object({
+      teamId: z.string().describe("The Linear team ID"),
+      title: z.string().describe("Issue title"),
+      description: z.string().optional().describe("Markdown description"),
+      priority: z
+        .number()
+        .min(0)
+        .max(4)
+        .optional()
+        .describe("Priority 0=none, 1=urgent, 2=high, 3=medium, 4=low"),
+      labelIds: z
+        .array(z.string())
+        .optional()
+        .describe("Label IDs to attach"),
+      assigneeId: z.string().optional().describe("Assignee user ID"),
+    }),
+    execute: async (input) => {
+      if (!linearConnector.isLinearConfigured())
+        return { error: "Linear not configured" };
+      return linearConnector.createIssue(input);
+    },
+  }),
+
+  update_linear_issue: tool({
+    description:
+      "Update an existing Linear issue — set priority, labels, state, or assignee.",
+    inputSchema: z.object({
+      issueId: z.string().describe("The Linear issue ID"),
+      priority: z
+        .number()
+        .min(0)
+        .max(4)
+        .optional()
+        .describe("Priority 0=none, 1=urgent, 2=high, 3=medium, 4=low"),
+      labelIds: z
+        .array(z.string())
+        .optional()
+        .describe("Label IDs to set"),
+      stateId: z.string().optional().describe("Workflow state ID"),
+      assigneeId: z.string().optional().describe("Assignee user ID"),
+    }),
+    execute: async ({ issueId, ...rest }) => {
+      if (!linearConnector.isLinearConfigured())
+        return { error: "Linear not configured" };
+      return linearConnector.updateIssue(issueId, rest);
+    },
+  }),
+
+  add_linear_comment: tool({
+    description: "Post a comment on a Linear issue.",
+    inputSchema: z.object({
+      issueId: z.string().describe("The Linear issue ID"),
+      body: z.string().describe("Comment body (Markdown)"),
+    }),
+    execute: async ({ issueId, body }) => {
+      if (!linearConnector.isLinearConfigured())
+        return { error: "Linear not configured" };
+      return linearConnector.addComment(issueId, body);
+    },
+  }),
 };
 
 // ─── All Tools Combined ───────────────────────────────────────────────────────
