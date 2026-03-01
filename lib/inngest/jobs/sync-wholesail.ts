@@ -1,29 +1,29 @@
 /**
- * Inngest Job — Sync Trackr Metrics
+ * Inngest Job — Sync Wholesail Metrics
  *
- * Runs every 30 minutes. Queries Trackr's Neon DB and upserts a snapshot
+ * Runs every 30 minutes. Queries Wholesail's Neon DB and upserts a snapshot
  * into project_metric_snapshots for the AM Collective master dashboard.
  *
- * Uses TRACKR_DATABASE_URL env var — read-only SELECT queries only.
+ * Uses WHOLESAIL_DATABASE_URL env var — read-only SELECT queries only.
  *
  * Optimized: 2 steps (fetch + upsert) to minimize Inngest execution costs.
  */
 
 import { inngest } from "../client";
 import { captureError } from "@/lib/errors";
-import { getSnapshot, isConfigured } from "@/lib/connectors/trackr";
+import { getSnapshot, isConfigured } from "@/lib/connectors/wholesail";
 import { db } from "@/lib/db";
 import { projectMetricSnapshots, syncRuns } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-export const syncTrackr = inngest.createFunction(
+export const syncWholesail = inngest.createFunction(
   {
-    id: "sync-trackr",
-    name: "Sync Trackr Metrics",
+    id: "sync-wholesail",
+    name: "Sync Wholesail Metrics",
     retries: 2,
     onFailure: async ({ error }) => {
       captureError(error, {
-        tags: { source: "inngest", job: "sync-trackr" },
+        tags: { source: "inngest", job: "sync-wholesail" },
         level: "warning",
       });
     },
@@ -31,18 +31,18 @@ export const syncTrackr = inngest.createFunction(
   { cron: "*/30 * * * *" },
   async ({ step }) => {
     if (!isConfigured()) {
-      return { skipped: true, reason: "TRACKR_DATABASE_URL not set" };
+      return { skipped: true, reason: "WHOLESAIL_DATABASE_URL not set" };
     }
 
-    // Step 1: Fetch snapshot from Trackr DB
-    const result = await step.run("fetch-trackr-snapshot", async () => {
+    // Step 1: Fetch snapshot from Wholesail DB
+    const result = await step.run("fetch-wholesail-snapshot", async () => {
       return getSnapshot();
     });
 
     // Step 2: Record sync run + upsert snapshot (combined to save executions)
     await step.run("upsert-and-record", async () => {
       const [syncRun] = await db.insert(syncRuns).values({
-        service: "trackr",
+        service: "wholesail",
         status: "running",
         triggeredBy: "system",
       }).returning();
@@ -55,14 +55,14 @@ export const syncTrackr = inngest.createFunction(
         }).where(eq(syncRuns.id, syncRun.id));
 
         await db.insert(projectMetricSnapshots).values({
-          projectSlug: "trackr",
+          projectSlug: "wholesail",
           mrrCents: 0,
           activeUsers: 0,
           newUsersWeek: 0,
           activeSubscriptions: 0,
-          primaryMetricLabel: "Audit submissions (7d)",
+          primaryMetricLabel: "Pipeline Value",
           primaryMetricValue: 0,
-          secondaryMetricLabel: "Active subscriptions",
+          secondaryMetricLabel: "Active Builds",
           secondaryMetricValue: 0,
           healthScore: 0,
           syncStatus: "error",
@@ -84,22 +84,20 @@ export const syncTrackr = inngest.createFunction(
       const snap = result.data;
 
       let healthScore = 100;
-      if (snap.activeSubscriptions === 0) healthScore -= 30;
-      if (snap.auditPipelinePending > 10) healthScore -= 15;
-      if (snap.newWorkspacesWeek === 0) healthScore -= 10;
-      if (snap.apiCostsMtdCents > 5000 * 100) healthScore -= 10;
+      if (snap.stuckProjects > 0) healthScore -= 20;
+      if (snap.overdueProjects > 0) healthScore -= 15;
       healthScore = Math.max(0, healthScore);
 
       await db.insert(projectMetricSnapshots).values({
-        projectSlug: "trackr",
-        mrrCents: snap.mrrCents,
-        activeUsers: snap.totalWorkspaces,
-        newUsersWeek: snap.newWorkspacesWeek,
-        activeSubscriptions: snap.activeSubscriptions,
-        primaryMetricLabel: "Audit submissions (7d)",
-        primaryMetricValue: snap.auditSubmissionsLastWeek,
-        secondaryMetricLabel: "Tools researched",
-        secondaryMetricValue: snap.totalToolsResearched,
+        projectSlug: "wholesail",
+        mrrCents: snap.mrrFromRetainers * 100,
+        activeUsers: snap.liveClients,
+        newUsersWeek: snap.newIntakesMonth,
+        activeSubscriptions: snap.liveClients,
+        primaryMetricLabel: "Pipeline Value",
+        primaryMetricValue: snap.pipelineValue * 100,
+        secondaryMetricLabel: "Active Builds",
+        secondaryMetricValue: snap.activeBuilds,
         healthScore,
         syncStatus: "ok",
         errorMessage: null,
@@ -108,14 +106,14 @@ export const syncTrackr = inngest.createFunction(
       }).onConflictDoUpdate({
         target: projectMetricSnapshots.projectSlug,
         set: {
-          mrrCents: snap.mrrCents,
-          activeUsers: snap.totalWorkspaces,
-          newUsersWeek: snap.newWorkspacesWeek,
-          activeSubscriptions: snap.activeSubscriptions,
-          primaryMetricLabel: "Audit submissions (7d)",
-          primaryMetricValue: snap.auditSubmissionsLastWeek,
-          secondaryMetricLabel: "Tools researched",
-          secondaryMetricValue: snap.totalToolsResearched,
+          mrrCents: snap.mrrFromRetainers * 100,
+          activeUsers: snap.liveClients,
+          newUsersWeek: snap.newIntakesMonth,
+          activeSubscriptions: snap.liveClients,
+          primaryMetricLabel: "Pipeline Value",
+          primaryMetricValue: snap.pipelineValue * 100,
+          secondaryMetricLabel: "Active Builds",
+          secondaryMetricValue: snap.activeBuilds,
           healthScore,
           syncStatus: "ok",
           errorMessage: null,
@@ -131,6 +129,6 @@ export const syncTrackr = inngest.createFunction(
       }).where(eq(syncRuns.id, syncRun.id));
     });
 
-    return { success: true, projectSlug: "trackr" };
+    return { success: true, projectSlug: "wholesail" };
   }
 );

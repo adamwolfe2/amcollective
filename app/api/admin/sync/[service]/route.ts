@@ -83,6 +83,22 @@ const SERVICES: Record<string, ServiceConfig> = {
       return { metadata: { triggeredVia: "inngest" } };
     },
   },
+  taskspace: {
+    name: "TaskSpace",
+    envKey: "TASKSPACE_DATABASE_URL",
+    sync: async () => {
+      await inngest.send({ name: "sync-taskspace", data: {} });
+      return { metadata: { triggeredVia: "inngest" } };
+    },
+  },
+  wholesail: {
+    name: "Wholesail",
+    envKey: "WHOLESAIL_DATABASE_URL",
+    sync: async () => {
+      await inngest.send({ name: "sync-wholesail", data: {} });
+      return { metadata: { triggeredVia: "inngest" } };
+    },
+  },
 };
 
 export async function POST(

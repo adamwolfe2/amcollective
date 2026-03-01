@@ -1,29 +1,29 @@
 /**
- * Inngest Job — Sync Trackr Metrics
+ * Inngest Job — Sync TaskSpace Metrics
  *
- * Runs every 30 minutes. Queries Trackr's Neon DB and upserts a snapshot
+ * Runs every 30 minutes. Queries TaskSpace's Neon DB and upserts a snapshot
  * into project_metric_snapshots for the AM Collective master dashboard.
  *
- * Uses TRACKR_DATABASE_URL env var — read-only SELECT queries only.
+ * Uses TASKSPACE_DATABASE_URL env var — read-only SELECT queries only.
  *
  * Optimized: 2 steps (fetch + upsert) to minimize Inngest execution costs.
  */
 
 import { inngest } from "../client";
 import { captureError } from "@/lib/errors";
-import { getSnapshot, isConfigured } from "@/lib/connectors/trackr";
+import { getSnapshot, isConfigured } from "@/lib/connectors/taskspace";
 import { db } from "@/lib/db";
 import { projectMetricSnapshots, syncRuns } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 
-export const syncTrackr = inngest.createFunction(
+export const syncTaskspace = inngest.createFunction(
   {
-    id: "sync-trackr",
-    name: "Sync Trackr Metrics",
+    id: "sync-taskspace",
+    name: "Sync TaskSpace Metrics",
     retries: 2,
     onFailure: async ({ error }) => {
       captureError(error, {
-        tags: { source: "inngest", job: "sync-trackr" },
+        tags: { source: "inngest", job: "sync-taskspace" },
         level: "warning",
       });
     },
@@ -31,18 +31,18 @@ export const syncTrackr = inngest.createFunction(
   { cron: "*/30 * * * *" },
   async ({ step }) => {
     if (!isConfigured()) {
-      return { skipped: true, reason: "TRACKR_DATABASE_URL not set" };
+      return { skipped: true, reason: "TASKSPACE_DATABASE_URL not set" };
     }
 
-    // Step 1: Fetch snapshot from Trackr DB
-    const result = await step.run("fetch-trackr-snapshot", async () => {
+    // Step 1: Fetch snapshot from TaskSpace DB
+    const result = await step.run("fetch-taskspace-snapshot", async () => {
       return getSnapshot();
     });
 
     // Step 2: Record sync run + upsert snapshot (combined to save executions)
     await step.run("upsert-and-record", async () => {
       const [syncRun] = await db.insert(syncRuns).values({
-        service: "trackr",
+        service: "taskspace",
         status: "running",
         triggeredBy: "system",
       }).returning();
@@ -55,14 +55,14 @@ export const syncTrackr = inngest.createFunction(
         }).where(eq(syncRuns.id, syncRun.id));
 
         await db.insert(projectMetricSnapshots).values({
-          projectSlug: "trackr",
+          projectSlug: "taskspace",
           mrrCents: 0,
           activeUsers: 0,
           newUsersWeek: 0,
           activeSubscriptions: 0,
-          primaryMetricLabel: "Audit submissions (7d)",
+          primaryMetricLabel: "EOD Rate (7d)",
           primaryMetricValue: 0,
-          secondaryMetricLabel: "Active subscriptions",
+          secondaryMetricLabel: "Open Escalations",
           secondaryMetricValue: 0,
           healthScore: 0,
           syncStatus: "error",
@@ -84,22 +84,21 @@ export const syncTrackr = inngest.createFunction(
       const snap = result.data;
 
       let healthScore = 100;
-      if (snap.activeSubscriptions === 0) healthScore -= 30;
-      if (snap.auditPipelinePending > 10) healthScore -= 15;
-      if (snap.newWorkspacesWeek === 0) healthScore -= 10;
-      if (snap.apiCostsMtdCents > 5000 * 100) healthScore -= 10;
+      if (snap.eodRate7Day < 50) healthScore -= 25;
+      if (snap.openEscalations > 5) healthScore -= 15;
+      if (snap.rocksBlocked > 2) healthScore -= 10;
       healthScore = Math.max(0, healthScore);
 
       await db.insert(projectMetricSnapshots).values({
-        projectSlug: "trackr",
-        mrrCents: snap.mrrCents,
-        activeUsers: snap.totalWorkspaces,
-        newUsersWeek: snap.newWorkspacesWeek,
-        activeSubscriptions: snap.activeSubscriptions,
-        primaryMetricLabel: "Audit submissions (7d)",
-        primaryMetricValue: snap.auditSubmissionsLastWeek,
-        secondaryMetricLabel: "Tools researched",
-        secondaryMetricValue: snap.totalToolsResearched,
+        projectSlug: "taskspace",
+        mrrCents: 0,
+        activeUsers: snap.totalMembers,
+        newUsersWeek: 0,
+        activeSubscriptions: snap.totalOrgs,
+        primaryMetricLabel: "EOD Rate (7d)",
+        primaryMetricValue: Math.round(snap.eodRate7Day),
+        secondaryMetricLabel: "Open Escalations",
+        secondaryMetricValue: snap.openEscalations,
         healthScore,
         syncStatus: "ok",
         errorMessage: null,
@@ -108,14 +107,14 @@ export const syncTrackr = inngest.createFunction(
       }).onConflictDoUpdate({
         target: projectMetricSnapshots.projectSlug,
         set: {
-          mrrCents: snap.mrrCents,
-          activeUsers: snap.totalWorkspaces,
-          newUsersWeek: snap.newWorkspacesWeek,
-          activeSubscriptions: snap.activeSubscriptions,
-          primaryMetricLabel: "Audit submissions (7d)",
-          primaryMetricValue: snap.auditSubmissionsLastWeek,
-          secondaryMetricLabel: "Tools researched",
-          secondaryMetricValue: snap.totalToolsResearched,
+          mrrCents: 0,
+          activeUsers: snap.totalMembers,
+          newUsersWeek: 0,
+          activeSubscriptions: snap.totalOrgs,
+          primaryMetricLabel: "EOD Rate (7d)",
+          primaryMetricValue: Math.round(snap.eodRate7Day),
+          secondaryMetricLabel: "Open Escalations",
+          secondaryMetricValue: snap.openEscalations,
           healthScore,
           syncStatus: "ok",
           errorMessage: null,
@@ -131,6 +130,6 @@ export const syncTrackr = inngest.createFunction(
       }).where(eq(syncRuns.id, syncRun.id));
     });
 
-    return { success: true, projectSlug: "trackr" };
+    return { success: true, projectSlug: "taskspace" };
   }
 );

@@ -24,3 +24,5 @@ export { deliverWebhooks } from "./deliver-webhooks";
 export { syncGmail, syncGmailManual } from "./sync-gmail";
 export { triageLinearIssue } from "./triage-linear-issue";
 export { syncTrackr } from "./sync-trackr";
+export { syncTaskspace } from "./sync-taskspace";
+export { syncWholesail } from "./sync-wholesail";

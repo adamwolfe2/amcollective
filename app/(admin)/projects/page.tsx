@@ -18,6 +18,8 @@ import {
 } from "@/components/ui/empty";
 import { AddProjectDialog } from "./add-project-dialog";
 import { formatDistanceToNow } from "date-fns";
+import { db } from "@/lib/db";
+import { projectMetricSnapshots } from "@/lib/db/schema";
 
 const statusStyles: Record<string, string> = {
   active: "border-green-600 text-green-700 bg-green-50",
@@ -34,6 +36,18 @@ const deployStateColor: Record<string, string> = {
   INITIALIZING: "bg-blue-400",
 };
 
+function formatCents(cents: number): string {
+  if (cents === 0) return "--";
+  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+}
+
+function healthColor(score: number | null): string {
+  if (score === null) return "border-[#0A0A0A]/30 text-[#0A0A0A]/50 bg-[#0A0A0A]/5";
+  if (score >= 80) return "border-green-600 text-green-700 bg-green-50";
+  if (score >= 50) return "border-amber-600 text-amber-700 bg-amber-50";
+  return "border-red-600 text-red-700 bg-red-50";
+}
+
 interface ProjectRow {
   id: string;
   name: string;
@@ -44,6 +58,10 @@ interface ProjectRow {
   lastDeployTime: number | null;
   teamCount: number;
   clientCount: number;
+  mrrCents: number | null;
+  activeUsers: number | null;
+  healthScore: number | null;
+  syncedAt: Date | null;
 }
 
 export default async function ProjectsPage() {
@@ -54,6 +72,10 @@ export default async function ProjectsPage() {
   const vercelProjects =
     vercelResult.success && vercelResult.data ? vercelResult.data : [];
   const vercelMap = new Map(vercelProjects.map((v) => [v.id, v]));
+
+  // Fetch metric snapshots for live data
+  const snapshots = await db.select().from(projectMetricSnapshots);
+  const snapshotMap = new Map(snapshots.map((s) => [s.projectSlug, s]));
 
   // Build enriched rows in parallel
   const rows: ProjectRow[] = await Promise.all(
@@ -77,6 +99,8 @@ export default async function ProjectsPage() {
         }
       }
 
+      const snapshot = snapshotMap.get(project.slug);
+
       return {
         id: project.id,
         name: project.name,
@@ -87,6 +111,10 @@ export default async function ProjectsPage() {
         lastDeployTime,
         teamCount: stats.teamCount,
         clientCount: stats.clientCount,
+        mrrCents: snapshot?.mrrCents ?? null,
+        activeUsers: snapshot?.activeUsers ?? null,
+        healthScore: snapshot?.healthScore ?? null,
+        syncedAt: snapshot?.syncedAt ?? null,
       };
     })
   );
@@ -137,11 +165,23 @@ export default async function ProjectsPage() {
                 <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 hidden md:table-cell">
                   Last Deploy
                 </TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 text-right hidden lg:table-cell">
+                  MRR
+                </TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 text-right hidden lg:table-cell">
+                  Users
+                </TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 hidden lg:table-cell">
+                  Health
+                </TableHead>
                 <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 text-right hidden sm:table-cell">
                   Team
                 </TableHead>
                 <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 text-right hidden sm:table-cell">
                   Clients
+                </TableHead>
+                <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 hidden xl:table-cell">
+                  Last Sync
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -199,11 +239,38 @@ export default async function ProjectsPage() {
                       </span>
                     )}
                   </TableCell>
+                  <TableCell className="text-right font-mono text-sm hidden lg:table-cell">
+                    {row.mrrCents !== null ? formatCents(row.mrrCents) : "--"}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-sm hidden lg:table-cell">
+                    {row.activeUsers !== null ? row.activeUsers : "--"}
+                  </TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    {row.healthScore !== null ? (
+                      <Badge
+                        variant="outline"
+                        className={`rounded-none text-[10px] uppercase font-mono tracking-wider ${healthColor(row.healthScore)}`}
+                      >
+                        {row.healthScore}
+                      </Badge>
+                    ) : (
+                      <span className="font-mono text-xs text-[#0A0A0A]/30">--</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right font-mono text-sm hidden sm:table-cell">
                     {row.teamCount}
                   </TableCell>
                   <TableCell className="text-right font-mono text-sm hidden sm:table-cell">
                     {row.clientCount}
+                  </TableCell>
+                  <TableCell className="hidden xl:table-cell">
+                    {row.syncedAt ? (
+                      <span className="font-mono text-xs text-[#0A0A0A]/50">
+                        {formatDistanceToNow(row.syncedAt, { addSuffix: true })}
+                      </span>
+                    ) : (
+                      <span className="font-mono text-xs text-[#0A0A0A]/30">--</span>
+                    )}
                   </TableCell>
                 </TableRow>
               ))}

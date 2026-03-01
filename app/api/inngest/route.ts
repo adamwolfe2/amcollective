@@ -31,6 +31,8 @@ import {
   syncGmailManual,
   triageLinearIssue,
   syncTrackr,
+  syncTaskspace,
+  syncWholesail,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -59,5 +61,7 @@ export const { GET, POST, PUT } = serve({
     syncGmailManual,
     triageLinearIssue,
     syncTrackr,
+    syncTaskspace,
+    syncWholesail,
   ],
 });
