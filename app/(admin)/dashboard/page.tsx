@@ -12,6 +12,7 @@ import { eq, and, sql, desc, gte, count } from "drizzle-orm";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { AiChat } from "@/components/ai-chat";
+import { currentUser } from "@clerk/nextjs/server";
 import {
   Users,
   FolderKanban,
@@ -394,8 +395,10 @@ function ActionsPanelSkeleton() {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-export default function DashboardPage() {
+export default async function DashboardPage() {
   const now = new Date();
+  const user = await currentUser();
+  const firstName = user?.firstName ?? "there";
 
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)]">
@@ -404,7 +407,7 @@ export default function DashboardPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold font-serif tracking-tight">
-              {greeting()}, Adam
+              {greeting()}, {firstName}
             </h1>
             <p className="text-[#0A0A0A]/40 font-mono text-[10px] mt-0.5">
               {format(now, "EEEE, MMMM d, yyyy")}
