@@ -39,6 +39,7 @@ export const taskSourceEnum = pgEnum("task_source", [
   "linear",
   "voice",
   "webhook",
+  "sprint",
 ]);
 
 export const messageDirectionEnum = pgEnum("message_direction", [
@@ -67,6 +68,14 @@ export const alertSeverityEnum = pgEnum("alert_severity", [
   "critical",
 ]);
 
+// ─── Subtask Item (stored as JSONB array on tasks) ──────────────────────────
+
+export type SubtaskItem = {
+  id: string;
+  content: string;
+  isCompleted: boolean;
+};
+
 // ─── Tables ─────────────────────────────────────────────────────────────────
 
 export const tasks = pgTable(
@@ -94,6 +103,7 @@ export const tasks = pgTable(
     position: integer("position").notNull().default(0),
     isArchived: boolean("is_archived").notNull().default(false),
     completedAt: timestamp("completed_at", { mode: "date" }),
+    subtasks: jsonb("subtasks").$type<SubtaskItem[]>().default([]).notNull(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()

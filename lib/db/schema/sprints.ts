@@ -3,6 +3,10 @@
  *
  * Replaces Notion for weekly planning. Each week has a sprint doc with
  * project sections (@mentions), assignees (@mentions), goals, and task checklists.
+ *
+ * v2: Canonical task identity layer — tasks live in the `tasks` table and are
+ * assigned to sprints/sections via `task_sprint_assignments`. Sprint snapshots
+ * capture historical completion data per project per sprint.
  */
 
 import {
@@ -15,9 +19,11 @@ import {
   integer,
   index,
   date,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { portfolioProjects, teamMembers } from "./projects";
+import { tasks } from "./operations";
 
 // ─── Weekly Sprint Document ───────────────────────────────────────────────────
 
@@ -30,6 +36,7 @@ export const weeklySprints = pgTable(
     weeklyFocus: varchar("weekly_focus", { length: 255 }),
     topOfMind: text("top_of_mind"), // freeform bullet-point notes
     shareToken: varchar("share_token", { length: 64 }).unique(), // public share link token
+    closedAt: timestamp("closed_at", { mode: "date" }), // set when sprint is closed
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -71,7 +78,7 @@ export const sprintSections = pgTable(
   ]
 );
 
-// ─── Sprint Tasks (checklist items per section) ───────────────────────────────
+// ─── Sprint Tasks (legacy — kept for backward compat, no new writes) ─────────
 
 export const sprintTasks = pgTable(
   "sprint_tasks",
@@ -95,10 +102,65 @@ export const sprintTasks = pgTable(
   ]
 );
 
+// ─── Task Sprint Assignments (canonical task → sprint/section mapping) ────────
+
+export const taskSprintAssignments = pgTable(
+  "task_sprint_assignments",
+  {
+    taskId: uuid("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    sprintId: uuid("sprint_id")
+      .notNull()
+      .references(() => weeklySprints.id, { onDelete: "cascade" }),
+    sectionId: uuid("section_id").references(() => sprintSections.id, {
+      onDelete: "set null",
+    }),
+    addedAt: timestamp("added_at", { mode: "date" }).defaultNow().notNull(),
+    removedAt: timestamp("removed_at", { mode: "date" }),
+    sortOrder: integer("sort_order").notNull().default(0),
+  },
+  (table) => [
+    index("tsa_sprint_id_idx").on(table.sprintId),
+    index("tsa_task_id_idx").on(table.taskId),
+    index("tsa_section_id_idx").on(table.sectionId),
+  ]
+  // PRIMARY KEY (task_id, sprint_id) defined in migration DDL
+);
+
+// ─── Sprint Snapshots (historical per-project completion snapshots) ────────────
+
+export const sprintSnapshots = pgTable(
+  "sprint_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sprintId: uuid("sprint_id")
+      .notNull()
+      .references(() => weeklySprints.id, { onDelete: "cascade" }),
+    projectId: uuid("project_id").references(() => portfolioProjects.id, {
+      onDelete: "set null",
+    }),
+    capturedAt: timestamp("captured_at", { mode: "date" }).defaultNow().notNull(),
+    totalTasks: integer("total_tasks").notNull().default(0),
+    completedTasks: integer("completed_tasks").notNull().default(0),
+    completionRate: integer("completion_rate").notNull().default(0),
+    openTasksJson: jsonb("open_tasks_json").$type<string[]>().default([]).notNull(),
+    velocityLabel: varchar("velocity_label", { length: 50 }),
+    locked: boolean("locked").notNull().default(false),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("ss_sprint_id_idx").on(table.sprintId),
+    index("ss_project_id_idx").on(table.projectId),
+  ]
+);
+
 // ─── Relations ────────────────────────────────────────────────────────────────
 
 export const weeklySprintsRelations = relations(weeklySprints, ({ many }) => ({
   sections: many(sprintSections),
+  taskAssignments: many(taskSprintAssignments),
+  snapshots: many(sprintSnapshots),
 }));
 
 export const sprintSectionsRelations = relations(
@@ -117,6 +179,7 @@ export const sprintSectionsRelations = relations(
       references: [teamMembers.id],
     }),
     tasks: many(sprintTasks),
+    taskAssignments: many(taskSprintAssignments),
   })
 );
 
@@ -124,5 +187,34 @@ export const sprintTasksRelations = relations(sprintTasks, ({ one }) => ({
   section: one(sprintSections, {
     fields: [sprintTasks.sectionId],
     references: [sprintSections.id],
+  }),
+}));
+
+export const taskSprintAssignmentsRelations = relations(
+  taskSprintAssignments,
+  ({ one }) => ({
+    task: one(tasks, {
+      fields: [taskSprintAssignments.taskId],
+      references: [tasks.id],
+    }),
+    sprint: one(weeklySprints, {
+      fields: [taskSprintAssignments.sprintId],
+      references: [weeklySprints.id],
+    }),
+    section: one(sprintSections, {
+      fields: [taskSprintAssignments.sectionId],
+      references: [sprintSections.id],
+    }),
+  })
+);
+
+export const sprintSnapshotsRelations = relations(sprintSnapshots, ({ one }) => ({
+  sprint: one(weeklySprints, {
+    fields: [sprintSnapshots.sprintId],
+    references: [weeklySprints.id],
+  }),
+  project: one(portfolioProjects, {
+    fields: [sprintSnapshots.projectId],
+    references: [portfolioProjects.id],
   }),
 }));
