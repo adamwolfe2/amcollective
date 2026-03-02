@@ -7,12 +7,14 @@ import { db } from "@/lib/db";
 import {
   weeklySprints,
   sprintSections,
-  sprintTasks,
+  tasks,
+  taskSprintAssignments,
   portfolioProjects,
   teamMembers,
 } from "@/lib/db/schema";
-import { eq, ilike } from "drizzle-orm";
+import { eq, isNull, and } from "drizzle-orm";
 import { getAnthropicClient, MODEL_HAIKU, trackAIUsage } from "@/lib/ai/client";
+import { inngest } from "@/lib/inngest/client";
 
 type ActionResult<T = unknown> = {
   success: boolean;
@@ -54,8 +56,8 @@ export async function toggleSprintShare(
 
   try {
     const newToken = currentToken
-      ? null // disable sharing
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`; // short random token
+      ? null
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 
     await db
       .update(weeklySprints)
@@ -115,6 +117,28 @@ export async function updateSprint(
   }
 }
 
+export async function closeSprint(id: string): Promise<ActionResult> {
+  const userId = await getUserId();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  try {
+    await db
+      .update(weeklySprints)
+      .set({ closedAt: new Date() })
+      .where(eq(weeklySprints.id, id));
+
+    await inngest.send({
+      name: "sprint/snapshot.requested",
+      data: { sprintId: id },
+    });
+
+    revalidatePath(`/sprints/${id}`);
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed" };
+  }
+}
+
 // ─── Section CRUD ─────────────────────────────────────────────────────────────
 
 /** Fuzzy-resolve a project name to its DB id. Case-insensitive, partial match. */
@@ -164,11 +188,11 @@ export async function createSection(
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
-    // Resolve FKs if not already provided
     const projectId =
       data.projectId ?? (await resolveProjectId(data.projectName));
     const assigneeId =
-      data.assigneeId ?? (data.assigneeName ? await resolveAssigneeId(data.assigneeName) : null);
+      data.assigneeId ??
+      (data.assigneeName ? await resolveAssigneeId(data.assigneeName) : null);
 
     const [section] = await db
       .insert(sprintSections)
@@ -203,7 +227,6 @@ export async function updateSection(
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
-    // Re-resolve FKs when names change
     const projectId =
       data.projectName !== undefined
         ? await resolveProjectId(data.projectName)
@@ -261,10 +284,42 @@ export async function createTask(
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
+    // Resolve projectId and assigneeId from section
+    const [section] = await db
+      .select({
+        projectId: sprintSections.projectId,
+        assigneeId: sprintSections.assigneeId,
+      })
+      .from(sprintSections)
+      .where(eq(sprintSections.id, sectionId));
+
+    // Insert canonical task
     const [task] = await db
-      .insert(sprintTasks)
-      .values({ sectionId, content, sortOrder })
-      .returning({ id: sprintTasks.id });
+      .insert(tasks)
+      .values({
+        title: content,
+        status: "todo",
+        source: "sprint",
+        projectId: section?.projectId ?? null,
+        assigneeId: section?.assigneeId ?? null,
+        position: sortOrder,
+        subtasks: [],
+      })
+      .returning({ id: tasks.id });
+
+    // Link task to sprint+section
+    await db.insert(taskSprintAssignments).values({
+      taskId: task.id,
+      sprintId,
+      sectionId,
+      sortOrder,
+    });
+
+    // Trigger metrics sync
+    await inngest.send({
+      name: "sprint/task.changed",
+      data: { taskId: task.id, sprintId },
+    });
 
     revalidatePath(`/sprints/${sprintId}`);
     return { success: true, data: { id: task.id } };
@@ -283,9 +338,17 @@ export async function toggleTask(
 
   try {
     await db
-      .update(sprintTasks)
-      .set({ isCompleted })
-      .where(eq(sprintTasks.id, id));
+      .update(tasks)
+      .set({
+        status: isCompleted ? "done" : "todo",
+        completedAt: isCompleted ? new Date() : null,
+      })
+      .where(eq(tasks.id, id));
+
+    await inngest.send({
+      name: "sprint/task.changed",
+      data: { taskId: id, sprintId },
+    });
 
     revalidatePath(`/sprints/${sprintId}`);
     revalidatePath("/dashboard");
@@ -305,9 +368,9 @@ export async function updateTask(
 
   try {
     await db
-      .update(sprintTasks)
-      .set({ content })
-      .where(eq(sprintTasks.id, id));
+      .update(tasks)
+      .set({ title: content })
+      .where(eq(tasks.id, id));
 
     revalidatePath(`/sprints/${sprintId}`);
     return { success: true };
@@ -324,7 +387,35 @@ export async function deleteTask(
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
-    await db.delete(sprintTasks).where(eq(sprintTasks.id, id));
+    // Soft-delete: mark assignment as removed
+    await db
+      .update(taskSprintAssignments)
+      .set({ removedAt: new Date() })
+      .where(
+        and(
+          eq(taskSprintAssignments.taskId, id),
+          eq(taskSprintAssignments.sprintId, sprintId)
+        )
+      );
+
+    // Check if any active assignments remain; if not, archive the task
+    const remaining = await db
+      .select({ taskId: taskSprintAssignments.taskId })
+      .from(taskSprintAssignments)
+      .where(
+        and(
+          eq(taskSprintAssignments.taskId, id),
+          isNull(taskSprintAssignments.removedAt)
+        )
+      );
+
+    if (remaining.length === 0) {
+      await db
+        .update(tasks)
+        .set({ isArchived: true })
+        .where(eq(tasks.id, id));
+    }
+
     revalidatePath(`/sprints/${sprintId}`);
     return { success: true };
   } catch (e) {
@@ -351,7 +442,6 @@ export async function parseSprintText(
 
   const ai = getAnthropicClient();
   if (!ai) {
-    // Fallback: treat each line as a task in a single "General" section
     const tasks = rawText
       .split("\n")
       .map((l) => l.replace(/^[-•*]\s*/, "").trim())
@@ -414,11 +504,9 @@ Return JSON:
     const rawJson =
       response.content[0].type === "text" ? response.content[0].text : "";
 
-    // Extract JSON from possible markdown fences
     const jsonMatch = rawJson.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
 
-    // Repair common AI JSON issues: literal newlines/tabs inside string values
     const repaired = jsonMatch[0].replace(
       /"((?:[^"\\]|\\.)*)"/g,
       (_, content: string) =>
@@ -427,13 +515,20 @@ Return JSON:
 
     const parsed = JSON.parse(repaired);
     const sections: ParsedSprintSection[] = (parsed.sections ?? []).map(
-      (s: { projectName?: string; goal?: string | null; assigneeName?: string | null; tasks?: string[] }) => {
-        // Fuzzy-match the AI's detected assignee name to a known team member
-        const rawAssignee = s.assigneeName ? String(s.assigneeName).toLowerCase() : null;
+      (s: {
+        projectName?: string;
+        goal?: string | null;
+        assigneeName?: string | null;
+        tasks?: string[];
+      }) => {
+        const rawAssignee = s.assigneeName
+          ? String(s.assigneeName).toLowerCase()
+          : null;
         const matchedAssignee = rawAssignee
-          ? knownTeamMembers.find((m) =>
-              m.toLowerCase().startsWith(rawAssignee) ||
-              rawAssignee.startsWith(m.toLowerCase().split(" ")[0])
+          ? knownTeamMembers.find(
+              (m) =>
+                m.toLowerCase().startsWith(rawAssignee) ||
+                rawAssignee.startsWith(m.toLowerCase().split(" ")[0])
             ) ?? null
           : null;
 
@@ -471,56 +566,82 @@ export async function importParsedSections(
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
-    // Load lookup tables once for the whole batch
     const [allProjects, allMembers] = await Promise.all([
-      db.select({ id: portfolioProjects.id, name: portfolioProjects.name }).from(portfolioProjects),
-      db.select({ id: teamMembers.id, name: teamMembers.name }).from(teamMembers),
+      db
+        .select({ id: portfolioProjects.id, name: portfolioProjects.name })
+        .from(portfolioProjects),
+      db
+        .select({ id: teamMembers.id, name: teamMembers.name })
+        .from(teamMembers),
     ]);
 
     function matchProject(name: string): string | null {
       const lower = name.toLowerCase();
-      return allProjects.find(
-        (p) =>
-          p.name.toLowerCase() === lower ||
-          p.name.toLowerCase().includes(lower) ||
-          lower.includes(p.name.toLowerCase())
-      )?.id ?? null;
+      return (
+        allProjects.find(
+          (p) =>
+            p.name.toLowerCase() === lower ||
+            p.name.toLowerCase().includes(lower) ||
+            lower.includes(p.name.toLowerCase())
+        )?.id ?? null
+      );
     }
 
     function matchMember(name: string | null): string | null {
       if (!name) return null;
       const lower = name.toLowerCase();
-      return allMembers.find(
-        (m) =>
-          m.name.toLowerCase() === lower ||
-          m.name.toLowerCase().startsWith(lower) ||
-          lower.startsWith(m.name.toLowerCase().split(" ")[0])
-      )?.id ?? null;
+      return (
+        allMembers.find(
+          (m) =>
+            m.name.toLowerCase() === lower ||
+            m.name.toLowerCase().startsWith(lower) ||
+            lower.startsWith(m.name.toLowerCase().split(" ")[0])
+        )?.id ?? null
+      );
     }
 
     for (let i = 0; i < sections.length; i++) {
       const sec = sections[i];
+      const resolvedProjectId = matchProject(sec.projectName);
+      const resolvedAssigneeId = matchMember(sec.assigneeName);
+
       const [newSection] = await db
         .insert(sprintSections)
         .values({
           sprintId,
           projectName: sec.projectName,
-          projectId: matchProject(sec.projectName),
+          projectId: resolvedProjectId,
           assigneeName: sec.assigneeName || null,
-          assigneeId: matchMember(sec.assigneeName),
+          assigneeId: resolvedAssigneeId,
           goal: sec.goal || null,
           sortOrder: startSortOrder + i,
         })
         .returning({ id: sprintSections.id });
 
       if (sec.tasks.length > 0) {
-        await db.insert(sprintTasks).values(
-          sec.tasks.map((content, idx) => ({
+        for (let j = 0; j < sec.tasks.length; j++) {
+          const content = sec.tasks[j];
+
+          const [newTask] = await db
+            .insert(tasks)
+            .values({
+              title: content,
+              status: "todo",
+              source: "sprint",
+              projectId: resolvedProjectId,
+              assigneeId: resolvedAssigneeId,
+              position: j,
+              subtasks: [],
+            })
+            .returning({ id: tasks.id });
+
+          await db.insert(taskSprintAssignments).values({
+            taskId: newTask.id,
+            sprintId,
             sectionId: newSection.id,
-            content,
-            sortOrder: idx,
-          }))
-        );
+            sortOrder: j,
+          });
+        }
       }
     }
 
