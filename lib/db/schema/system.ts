@@ -13,6 +13,7 @@ import {
 import { pgEnum } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { portfolioProjects } from "./projects";
+import { clients } from "./crm";
 
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
@@ -205,6 +206,50 @@ export const userPresence = pgTable(
 );
 
 // ─── Relations ──────────────────────────────────────────────────────────────
+
+// ─── Credentials Vault ──────────────────────────────────────────────────────
+
+export const credentials = pgTable(
+  "credentials",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    label: varchar("label", { length: 255 }).notNull(),
+    service: varchar("service", { length: 100 }).notNull(),
+    username: text("username"),
+    passwordEncrypted: text("password_encrypted"),
+    url: text("url"),
+    notes: text("notes"),
+    clientId: uuid("client_id").references(() => clients.id, {
+      onDelete: "set null",
+    }),
+    projectId: uuid("project_id").references(() => portfolioProjects.id, {
+      onDelete: "set null",
+    }),
+    createdBy: varchar("created_by", { length: 255 }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("credentials_service_idx").on(table.service),
+    index("credentials_client_id_idx").on(table.clientId),
+    index("credentials_project_id_idx").on(table.projectId),
+    index("credentials_created_at_idx").on(table.createdAt),
+  ]
+);
+
+export const credentialsRelations = relations(credentials, ({ one }) => ({
+  client: one(clients, {
+    fields: [credentials.clientId],
+    references: [clients.id],
+  }),
+  project: one(portfolioProjects, {
+    fields: [credentials.projectId],
+    references: [portfolioProjects.id],
+  }),
+}));
 
 export const webhookRegistrationsRelations = relations(
   webhookRegistrations,

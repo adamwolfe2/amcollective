@@ -37,6 +37,7 @@ import {
   sprintSnapshot,
   handleComposioTrigger,
   handleComposioExpired,
+  syncStripeCosts,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -71,5 +72,6 @@ export const { GET, POST, PUT } = serve({
     sprintSnapshot,
     handleComposioTrigger,
     handleComposioExpired,
+    syncStripeCosts,
   ],
 });

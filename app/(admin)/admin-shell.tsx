@@ -34,6 +34,7 @@ import {
   ShieldCheck,
   Send,
   Zap,
+  KeyRound,
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { CompanySwitcher } from "@/components/company-switcher";
@@ -62,6 +63,7 @@ const NAV_ITEMS = [
   { label: "Outreach", href: "/outreach", icon: Send },
   { label: "AI", href: "/ai", icon: Sparkles },
   { label: "Alerts", href: "/alerts", icon: Bell },
+  { label: "Vault", href: "/vault", icon: KeyRound },
   { label: "Compliance", href: "/compliance", icon: ShieldCheck },
   { label: "Activity", href: "/activity", icon: Activity },
   { label: "Settings", href: "/settings", icon: Settings },

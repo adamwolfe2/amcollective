@@ -29,3 +29,4 @@ export { syncWholesail } from "./sync-wholesail";
 export { syncProjectMetrics } from "./sync-project-metrics";
 export { sprintSnapshot } from "./sprint-snapshot";
 export { handleComposioTrigger, handleComposioExpired } from "./handle-composio-trigger";
+export { syncStripeCosts } from "./sync-stripe-costs";

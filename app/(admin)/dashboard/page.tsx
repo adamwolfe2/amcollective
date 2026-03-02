@@ -8,7 +8,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, and, sql, desc, gte, count, asc } from "drizzle-orm";
+import { eq, and, sql, desc, gte, count, asc, isNull } from "drizzle-orm";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { AiChat } from "@/components/ai-chat";
@@ -108,20 +108,30 @@ async function getCurrentSprint() {
     .orderBy(asc(schema.sprintSections.sortOrder));
 
   const tasks = await db
-    .select()
-    .from(schema.sprintTasks)
-    .orderBy(asc(schema.sprintTasks.sortOrder));
+    .select({
+      id: schema.tasks.id,
+      sectionId: schema.taskSprintAssignments.sectionId,
+      isCompleted: sql<boolean>`(${schema.tasks.status} = 'done')`,
+      sortOrder: schema.taskSprintAssignments.sortOrder,
+    })
+    .from(schema.taskSprintAssignments)
+    .innerJoin(schema.tasks, eq(schema.taskSprintAssignments.taskId, schema.tasks.id))
+    .where(
+      and(
+        eq(schema.taskSprintAssignments.sprintId, sprint.id),
+        isNull(schema.taskSprintAssignments.removedAt)
+      )
+    )
+    .orderBy(asc(schema.taskSprintAssignments.sortOrder));
 
   const tasksBySectionId = new Map<
     string,
     { total: number; done: number }
   >();
   for (const task of tasks) {
-    const curr = tasksBySectionId.get(task.sectionId) ?? {
-      total: 0,
-      done: 0,
-    };
-    tasksBySectionId.set(task.sectionId, {
+    const key = task.sectionId ?? "__none__";
+    const curr = tasksBySectionId.get(key) ?? { total: 0, done: 0 };
+    tasksBySectionId.set(key, {
       total: curr.total + 1,
       done: curr.done + (task.isCompleted ? 1 : 0),
     });

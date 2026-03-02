@@ -7,6 +7,7 @@ import {
   timestamp,
   integer,
   index,
+  uniqueIndex,
   jsonb,
   boolean,
   numeric,
@@ -116,6 +117,7 @@ export const subscriptionCosts = pgTable(
     category: varchar("category", { length: 100 }), // infrastructure, ai, marketing, etc.
     notes: text("notes"),
     isActive: boolean("is_active").notNull().default(true),
+    stripeSubscriptionId: varchar("stripe_subscription_id", { length: 255 }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -126,6 +128,7 @@ export const subscriptionCosts = pgTable(
     index("subscription_costs_company_tag_idx").on(table.companyTag),
     index("subscription_costs_is_active_idx").on(table.isActive),
     index("subscription_costs_next_renewal_idx").on(table.nextRenewal),
+    uniqueIndex("subscription_costs_stripe_sub_id_idx").on(table.stripeSubscriptionId),
   ]
 );
 
