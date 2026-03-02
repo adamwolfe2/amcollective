@@ -303,7 +303,8 @@ CRITICAL RULES — follow exactly:
 7. Strip checkbox markers [ ], [x], -, •, numbers from task text — just the task content.
 8. Tasks with no clear project attribution go into a section named "AM Collective".
 9. Do NOT invent tasks. Only use what's in the text.
-10. Return ONLY valid JSON — no markdown fences, no explanation.`;
+10. Return ONLY valid JSON — no markdown fences, no explanation.
+11. CRITICAL: Every string value must be on a single line. Never use literal newlines or line breaks inside JSON string values.`;
 
   const userPrompt = `Parse these notes. Remember: every individual task must be its own array element — never combine tasks.
 
@@ -324,7 +325,7 @@ Return JSON:
   try {
     const response = await ai.messages.create({
       model: MODEL_HAIKU,
-      max_tokens: 1024,
+      max_tokens: 4096,
       messages: [{ role: "user", content: userPrompt }],
       system: systemPrompt,
     });
@@ -343,7 +344,14 @@ Return JSON:
     const jsonMatch = rawJson.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error("No JSON in response");
 
-    const parsed = JSON.parse(jsonMatch[0]);
+    // Repair common AI JSON issues: literal newlines/tabs inside string values
+    const repaired = jsonMatch[0].replace(
+      /"((?:[^"\\]|\\.)*)"/g,
+      (_, content: string) =>
+        `"${content.replace(/[\r\n\t]+/g, " ").replace(/ {2,}/g, " ").trim()}"`
+    );
+
+    const parsed = JSON.parse(repaired);
     const sections: ParsedSprintSection[] = (parsed.sections ?? []).map(
       (s: { projectName?: string; goal?: string | null; assigneeName?: string | null; tasks?: string[] }) => {
         // Fuzzy-match the AI's detected assignee name to a known team member
