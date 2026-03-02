@@ -498,7 +498,7 @@ function SprintAIImport({
       {/* Trigger button — rendered inline by the parent */}
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 px-3 py-1.5 border border-[#0A0A0A]/15 text-[#0A0A0A]/50 font-mono text-xs hover:border-[#0A0A0A]/40 hover:text-[#0A0A0A]/70 transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0A0A0A] text-white font-mono text-xs hover:bg-[#0A0A0A]/80 transition-colors shrink-0"
       >
         <Sparkles size={11} />
         AI Parse
@@ -989,34 +989,32 @@ export function SprintEditor({
 
   return (
     <div className="max-w-3xl">
-      {/* Sprint title + AI Import button */}
-      <div className="flex items-start justify-between gap-4 mb-2">
-        <div className="flex-1">
-          <InlineEdit
-            value={title}
-            onSave={saveTitle}
-            className="text-3xl font-bold font-serif text-[#0A0A0A] tracking-tight block"
-            placeholder="Sprint title"
-          />
-        </div>
-        <div className="mt-2 shrink-0">
-          <SprintAIImport
-            sprintId={sprint.id}
-            projects={projects}
-            teamMembers={teamMembers}
-            currentSectionCount={sections.length}
-            onImported={handleImportSections}
-          />
-        </div>
+      {/* Sprint title */}
+      <div className="mb-3">
+        <InlineEdit
+          value={title}
+          onSave={saveTitle}
+          className="text-3xl font-bold font-serif text-[#0A0A0A] tracking-tight block"
+          placeholder="Sprint title"
+        />
       </div>
 
-      {/* Weekly focus */}
-      <div className="mb-2">
-        <InlineEdit
-          value={weeklyFocus}
-          onSave={saveWeeklyFocus}
-          className="font-mono text-xs uppercase tracking-widest text-[#0A0A0A]/40"
-          placeholder="WEEKLY FOCUS: ..."
+      {/* Weekly focus + AI Import button on same row */}
+      <div className="flex items-center gap-4 mb-2">
+        <div className="flex-1">
+          <InlineEdit
+            value={weeklyFocus}
+            onSave={saveWeeklyFocus}
+            className="font-mono text-xs uppercase tracking-widest text-[#0A0A0A]/40"
+            placeholder="WEEKLY FOCUS: ..."
+          />
+        </div>
+        <SprintAIImport
+          sprintId={sprint.id}
+          projects={projects}
+          teamMembers={teamMembers}
+          currentSectionCount={sections.length}
+          onImported={handleImportSections}
         />
       </div>
 
