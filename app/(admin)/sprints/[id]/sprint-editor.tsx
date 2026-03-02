@@ -10,10 +10,12 @@ import {
 import {
   Plus,
   Trash2,
-  ChevronDown,
-  ChevronUp,
   Check,
   X,
+  Sparkles,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
   GripVertical,
 } from "lucide-react";
 import {
@@ -25,6 +27,9 @@ import {
   toggleTask,
   updateTask,
   deleteTask,
+  parseSprintText,
+  importParsedSections,
+  type ParsedSprintSection,
 } from "@/lib/actions/sprints";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -393,6 +398,323 @@ function SectionBlock({
   );
 }
 
+// ─── Paste & Parse Panel ──────────────────────────────────────────────────────
+
+type ReviewSection = ParsedSprintSection & { assigneeName: string };
+
+function PasteParsePanel({
+  sprintId,
+  projects,
+  teamMembers,
+  currentSectionCount,
+  onImported,
+}: {
+  sprintId: string;
+  projects: ProjectOption[];
+  teamMembers: TeamMemberOption[];
+  currentSectionCount: number;
+  onImported: (sections: Array<ReviewSection & { id: string }>) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"paste" | "parsing" | "review">("paste");
+  const [rawText, setRawText] = useState("");
+  const [parsed, setParsed] = useState<ReviewSection[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleClose() {
+    setOpen(false);
+    setStep("paste");
+    setRawText("");
+    setParsed([]);
+    setError(null);
+  }
+
+  function handleParse() {
+    if (!rawText.trim()) return;
+    setError(null);
+    setStep("parsing");
+    startTransition(async () => {
+      const result = await parseSprintText(
+        rawText,
+        projects.map((p) => p.name),
+        teamMembers.map((m) => m.name)
+      );
+      if (result.success && result.data) {
+        setParsed(result.data.map((s) => ({ ...s, assigneeName: "" })));
+        setStep("review");
+      } else {
+        setError(result.error ?? "Parse failed");
+        setStep("paste");
+      }
+    });
+  }
+
+  function updateAssignee(idx: number, val: string) {
+    setParsed((prev) =>
+      prev.map((s, i) => (i === idx ? { ...s, assigneeName: val } : s))
+    );
+  }
+
+  function updateTaskText(sectionIdx: number, taskIdx: number, val: string) {
+    setParsed((prev) =>
+      prev.map((s, i) =>
+        i === sectionIdx
+          ? {
+              ...s,
+              tasks: s.tasks.map((t, j) => (j === taskIdx ? val : t)),
+            }
+          : s
+      )
+    );
+  }
+
+  function removeTask(sectionIdx: number, taskIdx: number) {
+    setParsed((prev) =>
+      prev.map((s, i) =>
+        i === sectionIdx
+          ? { ...s, tasks: s.tasks.filter((_, j) => j !== taskIdx) }
+          : s
+      )
+    );
+  }
+
+  function removeSection(idx: number) {
+    setParsed((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function handleImport() {
+    if (parsed.length === 0) return;
+    startTransition(async () => {
+      const result = await importParsedSections(
+        sprintId,
+        parsed.map((s) => ({
+          projectName: s.projectName,
+          goal: s.goal,
+          assigneeName: s.assigneeName || null,
+          tasks: s.tasks.filter(Boolean),
+        })),
+        currentSectionCount
+      );
+      if (result.success) {
+        // Build optimistic sections with temp IDs
+        const optimistic = parsed.map((s) => ({
+          ...s,
+          id: crypto.randomUUID(),
+        }));
+        onImported(optimistic);
+        handleClose();
+      } else {
+        setError(result.error ?? "Import failed");
+      }
+    });
+  }
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-2 px-4 py-3 border border-dashed border-[#0A0A0A]/20 text-[#0A0A0A]/40 font-mono text-xs hover:border-[#0A0A0A]/40 hover:text-[#0A0A0A]/60 transition-colors w-full mt-2"
+      >
+        <Sparkles size={12} />
+        Paste & parse notes with AI
+      </button>
+    );
+  }
+
+  const inputCls =
+    "w-full border-b border-[#0A0A0A]/20 py-1 font-mono text-sm bg-transparent focus:outline-none focus:border-[#0A0A0A]/50 placeholder:text-[#0A0A0A]/30";
+
+  return (
+    <div className="border border-[#0A0A0A]/20 bg-white mt-2">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-[#0A0A0A]/10">
+        <div className="flex items-center gap-2">
+          <Sparkles size={13} className="text-[#0A0A0A]/50" />
+          <span className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/60">
+            {step === "paste"
+              ? "Paste Notes"
+              : step === "parsing"
+              ? "Parsing..."
+              : "Review & Assign"}
+          </span>
+        </div>
+        <button
+          onClick={handleClose}
+          className="text-[#0A0A0A]/30 hover:text-[#0A0A0A]/60"
+        >
+          <X size={14} />
+        </button>
+      </div>
+
+      {/* ── Step 1: Paste ── */}
+      {(step === "paste" || step === "parsing") && (
+        <div className="p-5">
+          <p className="font-mono text-[10px] text-[#0A0A0A]/40 mb-3 uppercase tracking-wider">
+            Paste your notes below — AI will group tasks by project and extract
+            goals
+          </p>
+          <textarea
+            value={rawText}
+            onChange={(e) => setRawText(e.target.value)}
+            placeholder={`Trackr\n- Fix the tool cost sync\n- Update pricing page copy\n\nCursive\n- Onboard new client ABC\n- Fix lead import bug\n\nGeneral\n- Review contracts`}
+            rows={10}
+            className="w-full font-mono text-sm text-[#0A0A0A]/80 bg-[#F3F3EF] border border-[#0A0A0A]/10 p-4 focus:outline-none focus:border-[#0A0A0A]/30 resize-none placeholder:text-[#0A0A0A]/25 leading-relaxed"
+            disabled={step === "parsing"}
+          />
+          {error && (
+            <p className="font-mono text-xs text-red-600 mt-2">{error}</p>
+          )}
+          <div className="flex items-center gap-3 mt-4">
+            <button
+              onClick={handleParse}
+              disabled={!rawText.trim() || step === "parsing"}
+              className="flex items-center gap-2 px-4 py-2 bg-[#0A0A0A] text-white font-mono text-xs disabled:opacity-40 hover:bg-[#0A0A0A]/80 transition-colors"
+            >
+              {step === "parsing" ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  Parsing...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={12} />
+                  Parse with AI
+                </>
+              )}
+            </button>
+            <button
+              onClick={handleClose}
+              className="px-4 py-2 border border-[#0A0A0A]/20 font-mono text-xs"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Step 2: Review & Assign ── */}
+      {step === "review" && (
+        <div className="p-5">
+          <p className="font-mono text-[10px] text-[#0A0A0A]/40 mb-4 uppercase tracking-wider">
+            {parsed.length} section{parsed.length !== 1 ? "s" : ""} parsed —
+            assign each section, edit tasks, then add to sprint
+          </p>
+
+          <div className="space-y-5">
+            {parsed.map((section, si) => (
+              <div
+                key={si}
+                className="border border-[#0A0A0A]/10 bg-[#F3F3EF]/50 p-4"
+              >
+                {/* Section header row */}
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1 mr-4">
+                    <p className="font-serif font-bold italic text-[#0A0A0A] text-sm mb-1">
+                      {section.projectName}
+                    </p>
+                    {section.goal && (
+                      <p className="font-mono text-[10px] text-[#0A0A0A]/50">
+                        {section.goal}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {/* Assignee picker */}
+                    <select
+                      value={section.assigneeName}
+                      onChange={(e) => updateAssignee(si, e.target.value)}
+                      className="border border-[#0A0A0A]/20 bg-white px-2 py-1 font-mono text-xs focus:outline-none focus:border-[#0A0A0A]/40"
+                    >
+                      <option value="">Unassigned</option>
+                      {teamMembers.map((m) => (
+                        <option key={m.id} value={m.name}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => removeSection(si)}
+                      className="text-[#0A0A0A]/20 hover:text-red-500 transition-colors"
+                      title="Remove section"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Tasks */}
+                <div className="space-y-1">
+                  {section.tasks.map((task, ti) => (
+                    <div key={ti} className="flex items-center gap-2 group">
+                      <div className="w-3 h-3 border border-[#0A0A0A]/20 shrink-0" />
+                      <input
+                        value={task}
+                        onChange={(e) =>
+                          updateTaskText(si, ti, e.target.value)
+                        }
+                        className="flex-1 font-serif text-sm bg-transparent border-b border-transparent focus:border-[#0A0A0A]/20 focus:outline-none py-0.5"
+                      />
+                      <button
+                        onClick={() => removeTask(si, ti)}
+                        className="opacity-0 group-hover:opacity-100 text-[#0A0A0A]/30 hover:text-red-500 shrink-0"
+                      >
+                        <X size={11} />
+                      </button>
+                    </div>
+                  ))}
+                  {section.tasks.length === 0 && (
+                    <p className="font-mono text-[10px] text-[#0A0A0A]/30 italic">
+                      No tasks — section will be added with no tasks
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {error && (
+            <p className="font-mono text-xs text-red-600 mt-3">{error}</p>
+          )}
+
+          <div className="flex items-center gap-3 mt-5">
+            <button
+              onClick={handleImport}
+              disabled={isPending || parsed.length === 0}
+              className="flex items-center gap-2 px-4 py-2 bg-[#0A0A0A] text-white font-mono text-xs disabled:opacity-40 hover:bg-[#0A0A0A]/80 transition-colors"
+            >
+              {isPending ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" />
+                  Adding...
+                </>
+              ) : (
+                <>
+                  <Check size={12} />
+                  Add {parsed.length} section{parsed.length !== 1 ? "s" : ""}{" "}
+                  to sprint
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => setStep("paste")}
+              className="px-4 py-2 border border-[#0A0A0A]/20 font-mono text-xs"
+            >
+              Back
+            </button>
+            <button
+              onClick={handleClose}
+              className="font-mono text-xs text-[#0A0A0A]/40 hover:text-[#0A0A0A]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Add Section Form ─────────────────────────────────────────────────────────
 
 function AddSectionForm({
@@ -614,6 +936,25 @@ export function SprintEditor({
     setSections((prev) => [...prev, section]);
   }
 
+  function handleImportSections(
+    imported: Array<ParsedSprintSection & { assigneeName: string; id: string }>
+  ) {
+    const newSections: SprintSection[] = imported.map((s, i) => ({
+      id: s.id,
+      projectName: s.projectName,
+      assigneeName: s.assigneeName || null,
+      goal: s.goal,
+      sortOrder: sections.length + i,
+      tasks: s.tasks.map((content, j) => ({
+        id: crypto.randomUUID(),
+        content,
+        isCompleted: false,
+        sortOrder: j,
+      })),
+    }));
+    setSections((prev) => [...prev, ...newSections]);
+  }
+
   function handleUpdateSection(id: string, data: Partial<SprintSection>) {
     setSections((prev) =>
       prev.map((s) => (s.id === id ? { ...s, ...data } : s))
@@ -750,6 +1091,15 @@ export function SprintEditor({
         projects={projects}
         teamMembers={teamMembers}
         nextSortOrder={sections.length}
+      />
+
+      {/* Paste & Parse */}
+      <PasteParsePanel
+        sprintId={sprint.id}
+        projects={projects}
+        teamMembers={teamMembers}
+        currentSectionCount={sections.length}
+        onImported={handleImportSections}
       />
     </div>
   );
