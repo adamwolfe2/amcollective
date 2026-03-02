@@ -50,6 +50,7 @@ async function getSprint(id: string): Promise<SprintData | null> {
     title: sprint.title,
     weeklyFocus: sprint.weeklyFocus,
     topOfMind: sprint.topOfMind,
+    shareToken: sprint.shareToken ?? null,
     sections: sections.map(
       (s): SprintSection => ({
         id: s.id,

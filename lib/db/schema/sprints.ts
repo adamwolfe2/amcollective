@@ -29,13 +29,17 @@ export const weeklySprints = pgTable(
     title: varchar("title", { length: 255 }).notNull(),
     weeklyFocus: varchar("weekly_focus", { length: 255 }),
     topOfMind: text("top_of_mind"), // freeform bullet-point notes
+    shareToken: varchar("share_token", { length: 64 }).unique(), // public share link token
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
       .notNull()
       .$onUpdate(() => new Date()),
   },
-  (table) => [index("weekly_sprints_week_of_idx").on(table.weekOf)]
+  (table) => [
+    index("weekly_sprints_week_of_idx").on(table.weekOf),
+    index("weekly_sprints_share_token_idx").on(table.shareToken),
+  ]
 );
 
 // ─── Sprint Sections (per-project groupings) ──────────────────────────────────

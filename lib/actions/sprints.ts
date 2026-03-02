@@ -43,6 +43,30 @@ export async function createSprint(formData: FormData): Promise<void> {
   redirect(`/sprints/${sprint.id}`);
 }
 
+export async function toggleSprintShare(
+  id: string,
+  currentToken: string | null
+): Promise<ActionResult<{ shareToken: string | null }>> {
+  const userId = await getUserId();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  try {
+    const newToken = currentToken
+      ? null // disable sharing
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`; // short random token
+
+    await db
+      .update(weeklySprints)
+      .set({ shareToken: newToken })
+      .where(eq(weeklySprints.id, id));
+
+    revalidatePath(`/sprints/${id}`);
+    return { success: true, data: { shareToken: newToken } };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed" };
+  }
+}
+
 export async function deleteSprint(id: string): Promise<ActionResult> {
   const userId = await getUserId();
   if (!userId) return { success: false, error: "Unauthorized" };

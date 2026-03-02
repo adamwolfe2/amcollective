@@ -42,6 +42,7 @@ const isPublicRoute = createRouteMatcher([
   "/contracts/sign/(.*)",
   "/proposals/(.*)",
   "/surveys/(.*)",
+  "/s/(.*)", // public sprint share links
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

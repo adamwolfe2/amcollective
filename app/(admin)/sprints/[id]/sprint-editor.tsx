@@ -14,6 +14,10 @@ import {
   X,
   Sparkles,
   Loader2,
+  Link2,
+  Link2Off,
+  Copy,
+  CheckCheck,
 } from "lucide-react";
 import {
   updateSprint,
@@ -26,6 +30,7 @@ import {
   deleteTask,
   parseSprintText,
   importParsedSections,
+  toggleSprintShare,
   type ParsedSprintSection,
 } from "@/lib/actions/sprints";
 
@@ -52,6 +57,7 @@ export type SprintData = {
   title: string;
   weeklyFocus: string | null;
   topOfMind: string | null;
+  shareToken: string | null;
   sections: SprintSection[];
 };
 
@@ -391,6 +397,95 @@ function SectionBlock({
           Add task
         </button>
       )}
+    </div>
+  );
+}
+
+// ─── Share Button ─────────────────────────────────────────────────────────────
+
+function SprintShareButton({
+  sprintId,
+  initialToken,
+}: {
+  sprintId: string;
+  initialToken: string | null;
+}) {
+  const [token, setToken] = useState(initialToken);
+  const [copied, setCopied] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  const shareUrl =
+    typeof window !== "undefined" && token
+      ? `${window.location.origin}/s/${token}`
+      : token
+      ? `/s/${token}`
+      : null;
+
+  function handleToggle() {
+    startTransition(async () => {
+      const result = await toggleSprintShare(sprintId, token);
+      if (result.success && result.data !== undefined) {
+        setToken(result.data.shareToken);
+        setCopied(false);
+      }
+    });
+  }
+
+  function handleCopy() {
+    if (!shareUrl) return;
+    navigator.clipboard.writeText(shareUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  if (!token) {
+    return (
+      <button
+        onClick={handleToggle}
+        disabled={isPending}
+        className="flex items-center gap-1.5 px-3 py-1.5 border border-[#0A0A0A]/20 text-[#0A0A0A]/50 font-mono text-xs hover:border-[#0A0A0A]/40 hover:text-[#0A0A0A]/70 transition-colors disabled:opacity-40"
+      >
+        {isPending ? (
+          <Loader2 size={11} className="animate-spin" />
+        ) : (
+          <Link2 size={11} />
+        )}
+        Share
+      </button>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      <button
+        onClick={handleCopy}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0A0A0A]/5 border border-[#0A0A0A]/20 text-[#0A0A0A]/70 font-mono text-xs hover:bg-[#0A0A0A]/10 transition-colors"
+        title={shareUrl ?? ""}
+      >
+        {copied ? (
+          <>
+            <CheckCheck size={11} className="text-green-600" />
+            Copied!
+          </>
+        ) : (
+          <>
+            <Copy size={11} />
+            Copy link
+          </>
+        )}
+      </button>
+      <button
+        onClick={handleToggle}
+        disabled={isPending}
+        className="p-1.5 border border-[#0A0A0A]/20 text-[#0A0A0A]/30 hover:text-red-500 hover:border-red-300 transition-colors disabled:opacity-40"
+        title="Disable public link"
+      >
+        {isPending ? (
+          <Loader2 size={11} className="animate-spin" />
+        ) : (
+          <Link2Off size={11} />
+        )}
+      </button>
     </div>
   );
 }
@@ -891,6 +986,7 @@ export function SprintEditor({
   const [weeklyFocus, setWeeklyFocus] = useState(sprint.weeklyFocus ?? "");
   const [topOfMind, setTopOfMind] = useState(sprint.topOfMind ?? "");
   const [sections, setSections] = useState<SprintSection[]>(sprint.sections);
+  const shareToken = sprint.shareToken ?? null;
 
   // Sprint header edits
   function saveTitle(val: string) {
@@ -999,8 +1095,8 @@ export function SprintEditor({
         />
       </div>
 
-      {/* Weekly focus + AI Import button on same row */}
-      <div className="flex items-center gap-4 mb-2">
+      {/* Weekly focus + action buttons on same row */}
+      <div className="flex items-center gap-3 mb-2">
         <div className="flex-1">
           <InlineEdit
             value={weeklyFocus}
@@ -1009,6 +1105,7 @@ export function SprintEditor({
             placeholder="WEEKLY FOCUS: ..."
           />
         </div>
+        <SprintShareButton sprintId={sprint.id} initialToken={shareToken} />
         <SprintAIImport
           sprintId={sprint.id}
           projects={projects}
