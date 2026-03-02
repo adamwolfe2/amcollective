@@ -107,6 +107,7 @@ export const sprintTasks = pgTable(
 export const taskSprintAssignments = pgTable(
   "task_sprint_assignments",
   {
+    id: uuid("id").primaryKey().defaultRandom(),
     taskId: uuid("task_id")
       .notNull()
       .references(() => tasks.id, { onDelete: "cascade" }),
@@ -124,8 +125,8 @@ export const taskSprintAssignments = pgTable(
     index("tsa_sprint_id_idx").on(table.sprintId),
     index("tsa_task_id_idx").on(table.taskId),
     index("tsa_section_id_idx").on(table.sectionId),
+    // uniq_active_tsa partial index created in DB migration (Drizzle can't express WHERE clause)
   ]
-  // PRIMARY KEY (task_id, sprint_id) defined in migration DDL
 );
 
 // ─── Sprint Snapshots (historical per-project completion snapshots) ────────────

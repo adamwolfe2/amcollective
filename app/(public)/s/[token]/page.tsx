@@ -68,32 +68,46 @@ async function getSprintByToken(token: string) {
       )
     );
 
-  // Step 4: Group tasks by sectionId
-  const tasksBySectionId = new Map<
-    string,
-    Array<PublicTask>
-  >();
+  // Step 4: Group tasks by sectionId; collect orphaned tasks separately
+  const tasksBySectionId = new Map<string, Array<PublicTask>>();
+  const unassignedTasks: PublicTask[] = [];
+
   for (const task of allTasks) {
     const sectionId = task.sectionId;
-    if (!sectionId) continue;
-    if (!tasksBySectionId.has(sectionId)) {
-      tasksBySectionId.set(sectionId, []);
-    }
-    tasksBySectionId.get(sectionId)!.push({
+    const publicTask: PublicTask = {
       id: task.id,
       content: task.content,
       isCompleted: task.isCompleted,
       sortOrder: task.sortOrder,
+    };
+    if (!sectionId) {
+      unassignedTasks.push(publicTask);
+    } else {
+      if (!tasksBySectionId.has(sectionId)) {
+        tasksBySectionId.set(sectionId, []);
+      }
+      tasksBySectionId.get(sectionId)!.push(publicTask);
+    }
+  }
+
+  const builtSections = sections.map((s) => ({
+    ...s,
+    tasks: tasksBySectionId.get(s.id) ?? [],
+  }));
+
+  // Append synthetic unassigned bucket if needed
+  if (unassignedTasks.length > 0) {
+    builtSections.push({
+      id: "__unassigned__",
+      projectName: "Unassigned",
+      assigneeName: null,
+      goal: null,
+      sortOrder: 9999,
+      tasks: unassignedTasks,
     });
   }
 
-  return {
-    sprint,
-    sections: sections.map((s) => ({
-      ...s,
-      tasks: tasksBySectionId.get(s.id) ?? [],
-    })),
-  };
+  return { sprint, sections: builtSections };
 }
 
 export default async function PublicSprintPage({

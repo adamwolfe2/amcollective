@@ -64,20 +64,49 @@ async function getSprint(id: string): Promise<SprintData | null> {
       )
     );
 
-  // Step 4: Group tasks by sectionId
+  // Step 4: Group tasks by sectionId; collect orphaned (null sectionId) separately
   const tasksBySectionId = new Map<string, SprintTask[]>();
+  const unassignedTasks: SprintTask[] = [];
+
   for (const task of allTasks) {
     const sectionId = task.sectionId;
-    if (!sectionId) continue;
-    if (!tasksBySectionId.has(sectionId)) {
-      tasksBySectionId.set(sectionId, []);
-    }
-    tasksBySectionId.get(sectionId)!.push({
+    const sprintTask: SprintTask = {
       id: task.id,
       content: task.content,
       isCompleted: task.isCompleted,
       sortOrder: task.sortOrder,
       subtasks: task.subtasks ?? [],
+    };
+    if (!sectionId) {
+      unassignedTasks.push(sprintTask);
+    } else {
+      if (!tasksBySectionId.has(sectionId)) {
+        tasksBySectionId.set(sectionId, []);
+      }
+      tasksBySectionId.get(sectionId)!.push(sprintTask);
+    }
+  }
+
+  // Build section list; append synthetic "Unassigned" bucket if needed
+  const builtSections: SprintSection[] = sections.map(
+    (s): SprintSection => ({
+      id: s.id,
+      projectName: s.projectName,
+      assigneeName: s.assigneeName ?? null,
+      goal: s.goal,
+      sortOrder: s.sortOrder,
+      tasks: tasksBySectionId.get(s.id) ?? [],
+    })
+  );
+
+  if (unassignedTasks.length > 0) {
+    builtSections.push({
+      id: "__unassigned__",
+      projectName: "Unassigned",
+      assigneeName: null,
+      goal: null,
+      sortOrder: 9999,
+      tasks: unassignedTasks,
     });
   }
 
@@ -89,16 +118,7 @@ async function getSprint(id: string): Promise<SprintData | null> {
     topOfMind: sprint.topOfMind,
     shareToken: sprint.shareToken ?? null,
     closedAt: sprint.closedAt ?? null,
-    sections: sections.map(
-      (s): SprintSection => ({
-        id: s.id,
-        projectName: s.projectName,
-        assigneeName: s.assigneeName ?? null,
-        goal: s.goal,
-        sortOrder: s.sortOrder,
-        tasks: tasksBySectionId.get(s.id) ?? [],
-      })
-    ),
+    sections: builtSections,
   };
 }
 

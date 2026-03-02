@@ -450,6 +450,7 @@ function SectionBlock({
   onDeleteTask: (id: string) => void;
   projects: ProjectOption[];
 }) {
+  const isUnassigned = section.id === "__unassigned__";
   const [isPending, startTransition] = useTransition();
   const [newTaskContent, setNewTaskContent] = useState("");
   const [showTaskInput, setShowTaskInput] = useState(false);
@@ -509,49 +510,72 @@ function SectionBlock({
     <div className="mb-8 group/section">
       {/* Section header */}
       <div className="flex items-start justify-between mb-1">
-        <InlineEdit
-          value={section.projectName}
-          onSave={saveProjectName}
-          className="font-serif font-bold italic text-[#0A0A0A] text-base"
-          placeholder="Project name"
-        />
-        <div className="flex items-center gap-2 opacity-0 group-hover/section:opacity-100 transition-opacity">
-          {total > 0 && (
-            <span className="font-mono text-[10px] text-[#0A0A0A]/40">
-              {done}/{total}
+        {isUnassigned ? (
+          <span className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/30">
+            Unassigned
+          </span>
+        ) : (
+          <InlineEdit
+            value={section.projectName}
+            onSave={saveProjectName}
+            className="font-serif font-bold italic text-[#0A0A0A] text-base"
+            placeholder="Project name"
+          />
+        )}
+        {!isUnassigned && (
+          <div className="flex items-center gap-2 opacity-0 group-hover/section:opacity-100 transition-opacity">
+            {total > 0 && (
+              <span className="font-mono text-[10px] text-[#0A0A0A]/40">
+                {done}/{total}
+              </span>
+            )}
+            <button
+              onClick={handleDeleteSection}
+              className="text-[#0A0A0A]/20 hover:text-red-500 transition-colors"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        )}
+        {isUnassigned && total > 0 && (
+          <span className="font-mono text-[10px] text-[#0A0A0A]/30">
+            {done}/{total}
+          </span>
+        )}
+      </div>
+
+      {/* Goal + Assignee — only on real sections */}
+      {!isUnassigned && (
+        <>
+          <div className="mb-1.5">
+            <InlineEdit
+              value={section.goal ?? ""}
+              onSave={saveGoal}
+              className="font-mono text-xs text-[#0A0A0A]/50"
+              placeholder="goal — describe the week's objective for this project"
+            />
+          </div>
+          <div className="mb-3">
+            <span className="font-mono text-[10px] text-[#0A0A0A]/30">
+              @{" "}
             </span>
-          )}
-          <button
-            onClick={handleDeleteSection}
-            className="text-[#0A0A0A]/20 hover:text-red-500 transition-colors"
-          >
-            <Trash2 size={12} />
-          </button>
-        </div>
-      </div>
+            <InlineEdit
+              value={section.assigneeName ?? ""}
+              onSave={saveAssigneeName}
+              className="font-mono text-[10px] text-[#0A0A0A]/50"
+              placeholder="assignee"
+            />
+          </div>
+        </>
+      )}
 
-      {/* Goal */}
-      <div className="mb-1.5">
-        <InlineEdit
-          value={section.goal ?? ""}
-          onSave={saveGoal}
-          className="font-mono text-xs text-[#0A0A0A]/50"
-          placeholder="goal — describe the week's objective for this project"
-        />
-      </div>
-
-      {/* Assignee */}
-      <div className="mb-3">
-        <span className="font-mono text-[10px] text-[#0A0A0A]/30">
-          @{" "}
-        </span>
-        <InlineEdit
-          value={section.assigneeName ?? ""}
-          onSave={saveAssigneeName}
-          className="font-mono text-[10px] text-[#0A0A0A]/50"
-          placeholder="assignee"
-        />
-      </div>
+      {/* Unassigned hint */}
+      {isUnassigned && (
+        <p className="font-mono text-[10px] text-[#0A0A0A]/25 mb-3">
+          These tasks lost their section (section was deleted). Move them by
+          deleting and re-adding.
+        </p>
+      )}
 
       {/* Tasks */}
       <div className="space-y-0.5 pl-0">
@@ -569,36 +593,38 @@ function SectionBlock({
           ))}
       </div>
 
-      {/* Add task input */}
-      {showTaskInput ? (
-        <div className="flex items-center gap-2.5 mt-1.5">
-          <div className="w-4 h-4 border border-[#0A0A0A]/20 shrink-0" />
-          <input
-            ref={taskInputRef}
-            value={newTaskContent}
-            onChange={(e) => setNewTaskContent(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleAddTask();
-              if (e.key === "Escape") {
-                setNewTaskContent("");
-                setShowTaskInput(false);
-              }
-            }}
-            onBlur={() => {
-              if (!newTaskContent.trim()) setShowTaskInput(false);
-            }}
-            placeholder="Add task — press Enter"
-            className="flex-1 font-serif text-sm bg-transparent border-b border-[#0A0A0A]/20 focus:outline-none focus:border-[#0A0A0A]/50 text-[#0A0A0A]/70 placeholder:text-[#0A0A0A]/30"
-          />
-        </div>
-      ) : (
-        <button
-          onClick={() => setShowTaskInput(true)}
-          className="mt-2 flex items-center gap-1 font-mono text-[10px] text-[#0A0A0A]/25 hover:text-[#0A0A0A]/50 transition-colors"
-        >
-          <Plus size={10} />
-          Add task
-        </button>
+      {/* Add task — only on real sections */}
+      {!isUnassigned && (
+        showTaskInput ? (
+          <div className="flex items-center gap-2.5 mt-1.5">
+            <div className="w-4 h-4 border border-[#0A0A0A]/20 shrink-0" />
+            <input
+              ref={taskInputRef}
+              value={newTaskContent}
+              onChange={(e) => setNewTaskContent(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleAddTask();
+                if (e.key === "Escape") {
+                  setNewTaskContent("");
+                  setShowTaskInput(false);
+                }
+              }}
+              onBlur={() => {
+                if (!newTaskContent.trim()) setShowTaskInput(false);
+              }}
+              placeholder="Add task — press Enter"
+              className="flex-1 font-serif text-sm bg-transparent border-b border-[#0A0A0A]/20 focus:outline-none focus:border-[#0A0A0A]/50 text-[#0A0A0A]/70 placeholder:text-[#0A0A0A]/30"
+            />
+          </div>
+        ) : (
+          <button
+            onClick={() => setShowTaskInput(true)}
+            className="mt-2 flex items-center gap-1 font-mono text-[10px] text-[#0A0A0A]/25 hover:text-[#0A0A0A]/50 transition-colors"
+          >
+            <Plus size={10} />
+            Add task
+          </button>
+        )
       )}
     </div>
   );
