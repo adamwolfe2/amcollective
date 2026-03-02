@@ -5,14 +5,12 @@
  *
  * Layer stack (back → front):
  *   mountain.png  — Full-color Mt. Hood + Portland photo. Solid, no blend.  multiplier: 0.15
- *   fg.jpg        — Foreground evergreen trees, black bg → transparent       multiplier: 0.5
- *                   via mix-blend-mode:screen. Trees are dark enough that
- *                   screen blend produces clean silhouettes, not ghosting.
- *
- * Why mid.jpg was removed:
- *   The city skyline image has light-gray buildings. mix-blend-mode:screen
- *   on a light image produces a washed-out white ghost — not the dark vignette
- *   top edge either. Dropped entirely until a proper transparent PNG is available.
+ *   gradient      — White bottom-fade (z-10) for hero→page transition.
+ *   fg.jpg        — Foreground evergreen trees (z-15), above gradient.       multiplier: 0.5
+ *                   CSS mask fades the top (black sky area) so the mountain
+ *                   shows through, and fades the bottom so the white gradient
+ *                   below handles the page edge. No blend mode — trees keep
+ *                   their natural deep-green color for a lush, opaque look.
  *
  * Entrance animation:
  *   Triggered by `animateIn` (set true when intro panel starts sliding up).
@@ -127,17 +125,26 @@ export function ParallaxHero({
         />
       </div>
 
-      {/* ── FG: Evergreen trees — faster layer, bottom-anchored ──────── */}
-      {/* mix-blend-mode:screen makes the black background transparent.   */}
-      {/* Trees are dark green — dark enough to show as clean silhouettes  */}
-      {/* rather than ghosting. Image kept at natural aspect ratio so both  */}
-      {/* left/right tree clusters stay visible at full width.              */}
+      {/* ── FG: Evergreen trees — above gradient, CSS mask fade ──────── */}
+      {/* Rendered without blend mode so trees keep their natural rich     */}
+      {/* deep-green color. A CSS mask fades the top (black sky area of    */}
+      {/* the source image) to transparent so the mountain shows through,  */}
+      {/* and also fades the very bottom so the page-edge white gradient   */}
+      {/* below (z-10) handles the hero→page transition naturally.         */}
       <div
         ref={fgRef}
         className="absolute inset-0 will-change-transform overflow-hidden"
-        style={{ mixBlendMode: "screen", ...layerStyle(ANIM_DELAYS.fg) }}
+        style={{ zIndex: 15, ...layerStyle(ANIM_DELAYS.fg) }}
       >
-        <div className="absolute bottom-0 left-0 right-0">
+        <div
+          className="absolute bottom-0 left-0 right-0"
+          style={{
+            WebkitMaskImage:
+              "linear-gradient(to top, transparent 0%, black 18%, black 65%, transparent 100%)",
+            maskImage:
+              "linear-gradient(to top, transparent 0%, black 18%, black 65%, transparent 100%)",
+          }}
+        >
           <Image
             src="/parallax/fg.jpg"
             alt=""
