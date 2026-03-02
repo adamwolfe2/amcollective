@@ -13,10 +13,29 @@ import { NextRequest, NextResponse } from "next/server";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { inngest } from "@/lib/inngest/client";
+import crypto from "crypto";
+
+function verifySignature(rawBody: string, signature: string | null): boolean {
+  const secret = process.env.COMPOSIO_WEBHOOK_SECRET;
+  if (!secret || !signature) return !secret; // allow if no secret configured
+  const expected = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)
+    .digest("hex");
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const rawBody = await request.text();
+    const signature = request.headers.get("x-composio-signature") ??
+      request.headers.get("x-webhook-secret") ?? null;
+
+    if (!verifySignature(rawBody, signature)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+
+    const body = JSON.parse(rawBody);
     const eventType: string = body?.event ?? body?.type ?? "unknown";
     const payload = body?.payload ?? body?.data ?? body;
 

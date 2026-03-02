@@ -35,6 +35,8 @@ import {
   syncWholesail,
   syncProjectMetrics,
   sprintSnapshot,
+  handleComposioTrigger,
+  handleComposioExpired,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -67,5 +69,7 @@ export const { GET, POST, PUT } = serve({
     syncWholesail,
     syncProjectMetrics,
     sprintSnapshot,
+    handleComposioTrigger,
+    handleComposioExpired,
   ],
 });

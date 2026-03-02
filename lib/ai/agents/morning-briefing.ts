@@ -13,7 +13,7 @@ import { getRocks } from "@/lib/db/repositories/rocks";
 import { getUnreadCount } from "@/lib/db/repositories/messages";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { sql, eq, and, lte, notInArray } from "drizzle-orm";
+import { sql, eq, and, lte, notInArray, gte, like } from "drizzle-orm";
 
 export interface FollowUpLead {
   id: string;
@@ -21,6 +21,14 @@ export interface FollowUpLead {
   companyName: string | null;
   stage: string;
   nextFollowUpAt: Date | string | null;
+}
+
+export interface ComposioActivity {
+  githubPushes: Array<{ repo: string; pusher: string; commitCount: number; messages: string[] }>;
+  githubPRs: Array<{ repo: string; title: string; state: string; url: string }>;
+  calendarEvents: Array<{ summary: string; startTime: string; endTime: string }>;
+  linearIssues: Array<{ title: string; state: string }>;
+  slackMentions: number;
 }
 
 export interface BriefingData {
@@ -33,10 +41,80 @@ export interface BriefingData {
   overdueInvoices: number;
   overdueAmount: number;
   overdueFollowUps: FollowUpLead[];
+  composio: ComposioActivity;
+}
+
+async function gatherComposioActivity(): Promise<ComposioActivity> {
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000); // last 24h
+
+  const logs = await db
+    .select({
+      action: schema.auditLogs.action,
+      metadata: schema.auditLogs.metadata,
+    })
+    .from(schema.auditLogs)
+    .where(
+      and(
+        gte(schema.auditLogs.createdAt, since),
+        like(schema.auditLogs.action, "composio.%")
+      )
+    )
+    .orderBy(schema.auditLogs.createdAt)
+    .limit(100);
+
+  const result: ComposioActivity = {
+    githubPushes: [],
+    githubPRs: [],
+    calendarEvents: [],
+    linearIssues: [],
+    slackMentions: 0,
+  };
+
+  for (const log of logs) {
+    const meta = log.metadata as Record<string, unknown> | null;
+    if (!meta) continue;
+
+    if (log.action === "composio.github.push") {
+      result.githubPushes.push({
+        repo: String(meta.repo ?? "unknown"),
+        pusher: String(meta.pusher ?? "unknown"),
+        commitCount: Number(meta.commitCount ?? 0),
+        messages: (meta.messages as string[] | undefined) ?? [],
+      });
+    } else if (log.action === "composio.github.pull_request") {
+      result.githubPRs.push({
+        repo: String(meta.repo ?? "unknown"),
+        title: String(meta.title ?? ""),
+        state: String(meta.state ?? ""),
+        url: String(meta.url ?? ""),
+      });
+    } else if (log.action === "composio.calendar.event") {
+      result.calendarEvents.push({
+        summary: String(meta.summary ?? "Untitled event"),
+        startTime: String(meta.startTime ?? ""),
+        endTime: String(meta.endTime ?? ""),
+      });
+    } else if (
+      log.action === "composio.linear.issue.created" ||
+      log.action === "composio.linear.issue.updated"
+    ) {
+      result.linearIssues.push({
+        title: String(meta.title ?? ""),
+        state: String(meta.state ?? ""),
+      });
+    } else if (
+      log.action === "composio.slack.mention" ||
+      log.action === "composio.slack.dm"
+    ) {
+      result.slackMentions++;
+    }
+  }
+
+  return result;
 }
 
 export async function gatherBriefingData(): Promise<BriefingData> {
-  const [mrrResult, deploysResult, unresolvedAlerts, unreadMessages, rocks, overdueResult, followUps] =
+  const [mrrResult, deploysResult, unresolvedAlerts, unreadMessages, rocks, overdueResult, followUps, composio] =
     await Promise.all([
       stripeConnector.getMRR(),
       vercelConnector.getRecentDeployments(20),
@@ -68,6 +146,7 @@ export async function gatherBriefingData(): Promise<BriefingData> {
         )
         .orderBy(schema.leads.nextFollowUpAt)
         .limit(5),
+      gatherComposioActivity(),
     ]);
 
   const mrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) : null;
@@ -85,6 +164,7 @@ export async function gatherBriefingData(): Promise<BriefingData> {
     overdueInvoices: overdueResult[0]?.count ?? 0,
     overdueAmount: overdueResult[0]?.total ?? 0,
     overdueFollowUps: followUps,
+    composio,
   };
 }
 
@@ -93,6 +173,25 @@ export async function generateBriefing(data: BriefingData): Promise<string> {
   if (!anthropic) {
     return formatFallbackBriefing(data);
   }
+
+  const c = data.composio;
+  const totalCommits = c.githubPushes.reduce((s, p) => s + p.commitCount, 0);
+  const githubLine = totalCommits > 0
+    ? `GitHub (24h): ${totalCommits} commit(s) across ${c.githubPushes.map((p) => p.repo).join(", ")}${c.githubPRs.length > 0 ? `; ${c.githubPRs.length} PR(s)` : ""}`
+    : null;
+  const calendarLine = c.calendarEvents.length > 0
+    ? `Today's Calendar: ${c.calendarEvents.map((e) => `${e.summary} at ${e.startTime}`).slice(0, 5).join("; ")}`
+    : null;
+  const linearLine = c.linearIssues.length > 0
+    ? `Linear (24h): ${c.linearIssues.length} issue(s) — ${c.linearIssues.slice(0, 3).map((i) => i.title).join("; ")}`
+    : null;
+  const slackLine = c.slackMentions > 0
+    ? `Slack: ${c.slackMentions} mention(s) or DM(s) need attention`
+    : null;
+
+  const composioSection = [githubLine, calendarLine, linearLine, slackLine]
+    .filter(Boolean)
+    .join("\n");
 
   const prompt = `You are the AM Collective morning briefing bot. Generate a concise daily briefing from this data:
 
@@ -103,13 +202,15 @@ Unread Messages: ${data.unreadMessages}
 At-Risk Rocks: ${data.atRiskRocks}
 Overdue Invoices: ${data.overdueInvoices} ($${(data.overdueAmount / 100).toFixed(2)})
 Pipeline Follow-ups Due: ${data.overdueFollowUps.length}${data.overdueFollowUps.length > 0 ? "\n" + data.overdueFollowUps.map((l) => `  - ${l.contactName}${l.companyName ? ` / ${l.companyName}` : ""} (${l.stage})`).join("\n") : ""}
+${composioSection ? `\nConnected Tools (24h):\n${composioSection}` : ""}
 
 Rules:
-- 3-5 bullet points max
+- 4-6 bullet points max
 - Start each bullet with an emoji indicator
+- Include today's calendar if present — it's immediately actionable
+- Flag GitHub PRs that are open (may need review)
 - Flag anything that needs immediate attention
 - Be concise and scannable
-- If everything looks good, say so
 - Output plain text, no markdown headers`;
 
   const response = await anthropic.messages.create({
