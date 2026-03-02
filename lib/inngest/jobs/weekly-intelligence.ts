@@ -139,6 +139,12 @@ export const weeklyIntelligence = inngest.createFunction(
       });
     });
 
+    // Step 7: Trigger full project metrics sweep
+    await step.sendEvent("trigger-metrics-sweep", {
+      name: "sprint/metrics.sync",
+      data: { triggeredBy: "weekly-intelligence", weekOf },
+    });
+
     return { success: true, weekOf, insightCount: result.insights.length };
   }
 );

@@ -26,3 +26,5 @@ export { triageLinearIssue } from "./triage-linear-issue";
 export { syncTrackr } from "./sync-trackr";
 export { syncTaskspace } from "./sync-taskspace";
 export { syncWholesail } from "./sync-wholesail";
+export { syncProjectMetrics } from "./sync-project-metrics";
+export { sprintSnapshot } from "./sprint-snapshot";

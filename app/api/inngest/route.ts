@@ -33,6 +33,8 @@ import {
   syncTrackr,
   syncTaskspace,
   syncWholesail,
+  syncProjectMetrics,
+  sprintSnapshot,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -63,5 +65,7 @@ export const { GET, POST, PUT } = serve({
     syncTrackr,
     syncTaskspace,
     syncWholesail,
+    syncProjectMetrics,
+    sprintSnapshot,
   ],
 });
