@@ -8,8 +8,10 @@ import {
   weeklySprints,
   sprintSections,
   sprintTasks,
+  portfolioProjects,
+  teamMembers,
 } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, ilike } from "drizzle-orm";
 import { getAnthropicClient, MODEL_HAIKU, trackAIUsage } from "@/lib/ai/client";
 
 type ActionResult<T = unknown> = {
@@ -115,6 +117,38 @@ export async function updateSprint(
 
 // ─── Section CRUD ─────────────────────────────────────────────────────────────
 
+/** Fuzzy-resolve a project name to its DB id. Case-insensitive, partial match. */
+async function resolveProjectId(name: string): Promise<string | null> {
+  if (!name) return null;
+  const rows = await db
+    .select({ id: portfolioProjects.id, name: portfolioProjects.name })
+    .from(portfolioProjects);
+  const lower = name.toLowerCase();
+  const match = rows.find(
+    (r) =>
+      r.name.toLowerCase() === lower ||
+      r.name.toLowerCase().includes(lower) ||
+      lower.includes(r.name.toLowerCase())
+  );
+  return match?.id ?? null;
+}
+
+/** Fuzzy-resolve an assignee name to their teamMembers id. */
+async function resolveAssigneeId(name: string): Promise<string | null> {
+  if (!name) return null;
+  const rows = await db
+    .select({ id: teamMembers.id, name: teamMembers.name })
+    .from(teamMembers);
+  const lower = name.toLowerCase();
+  const match = rows.find(
+    (r) =>
+      r.name.toLowerCase() === lower ||
+      r.name.toLowerCase().startsWith(lower) ||
+      lower.startsWith(r.name.toLowerCase().split(" ")[0])
+  );
+  return match?.id ?? null;
+}
+
 export async function createSection(
   sprintId: string,
   data: {
@@ -130,14 +164,20 @@ export async function createSection(
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
+    // Resolve FKs if not already provided
+    const projectId =
+      data.projectId ?? (await resolveProjectId(data.projectName));
+    const assigneeId =
+      data.assigneeId ?? (data.assigneeName ? await resolveAssigneeId(data.assigneeName) : null);
+
     const [section] = await db
       .insert(sprintSections)
       .values({
         sprintId,
         projectName: data.projectName,
-        projectId: data.projectId || null,
+        projectId,
         assigneeName: data.assigneeName || null,
-        assigneeId: data.assigneeId || null,
+        assigneeId,
         goal: data.goal || null,
         sortOrder: data.sortOrder ?? 0,
       })
@@ -163,15 +203,25 @@ export async function updateSection(
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
+    // Re-resolve FKs when names change
+    const projectId =
+      data.projectName !== undefined
+        ? await resolveProjectId(data.projectName)
+        : undefined;
+    const assigneeId =
+      data.assigneeName !== undefined
+        ? data.assigneeName
+          ? await resolveAssigneeId(data.assigneeName)
+          : null
+        : undefined;
+
     await db
       .update(sprintSections)
       .set({
-        ...(data.projectName !== undefined && {
-          projectName: data.projectName,
-        }),
-        ...(data.assigneeName !== undefined && {
-          assigneeName: data.assigneeName,
-        }),
+        ...(data.projectName !== undefined && { projectName: data.projectName }),
+        ...(projectId !== undefined && { projectId }),
+        ...(data.assigneeName !== undefined && { assigneeName: data.assigneeName }),
+        ...(assigneeId !== undefined && { assigneeId }),
         ...(data.goal !== undefined && { goal: data.goal }),
       })
       .where(eq(sprintSections.id, id));
@@ -421,6 +471,33 @@ export async function importParsedSections(
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
+    // Load lookup tables once for the whole batch
+    const [allProjects, allMembers] = await Promise.all([
+      db.select({ id: portfolioProjects.id, name: portfolioProjects.name }).from(portfolioProjects),
+      db.select({ id: teamMembers.id, name: teamMembers.name }).from(teamMembers),
+    ]);
+
+    function matchProject(name: string): string | null {
+      const lower = name.toLowerCase();
+      return allProjects.find(
+        (p) =>
+          p.name.toLowerCase() === lower ||
+          p.name.toLowerCase().includes(lower) ||
+          lower.includes(p.name.toLowerCase())
+      )?.id ?? null;
+    }
+
+    function matchMember(name: string | null): string | null {
+      if (!name) return null;
+      const lower = name.toLowerCase();
+      return allMembers.find(
+        (m) =>
+          m.name.toLowerCase() === lower ||
+          m.name.toLowerCase().startsWith(lower) ||
+          lower.startsWith(m.name.toLowerCase().split(" ")[0])
+      )?.id ?? null;
+    }
+
     for (let i = 0; i < sections.length; i++) {
       const sec = sections[i];
       const [newSection] = await db
@@ -428,7 +505,9 @@ export async function importParsedSections(
         .values({
           sprintId,
           projectName: sec.projectName,
+          projectId: matchProject(sec.projectName),
           assigneeName: sec.assigneeName || null,
+          assigneeId: matchMember(sec.assigneeName),
           goal: sec.goal || null,
           sortOrder: startSortOrder + i,
         })

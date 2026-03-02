@@ -19,6 +19,7 @@ import {
   Copy,
   CheckCheck,
 } from "lucide-react";
+import { MentionInput, type MentionOption } from "./mention-input";
 import {
   updateSprint,
   createSection,
@@ -800,8 +801,13 @@ function AddSectionForm({
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [projectName, setProjectName] = useState("");
+  const [projectId, setProjectId] = useState<string | null>(null);
   const [assigneeName, setAssigneeName] = useState("");
+  const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [goal, setGoal] = useState("");
+
+  const projectOptions: MentionOption[] = projects.map((p) => ({ id: p.id, name: p.name }));
+  const memberOptions: MentionOption[] = teamMembers.map((m) => ({ id: m.id, name: m.name }));
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -816,20 +822,24 @@ function AddSectionForm({
       tasks: [],
     };
     onAdd(tempSection);
-    setProjectName("");
-    setAssigneeName("");
+    setProjectName(""); setProjectId(null);
+    setAssigneeName(""); setAssigneeId(null);
     setGoal("");
     setOpen(false);
 
     startTransition(async () => {
       await createSection(sprintId, {
         projectName: tempSection.projectName,
+        projectId,
         assigneeName: tempSection.assigneeName,
+        assigneeId,
         goal: tempSection.goal,
         sortOrder: nextSortOrder,
       });
     });
   }
+
+  const inputCls = ""; // MentionInput applies its own styles
 
   if (!open) {
     return (
@@ -843,9 +853,6 @@ function AddSectionForm({
     );
   }
 
-  const inputCls =
-    "w-full border-b border-[#0A0A0A]/20 py-1 font-mono text-sm bg-transparent focus:outline-none focus:border-[#0A0A0A]/50 placeholder:text-[#0A0A0A]/30";
-
   return (
     <form
       onSubmit={handleSubmit}
@@ -856,47 +863,43 @@ function AddSectionForm({
       </p>
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
-          <label className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1">
-            Project Name *
-          </label>
-          <input
-            className={inputCls}
+          <MentionInput
+            label="Project / Client *"
             value={projectName}
-            onChange={(e) => setProjectName(e.target.value)}
-            placeholder="Cursive, TBGC, Wholesail..."
-            list="project-options"
-            required
-            autoFocus
+            onChange={(v) => { setProjectName(v); if (!v) setProjectId(null); }}
+            onSelect={(opt) => setProjectId(opt?.id ?? null)}
+            options={projectOptions}
+            placeholder="DevSwarm, SOHO, TVTC..."
+            emptyText="No matching project — will be saved as free text"
           />
-          <datalist id="project-options">
-            {projects.map((p) => (
-              <option key={p.id} value={p.name} />
-            ))}
-          </datalist>
+          {projectId && (
+            <p className="font-mono text-[9px] text-[#0A0A0A]/30 mt-0.5">
+              linked to project
+            </p>
+          )}
         </div>
         <div>
-          <label className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1">
-            Assignee
-          </label>
-          <input
-            className={inputCls}
+          <MentionInput
+            label="Assignee"
             value={assigneeName}
-            onChange={(e) => setAssigneeName(e.target.value)}
-            placeholder="adam wolfe, Maggie Byrne..."
-            list="member-options"
+            onChange={(v) => { setAssigneeName(v); if (!v) setAssigneeId(null); }}
+            onSelect={(opt) => setAssigneeId(opt?.id ?? null)}
+            options={memberOptions}
+            placeholder="@ Adam, Maggie..."
+            emptyText="No matching team member"
           />
-          <datalist id="member-options">
-            {teamMembers.map((m) => (
-              <option key={m.id} value={m.name} />
-            ))}
-          </datalist>
+          {assigneeId && (
+            <p className="font-mono text-[9px] text-[#0A0A0A]/30 mt-0.5">
+              linked to team member
+            </p>
+          )}
         </div>
         <div className="col-span-2">
           <label className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1">
             Goal
           </label>
           <input
-            className={inputCls}
+            className="w-full border-b border-[#0A0A0A]/20 py-1 font-mono text-sm bg-transparent focus:outline-none focus:border-[#0A0A0A]/50 placeholder:text-[#0A0A0A]/30"
             value={goal}
             onChange={(e) => setGoal(e.target.value)}
             placeholder="goal — what needs to happen this week for this project"
