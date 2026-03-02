@@ -1,46 +1,20 @@
 "use client";
 
-/**
- * ParallaxHero — two-layer scroll parallax hero section.
- *
- * Layer stack (back → front):
- *   mountain.png  — Full-color Mt. Hood + Portland city photo. Solid bg.   multiplier: 0.15
- *   fg.png        — Foreground evergreen trees with proper alpha channel.    multiplier: 0.4
- *                   Generated from fg.jpg via ImageMagick luminance-based
- *                   alpha extraction (black background → transparent).
- *                   No blend mode needed — alpha composites naturally.
- *
- * Entrance animation:
- *   Triggered by `animateIn` (set true when intro panel starts sliding up).
- *   Layers rise from translateY(80px) → 0 in 650ms, staggered, synced to the
- *   700ms intro slide. Scroll RAF handler activates at 740ms.
- *
- * Accessibility: prefers-reduced-motion → no animation, no parallax.
- * Mobile: multipliers scaled 50% on screens ≤ 768px.
- */
-
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import Image from "next/image";
 import { useParallax } from "@/lib/use-parallax";
 
 export interface ParallaxHeroProps {
-  /** Flip to true when intro panel begins its exit — starts the rise animation */
   animateIn?: boolean;
-  /** Per-layer scroll multipliers */
-  multipliers?: { bg: number; fg: number };
-  /** Tailwind height classes for the hero section */
+  multipliers?: { bg: number };
   height?: string;
-  /** Rendered inside an absolute inset-0 z-20 div — use for login links, CTAs, etc. */
   overlay?: ReactNode;
   className?: string;
 }
 
-const DEFAULT_MULTIPLIERS = { bg: 0.15, fg: 0.4 };
-
-// Animation timing — synced to SLIDE_DURATION_MS in marketing-page.tsx (700ms)
+const DEFAULT_MULTIPLIERS = { bg: 0.15 };
 const ANIM_DURATION_MS = 650;
-const ANIM_DELAYS = { bg: 0, fg: 60 };
-const SCROLL_ACTIVE_DELAY_MS = ANIM_DELAYS.fg + ANIM_DURATION_MS + 30; // ~740ms
+const SCROLL_ACTIVE_DELAY_MS = ANIM_DURATION_MS + 30;
 
 export function ParallaxHero({
   animateIn = false,
@@ -54,17 +28,13 @@ export function ParallaxHero({
   const [visible, setVisible] = useState(false);
   const [scrollActive, setScrollActive] = useState(false);
 
-  // Detect user media preferences on mount
   useEffect(() => {
     const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const mobile = window.matchMedia("(max-width: 768px)");
-
     setPrefersReduced(motion.matches);
     setIsMobile(mobile.matches);
-
     const onMotion = (e: MediaQueryListEvent) => setPrefersReduced(e.matches);
     const onMobile = (e: MediaQueryListEvent) => setIsMobile(e.matches);
-
     motion.addEventListener("change", onMotion);
     mobile.addEventListener("change", onMobile);
     return () => {
@@ -73,7 +43,6 @@ export function ParallaxHero({
     };
   }, []);
 
-  // Reveal layers and schedule scroll handler activation when intro exits
   useEffect(() => {
     if (!animateIn) return;
     setVisible(true);
@@ -81,37 +50,25 @@ export function ParallaxHero({
     return () => clearTimeout(t);
   }, [animateIn]);
 
-  // Reduced-motion: reveal immediately, skip animation + parallax
   useEffect(() => {
     if (prefersReduced) setVisible(true);
   }, [prefersReduced]);
 
   const scale = isMobile ? 0.5 : 1;
   const scrollDisabled = prefersReduced || !scrollActive;
-
   const bgRef = useParallax(multipliers.bg * scale, scrollDisabled);
-  const fgRef = useParallax(multipliers.fg * scale, scrollDisabled);
 
-  function layerStyle(delay: number): CSSProperties {
+  const bgStyle: CSSProperties = (() => {
     if (prefersReduced) return { opacity: 1 };
     if (visible) {
-      return {
-        animation: `parallax-rise ${ANIM_DURATION_MS}ms cubic-bezier(0.16,1,0.3,1) ${delay}ms both`,
-      };
+      return { animation: `parallax-rise ${ANIM_DURATION_MS}ms cubic-bezier(0.16,1,0.3,1) 0ms both` };
     }
     return { opacity: 0, transform: "translate3d(0, 80px, 0)" };
-  }
+  })();
 
   return (
-    <section
-      className={`relative w-full ${height} overflow-hidden isolate ${className}`}
-    >
-      {/* ── BG: Full-color Mt. Hood + city photo — solid, no blend mode ── */}
-      <div
-        ref={bgRef}
-        className="absolute inset-0 will-change-transform"
-        style={layerStyle(ANIM_DELAYS.bg)}
-      >
+    <section className={`relative w-full ${height} overflow-hidden isolate ${className}`}>
+      <div ref={bgRef} className="absolute inset-0 will-change-transform" style={bgStyle}>
         <Image
           src="/parallax/mountain.png"
           alt="Mount Hood over Portland"
@@ -123,40 +80,15 @@ export function ParallaxHero({
         />
       </div>
 
-      {/* ── FG: Evergreen trees — proper PNG alpha, no blend mode needed ─ */}
-      <div
-        ref={fgRef}
-        className="absolute inset-0 will-change-transform overflow-hidden"
-        style={layerStyle(ANIM_DELAYS.fg)}
-      >
-        <div className="absolute bottom-0 left-0 right-0">
-          <Image
-            src="/parallax/fg.png"
-            alt=""
-            aria-hidden="true"
-            width={1206}
-            height={425}
-            sizes="100vw"
-            className="w-full h-auto block select-none pointer-events-none"
-            unoptimized
-          />
-        </div>
-      </div>
-
-      {/* ── Gradient: fade hero into the white page below ─────────────── */}
       <div
         className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none"
         style={{
           height: "40%",
-          background:
-            "linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.8) 30%, rgba(255,255,255,0.2) 65%, transparent 100%)",
+          background: "linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.8) 30%, rgba(255,255,255,0.2) 65%, transparent 100%)",
         }}
       />
 
-      {/* ── Overlay slot (login link, CTAs, etc.) ─────────────────────── */}
-      {overlay && (
-        <div className="absolute inset-0 z-20">{overlay}</div>
-      )}
+      {overlay && <div className="absolute inset-0 z-20">{overlay}</div>}
     </section>
   );
 }
