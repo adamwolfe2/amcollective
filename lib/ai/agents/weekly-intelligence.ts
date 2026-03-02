@@ -11,7 +11,8 @@ import { getUnresolvedCount } from "@/lib/db/repositories/alerts";
 import { getRocks } from "@/lib/db/repositories/rocks";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { sql, eq, gte, desc, count, and } from "drizzle-orm";
+import { sql, eq, gte, count, and } from "drizzle-orm";
+import { getProjectContextSummary } from "@/lib/intelligence/project-context";
 
 export interface WeeklyIntelData {
   // Revenue
@@ -42,6 +43,8 @@ export interface WeeklyIntelData {
   // Cash
   recurringTemplates: number;
   estimatedMonthlyRecurring: number;
+  // Sprint intelligence (per-project summaries)
+  sprintSummaries: string[];
 }
 
 export async function gatherWeeklyData(): Promise<WeeklyIntelData> {
@@ -138,6 +141,18 @@ export async function gatherWeeklyData(): Promise<WeeklyIntelData> {
       .where(eq(schema.recurringInvoices.status, "active")),
   ]);
 
+  // Sprint intelligence — fetch active project IDs then summarize each in parallel
+  const activeProjectRows = await db
+    .select({ id: schema.portfolioProjects.id })
+    .from(schema.portfolioProjects)
+    .where(eq(schema.portfolioProjects.status, "active"));
+
+  const sprintSummaries = (
+    await Promise.all(
+      activeProjectRows.map((p) => getProjectContextSummary(p.id))
+    )
+  ).filter((s) => s.trim().length > 0);
+
   return {
     mrr: mrrResult.success ? (mrrResult.data?.mrr ?? 0) : null,
     revenueTrend: revenueTrend.success ? (revenueTrend.data ?? null) : null,
@@ -161,6 +176,7 @@ export async function gatherWeeklyData(): Promise<WeeklyIntelData> {
     clientsWithOverdueInvoices: Number(clientsOverdue[0]?.count ?? 0),
     recurringTemplates: recurringData[0]?.count ?? 0,
     estimatedMonthlyRecurring: Number(recurringData[0]?.total ?? 0),
+    sprintSummaries,
   };
 }
 
@@ -185,6 +201,11 @@ export async function generateWeeklyIntelligence(
 
   const fmt = (cents: number) => `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 0 })}`;
 
+  const sprintSection =
+    data.sprintSummaries.length > 0
+      ? `\nSPRINT ACTIVITY (per project):\n${data.sprintSummaries.join("\n\n")}\n`
+      : "";
+
   const prompt = `You are a business intelligence analyst for AM Collective, a digital agency. Analyze this week's data and provide strategic insights.
 
 DATA:
@@ -203,7 +224,7 @@ DATA:
 - Total clients: ${data.totalClients}
 - Clients with overdue invoices: ${data.clientsWithOverdueInvoices}
 - Active recurring templates: ${data.recurringTemplates} (est. ${fmt(data.estimatedMonthlyRecurring)}/mo)
-
+${sprintSection}
 Respond in this exact JSON format (no markdown, just raw JSON):
 {
   "executiveSummary": "2-3 sentence overview of business health",
@@ -218,17 +239,18 @@ Respond in this exact JSON format (no markdown, just raw JSON):
 }
 
 Rules:
-- Generate 4-8 insights covering at least 3 different categories
+- Generate 5-9 insights covering at least 3 different categories
 - priority: 0=informational, 1=needs action soon, 2=urgent/needs attention now
 - Focus on actionable insights, not just restating numbers
 - Flag risks and opportunities
 - Be specific with dollar amounts and percentages
+- If sprint data is provided, include at least 1 insight about project momentum (declining velocity, stalled projects, high completion rate)
 - Do not use emojis`;
 
   try {
     const response = await anthropic.messages.create({
       model: MODEL_HAIKU,
-      max_tokens: 1000,
+      max_tokens: 1500,
       messages: [{ role: "user", content: prompt }],
     });
 
