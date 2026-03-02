@@ -4,6 +4,7 @@ import { desc, eq, sql, count } from "drizzle-orm";
 import Link from "next/link";
 import { createSprint } from "@/lib/actions/sprints";
 import { Plus, ChevronRight } from "lucide-react";
+import { SprintDeleteButton } from "./sprint-delete-button";
 import { format, isThisWeek } from "date-fns";
 
 async function getSprints() {
@@ -97,12 +98,14 @@ export default async function SprintsPage() {
             const isCurrent = isThisWeek(sprint.weekOf, { weekStartsOn: 1 });
 
             return (
-              <Link
+              <div
                 key={sprint.id}
-                href={`/sprints/${sprint.id}`}
-                className="block border border-[#0A0A0A]/10 bg-white hover:border-[#0A0A0A]/30 transition-colors group"
+                className="flex items-stretch border border-[#0A0A0A]/10 bg-white hover:border-[#0A0A0A]/30 transition-colors group"
               >
-                <div className="px-5 py-4 flex items-center justify-between">
+                <Link
+                  href={`/sprints/${sprint.id}`}
+                  className="flex-1 px-5 py-4 flex items-center justify-between"
+                >
                   <div className="flex items-center gap-4">
                     {isCurrent && (
                       <span className="px-2 py-0.5 bg-[#0A0A0A] text-white font-mono text-[10px] uppercase tracking-wider">
@@ -145,8 +148,11 @@ export default async function SprintsPage() {
                       className="text-[#0A0A0A]/20 group-hover:text-[#0A0A0A]/60 transition-colors"
                     />
                   </div>
+                </Link>
+                <div className="flex items-center pr-3">
+                  <SprintDeleteButton id={sprint.id} title={sprint.title} />
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>

@@ -43,6 +43,19 @@ export async function createSprint(formData: FormData): Promise<void> {
   redirect(`/sprints/${sprint.id}`);
 }
 
+export async function deleteSprint(id: string): Promise<ActionResult> {
+  const userId = await getUserId();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  try {
+    await db.delete(weeklySprints).where(eq(weeklySprints.id, id));
+    revalidatePath("/sprints");
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : "Failed" };
+  }
+}
+
 export async function updateSprint(
   id: string,
   data: {
