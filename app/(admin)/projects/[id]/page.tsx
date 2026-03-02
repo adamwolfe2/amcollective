@@ -7,6 +7,7 @@ import {
   getProjectTeamMembers,
   getProjectClients,
 } from "@/lib/db/repositories/projects";
+import { getProjectContext } from "@/lib/intelligence/project-context";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -72,12 +73,14 @@ export default async function ProjectDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [project, stats, teamMembers, projectClients] = await Promise.all([
-    getProject(id),
-    getProjectStats(id),
-    getProjectTeamMembers(id),
-    getProjectClients(id),
-  ]);
+  const [project, stats, teamMembers, projectClients, projectContext] =
+    await Promise.all([
+      getProject(id),
+      getProjectStats(id),
+      getProjectTeamMembers(id),
+      getProjectClients(id),
+      getProjectContext(id),
+    ]);
 
   if (!project) notFound();
 
@@ -317,8 +320,11 @@ export default async function ProjectDetailPage({
       <Separator className="bg-[#0A0A0A]/10 mb-6" />
 
       {/* Tabs */}
-      <Tabs defaultValue="team">
-        <TabsList className="rounded-none bg-transparent border border-[#0A0A0A]/20 p-0 h-auto">
+      <Tabs defaultValue="sprints">
+        <TabsList className="rounded-none bg-transparent border border-[#0A0A0A]/20 p-0 h-auto flex-wrap">
+          <TabsTrigger value="sprints" className={tabTriggerClass}>
+            Sprints ({projectContext?.sprintHistory.length ?? 0})
+          </TabsTrigger>
           <TabsTrigger value="team" className={tabTriggerClass}>
             Team ({stats.teamCount})
           </TabsTrigger>
@@ -337,6 +343,152 @@ export default async function ProjectDetailPage({
             </TabsTrigger>
           )}
         </TabsList>
+
+        {/* Sprints tab */}
+        <TabsContent value="sprints" className="mt-4">
+          {!projectContext || projectContext.sprintHistory.length === 0 ? (
+            <div className="border border-dashed border-[#0A0A0A]/20 p-8 text-center">
+              <p className="font-serif text-[#0A0A0A]/40">
+                No sprint history yet.
+              </p>
+              <p className="font-mono text-xs text-[#0A0A0A]/30 mt-1">
+                When sprint sections are linked to this project, history will appear here.
+              </p>
+              <Link
+                href="/sprints"
+                className="font-mono text-xs text-[#0A0A0A]/50 hover:text-[#0A0A0A] mt-3 inline-block"
+              >
+                Go to Sprints →
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Summary cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="border border-[#0A0A0A]/10 bg-white p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-1">
+                    30-day completion
+                  </p>
+                  <p className="text-2xl font-mono font-bold">
+                    {projectContext.completionRate30d}%
+                  </p>
+                </div>
+                <div className="border border-[#0A0A0A]/10 bg-white p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-1">
+                    Open tasks
+                  </p>
+                  <p className="text-2xl font-mono font-bold">
+                    {projectContext.openTaskCount}
+                  </p>
+                </div>
+                <div className="border border-[#0A0A0A]/10 bg-white p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-1">
+                    Weeks tracked
+                  </p>
+                  <p className="text-2xl font-mono font-bold">
+                    {projectContext.sprintHistory.length}
+                  </p>
+                </div>
+                <div className="border border-[#0A0A0A]/10 bg-white p-4">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-1">
+                    Momentum
+                  </p>
+                  <p className={`text-sm font-mono font-bold mt-1 ${
+                    projectContext.velocity === "accelerating"
+                      ? "text-green-600"
+                      : projectContext.velocity === "declining"
+                      ? "text-red-500"
+                      : projectContext.velocity === "inactive"
+                      ? "text-[#0A0A0A]/30"
+                      : "text-[#0A0A0A]"
+                  }`}>
+                    {projectContext.velocity.charAt(0).toUpperCase() + projectContext.velocity.slice(1)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Open tasks this week */}
+              {(projectContext.sprintHistory[0]?.openTasks.length ?? 0) > 0 && (
+                <div>
+                  <h3 className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-3">
+                    Open This Week
+                  </h3>
+                  <div className="border border-[#0A0A0A]/10 bg-white divide-y divide-[#0A0A0A]/5">
+                    {projectContext.sprintHistory[0].openTasks.map((task, i) => (
+                      <div key={i} className="flex items-start gap-3 px-4 py-2.5">
+                        <div className="w-3.5 h-3.5 border border-[#0A0A0A]/25 shrink-0 mt-0.5" />
+                        <span className="font-serif text-sm text-[#0A0A0A]">{task}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Sprint history timeline */}
+              <div>
+                <h3 className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-3">
+                  Sprint History
+                </h3>
+                <div className="border border-[#0A0A0A]/10 bg-white divide-y divide-[#0A0A0A]/5">
+                  {projectContext.sprintHistory.map((week) => {
+                    const filledBars = Math.round(week.pct / 10);
+                    return (
+                      <Link
+                        key={week.sprintId}
+                        href={`/sprints/${week.sprintId}`}
+                        className="flex items-center gap-4 px-5 py-3.5 hover:bg-[#0A0A0A]/[0.02] transition-colors group"
+                      >
+                        {/* Date */}
+                        <span className="font-mono text-xs text-[#0A0A0A]/40 w-16 shrink-0">
+                          {format(new Date(week.weekOf), "MMM d")}
+                        </span>
+
+                        {/* Goal */}
+                        <div className="flex-1 min-w-0">
+                          {week.goal ? (
+                            <p className="font-serif text-sm text-[#0A0A0A] truncate">
+                              {week.goal}
+                            </p>
+                          ) : (
+                            <p className="font-serif text-sm text-[#0A0A0A]/25 italic">
+                              No goal set
+                            </p>
+                          )}
+                          {week.assigneeName && (
+                            <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-0.5">
+                              @ {week.assigneeName}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Progress bar */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex gap-px">
+                            {Array.from({ length: 10 }).map((_, i) => (
+                              <div
+                                key={i}
+                                className={`w-2 h-3 ${
+                                  i < filledBars
+                                    ? week.pct === 100
+                                      ? "bg-[#0A0A0A]"
+                                      : "bg-[#0A0A0A]/60"
+                                    : "bg-[#0A0A0A]/10"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="font-mono text-[10px] text-[#0A0A0A]/40 w-10 text-right">
+                            {week.doneTasks}/{week.totalTasks}
+                          </span>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+        </TabsContent>
 
         {/* Team tab */}
         <TabsContent value="team" className="mt-4">
