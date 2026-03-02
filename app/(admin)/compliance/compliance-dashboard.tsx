@@ -58,8 +58,9 @@ export function ComplianceDashboard() {
 
   useEffect(() => {
     fetch("/api/audit-logs/stats")
-      .then((r) => r.json())
-      .then(setStats);
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && !d.error) setStats(d); })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
