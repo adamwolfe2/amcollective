@@ -25,3 +25,4 @@ export * from "./outreach";
 export * from "./integrations";
 export * from "./sync";
 export * from "./project-snapshots";
+export * from "./sprints";

@@ -1,0 +1,124 @@
+/**
+ * Sprint Schema — Weekly Sprint Documents
+ *
+ * Replaces Notion for weekly planning. Each week has a sprint doc with
+ * project sections (@mentions), assignees (@mentions), goals, and task checklists.
+ */
+
+import {
+  pgTable,
+  uuid,
+  varchar,
+  text,
+  boolean,
+  timestamp,
+  integer,
+  index,
+  date,
+} from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
+import { portfolioProjects, teamMembers } from "./projects";
+
+// ─── Weekly Sprint Document ───────────────────────────────────────────────────
+
+export const weeklySprints = pgTable(
+  "weekly_sprints",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    weekOf: date("week_of", { mode: "date" }).notNull(), // Monday of the sprint week
+    title: varchar("title", { length: 255 }).notNull(),
+    weeklyFocus: varchar("weekly_focus", { length: 255 }),
+    topOfMind: text("top_of_mind"), // freeform bullet-point notes
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [index("weekly_sprints_week_of_idx").on(table.weekOf)]
+);
+
+// ─── Sprint Sections (per-project groupings) ──────────────────────────────────
+
+export const sprintSections = pgTable(
+  "sprint_sections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sprintId: uuid("sprint_id")
+      .notNull()
+      .references(() => weeklySprints.id, { onDelete: "cascade" }),
+    // @project mention — either a platform project or free-text
+    projectId: uuid("project_id").references(() => portfolioProjects.id, {
+      onDelete: "set null",
+    }),
+    projectName: varchar("project_name", { length: 255 }).notNull(),
+    // @assignee mention — either a team member or free-text
+    assigneeId: uuid("assignee_id").references(() => teamMembers.id, {
+      onDelete: "set null",
+    }),
+    assigneeName: varchar("assignee_name", { length: 255 }),
+    goal: text("goal"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("sprint_sections_sprint_id_idx").on(table.sprintId),
+    index("sprint_sections_sort_order_idx").on(table.sortOrder),
+  ]
+);
+
+// ─── Sprint Tasks (checklist items per section) ───────────────────────────────
+
+export const sprintTasks = pgTable(
+  "sprint_tasks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sectionId: uuid("section_id")
+      .notNull()
+      .references(() => sprintSections.id, { onDelete: "cascade" }),
+    content: text("content").notNull(),
+    isCompleted: boolean("is_completed").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("sprint_tasks_section_id_idx").on(table.sectionId),
+    index("sprint_tasks_completed_idx").on(table.isCompleted),
+  ]
+);
+
+// ─── Relations ────────────────────────────────────────────────────────────────
+
+export const weeklySprintsRelations = relations(weeklySprints, ({ many }) => ({
+  sections: many(sprintSections),
+}));
+
+export const sprintSectionsRelations = relations(
+  sprintSections,
+  ({ one, many }) => ({
+    sprint: one(weeklySprints, {
+      fields: [sprintSections.sprintId],
+      references: [weeklySprints.id],
+    }),
+    project: one(portfolioProjects, {
+      fields: [sprintSections.projectId],
+      references: [portfolioProjects.id],
+    }),
+    assignee: one(teamMembers, {
+      fields: [sprintSections.assigneeId],
+      references: [teamMembers.id],
+    }),
+    tasks: many(sprintTasks),
+  })
+);
+
+export const sprintTasksRelations = relations(sprintTasks, ({ one }) => ({
+  section: one(sprintSections, {
+    fields: [sprintTasks.sectionId],
+    references: [sprintSections.id],
+  }),
+}));

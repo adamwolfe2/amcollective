@@ -8,7 +8,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, and, sql, desc, gte, count } from "drizzle-orm";
+import { eq, and, sql, desc, gte, count, asc } from "drizzle-orm";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { AiChat } from "@/components/ai-chat";
@@ -24,6 +24,8 @@ import {
   LineChart,
   Send,
   FileCheck,
+  Zap,
+  Check,
 } from "lucide-react";
 
 function greeting() {
@@ -86,6 +88,187 @@ const getCachedStaleClients = unstable_cache(
   ["dashboard-stale-clients"],
   { revalidate: 300 }
 );
+
+// ─── Sprint Widget ───────────────────────────────────────────────────────────
+
+async function getCurrentSprint() {
+  const sprints = await db
+    .select()
+    .from(schema.weeklySprints)
+    .orderBy(desc(schema.weeklySprints.weekOf))
+    .limit(1);
+
+  if (!sprints.length) return null;
+  const sprint = sprints[0];
+
+  const sections = await db
+    .select()
+    .from(schema.sprintSections)
+    .where(eq(schema.sprintSections.sprintId, sprint.id))
+    .orderBy(asc(schema.sprintSections.sortOrder));
+
+  const tasks = await db
+    .select()
+    .from(schema.sprintTasks)
+    .orderBy(asc(schema.sprintTasks.sortOrder));
+
+  const tasksBySectionId = new Map<
+    string,
+    { total: number; done: number }
+  >();
+  for (const task of tasks) {
+    const curr = tasksBySectionId.get(task.sectionId) ?? {
+      total: 0,
+      done: 0,
+    };
+    tasksBySectionId.set(task.sectionId, {
+      total: curr.total + 1,
+      done: curr.done + (task.isCompleted ? 1 : 0),
+    });
+  }
+
+  const totalTasks = tasks.length;
+  const doneTasks = tasks.filter((t) => t.isCompleted).length;
+
+  return { sprint, sections, tasksBySectionId, totalTasks, doneTasks };
+}
+
+async function SprintWidget() {
+  try {
+    const data = await getCurrentSprint();
+    if (!data) {
+      return (
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 flex items-center gap-1.5">
+              <Zap size={10} />
+              Weekly Sprint
+            </h3>
+            <Link
+              href="/sprints"
+              className="font-mono text-[10px] text-[#0A0A0A]/40 hover:text-[#0A0A0A]/60"
+            >
+              New sprint →
+            </Link>
+          </div>
+          <div className="border border-dashed border-[#0A0A0A]/10 py-4 text-center">
+            <p className="font-mono text-[10px] text-[#0A0A0A]/30">
+              No sprint this week.{" "}
+              <Link href="/sprints" className="underline">
+                Create one →
+              </Link>
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    const { sprint, sections, tasksBySectionId, totalTasks, doneTasks } = data;
+    const pct =
+      totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 flex items-center gap-1.5">
+            <Zap size={10} />
+            Weekly Sprint
+          </h3>
+          <Link
+            href={`/sprints/${sprint.id}`}
+            className="font-mono text-[10px] text-[#0A0A0A]/40 hover:text-[#0A0A0A]/60"
+          >
+            Open →
+          </Link>
+        </div>
+        <div className="border border-[#0A0A0A]/10 bg-white">
+          {/* Sprint header */}
+          <div className="px-3 py-2.5 border-b border-[#0A0A0A]/5">
+            <p className="font-serif font-bold text-[#0A0A0A] text-sm">
+              {sprint.title}
+            </p>
+            {sprint.weeklyFocus && (
+              <p className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 mt-0.5">
+                {sprint.weeklyFocus}
+              </p>
+            )}
+          </div>
+          {/* Progress bar */}
+          {totalTasks > 0 && (
+            <div className="px-3 py-2 border-b border-[#0A0A0A]/5">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-1 bg-[#0A0A0A]/10">
+                  <div
+                    className="h-full bg-[#0A0A0A] transition-all"
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span className="font-mono text-[9px] text-[#0A0A0A]/40 shrink-0">
+                  {doneTasks}/{totalTasks}
+                </span>
+              </div>
+            </div>
+          )}
+          {/* Section list */}
+          <div className="divide-y divide-[#0A0A0A]/5">
+            {sections.slice(0, 6).map((section) => {
+              const counts = tasksBySectionId.get(section.id) ?? {
+                total: 0,
+                done: 0,
+              };
+              const secPct =
+                counts.total > 0
+                  ? Math.round((counts.done / counts.total) * 100)
+                  : 0;
+
+              return (
+                <div
+                  key={section.id}
+                  className="px-3 py-2 flex items-center justify-between"
+                >
+                  <p className="font-serif text-[11px] italic font-medium text-[#0A0A0A]">
+                    {section.projectName}
+                  </p>
+                  <div className="flex items-center gap-2">
+                    {counts.total > 0 && (
+                      <>
+                        <div className="w-12 h-1 bg-[#0A0A0A]/10">
+                          <div
+                            className="h-full bg-[#0A0A0A]"
+                            style={{ width: `${secPct}%` }}
+                          />
+                        </div>
+                        <span className="font-mono text-[9px] text-[#0A0A0A]/40">
+                          {counts.done}/{counts.total}
+                        </span>
+                      </>
+                    )}
+                    {counts.total > 0 && counts.done === counts.total && (
+                      <Check size={10} className="text-emerald-500" />
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+            {sections.length > 6 && (
+              <div className="px-3 py-1.5">
+                <Link
+                  href={`/sprints/${sprint.id}`}
+                  className="font-mono text-[9px] text-[#0A0A0A]/40 hover:text-[#0A0A0A]/60"
+                >
+                  +{sections.length - 6} more sections →
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  } catch (err) {
+    console.error("[Dashboard] SprintWidget failed:", err);
+    return null;
+  }
+}
 
 // ─── Metrics Strip ──────────────────────────────────────────────────────────
 
@@ -253,6 +436,9 @@ async function ActionsPanel() {
 
     return (
       <div className="space-y-4">
+        {/* Sprint Widget */}
+        <SprintWidget />
+
         {/* Action Required */}
         {actionItems.length > 0 && (
           <div>
@@ -295,6 +481,7 @@ async function ActionsPanel() {
             Quick Access
           </h3>
           <div className="grid grid-cols-2 gap-1.5">
+            <QuickLink href="/sprints" icon={Zap} label="Sprints" />
             <QuickLink href="/leads" icon={Crosshair} label="Leads" />
             <QuickLink href="/clients" icon={Users} label="Clients" />
             <QuickLink href="/projects" icon={FolderKanban} label="Projects" />

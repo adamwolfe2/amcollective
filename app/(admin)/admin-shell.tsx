@@ -34,12 +34,14 @@ import {
   BookOpen,
   ShieldCheck,
   Send,
+  Zap,
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { CompanySwitcher } from "@/components/company-switcher";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Sprints", href: "/sprints", icon: Zap },
   { label: "Leads", href: "/leads", icon: Crosshair },
   { label: "Clients", href: "/clients", icon: Users },
   { label: "Projects", href: "/projects", icon: FolderKanban },
