@@ -250,6 +250,7 @@ export async function deleteTask(
 export type ParsedSprintSection = {
   projectName: string;
   goal: string | null;
+  assigneeName?: string | null;
   tasks: string[];
 };
 
@@ -274,32 +275,35 @@ export async function parseSprintText(
     };
   }
 
-  const systemPrompt = `You are a sprint planning assistant for AM Collective, an agency. Parse raw notes and extract a structured sprint plan.
+  const systemPrompt = `You are a sprint planning assistant for AM Collective, an agency. Parse raw notes into a structured sprint plan.
 
 Known projects/clients: ${knownProjects.length ? knownProjects.join(", ") : "none listed yet"}
 Team members: ${knownTeamMembers.length ? knownTeamMembers.join(", ") : "Adam, Maggie"}
 
-Rules:
-- Group tasks by project/client. Look for @mentions, headers, bold text, or context clues.
-- Match project names to the known projects list when possible (fuzzy match).
-- Extract one goal/objective per section if the text mentions what needs to happen for that project this week.
-- Keep task descriptions concise and in imperative form (e.g. "Update homepage copy", not "I need to update the homepage copy").
-- Tasks with no clear project attribution go into a section called "AM Collective".
-- Remove bullet symbols, dashes, numbers from task text.
-- Do not invent tasks not in the text.
-- Return valid JSON only — no markdown, no explanation.`;
+CRITICAL RULES — follow exactly:
+1. EACH task must be its own separate string in the tasks array. NEVER combine multiple tasks into one string.
+2. A task starts with "- ", "• ", a number like "1.", or was preceded by "[ ]" or "[x]". Split them ALL into individual items.
+3. Group tasks by project/client. Look for section headers (standalone line before tasks), @mentions like "@adam" or "— @maggie", or context clues.
+4. Detect assignee from @mentions near the project header (e.g. "Trackr — @adam" → assigneeName: "adam", then match to full name from team members list).
+5. Extract one short goal per section if mentioned (e.g. "goal: ...", or a line describing the objective).
+6. Keep task descriptions concise, imperative form ("Fix webhook bug" not "I need to fix the webhook bug").
+7. Strip checkbox markers [ ], [x], -, •, numbers from task text — just the task content.
+8. Tasks with no clear project attribution go into a section named "AM Collective".
+9. Do NOT invent tasks. Only use what's in the text.
+10. Return ONLY valid JSON — no markdown fences, no explanation.`;
 
-  const userPrompt = `Parse these notes into sprint sections:
+  const userPrompt = `Parse these notes. Remember: every individual task must be its own array element — never combine tasks.
 
 ${rawText}
 
-Return JSON with this exact shape:
+Return JSON:
 {
   "sections": [
     {
       "projectName": "string",
       "goal": "string or null",
-      "tasks": ["task 1", "task 2"]
+      "assigneeName": "first name only, or null if not mentioned",
+      "tasks": ["task 1", "task 2", "task 3"]
     }
   ]
 }`;
@@ -328,13 +332,25 @@ Return JSON with this exact shape:
 
     const parsed = JSON.parse(jsonMatch[0]);
     const sections: ParsedSprintSection[] = (parsed.sections ?? []).map(
-      (s: { projectName?: string; goal?: string | null; tasks?: string[] }) => ({
-        projectName: String(s.projectName ?? "General"),
-        goal: s.goal ? String(s.goal) : null,
-        tasks: Array.isArray(s.tasks)
-          ? s.tasks.map(String).filter(Boolean)
-          : [],
-      })
+      (s: { projectName?: string; goal?: string | null; assigneeName?: string | null; tasks?: string[] }) => {
+        // Fuzzy-match the AI's detected assignee name to a known team member
+        const rawAssignee = s.assigneeName ? String(s.assigneeName).toLowerCase() : null;
+        const matchedAssignee = rawAssignee
+          ? knownTeamMembers.find((m) =>
+              m.toLowerCase().startsWith(rawAssignee) ||
+              rawAssignee.startsWith(m.toLowerCase().split(" ")[0])
+            ) ?? null
+          : null;
+
+        return {
+          projectName: String(s.projectName ?? "General"),
+          goal: s.goal ? String(s.goal) : null,
+          assigneeName: matchedAssignee,
+          tasks: Array.isArray(s.tasks)
+            ? s.tasks.map(String).filter(Boolean)
+            : [],
+        };
+      }
     );
 
     return { success: true, data: sections };

@@ -398,11 +398,20 @@ function SectionBlock({
   );
 }
 
-// ─── Paste & Parse Panel ──────────────────────────────────────────────────────
+// ─── AI Import Modal ──────────────────────────────────────────────────────────
 
 type ReviewSection = ParsedSprintSection & { assigneeName: string };
 
-function PasteParsePanel({
+/** Pre-process raw text before sending to AI — splits [ ] checkboxes onto separate lines */
+function normalizeSprintText(raw: string): string {
+  return raw
+    .replace(/\[\s*x\s*\]/gi, "\n- [done] ")  // [x] → done bullet
+    .replace(/\[\s*\]/g, "\n- ")               // [ ] → new bullet line
+    .replace(/\n{3,}/g, "\n\n")               // collapse excessive blank lines
+    .trim();
+}
+
+function SprintAIImport({
   sprintId,
   projects,
   teamMembers,
@@ -416,75 +425,54 @@ function PasteParsePanel({
   onImported: (sections: Array<ReviewSection & { id: string }>) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [step, setStep] = useState<"paste" | "parsing" | "review">("paste");
   const [rawText, setRawText] = useState("");
-  const [parsed, setParsed] = useState<ReviewSection[]>([]);
+  const [parsed, setParsed] = useState<ReviewSection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (open) setTimeout(() => textareaRef.current?.focus(), 50);
+  }, [open]);
 
   function handleClose() {
     setOpen(false);
-    setStep("paste");
     setRawText("");
-    setParsed([]);
+    setParsed(null);
     setError(null);
   }
 
   function handleParse() {
     if (!rawText.trim()) return;
     setError(null);
-    setStep("parsing");
+    setParsed(null);
     startTransition(async () => {
+      const normalized = normalizeSprintText(rawText);
       const result = await parseSprintText(
-        rawText,
+        normalized,
         projects.map((p) => p.name),
         teamMembers.map((m) => m.name)
       );
       if (result.success && result.data) {
-        setParsed(result.data.map((s) => ({ ...s, assigneeName: "" })));
-        setStep("review");
+        setParsed(result.data.map((s) => ({ ...s, assigneeName: s.assigneeName ?? "" })));
       } else {
         setError(result.error ?? "Parse failed");
-        setStep("paste");
       }
     });
   }
 
   function updateAssignee(idx: number, val: string) {
     setParsed((prev) =>
-      prev.map((s, i) => (i === idx ? { ...s, assigneeName: val } : s))
-    );
-  }
-
-  function updateTaskText(sectionIdx: number, taskIdx: number, val: string) {
-    setParsed((prev) =>
-      prev.map((s, i) =>
-        i === sectionIdx
-          ? {
-              ...s,
-              tasks: s.tasks.map((t, j) => (j === taskIdx ? val : t)),
-            }
-          : s
-      )
-    );
-  }
-
-  function removeTask(sectionIdx: number, taskIdx: number) {
-    setParsed((prev) =>
-      prev.map((s, i) =>
-        i === sectionIdx
-          ? { ...s, tasks: s.tasks.filter((_, j) => j !== taskIdx) }
-          : s
-      )
+      prev ? prev.map((s, i) => (i === idx ? { ...s, assigneeName: val } : s)) : prev
     );
   }
 
   function removeSection(idx: number) {
-    setParsed((prev) => prev.filter((_, i) => i !== idx));
+    setParsed((prev) => prev ? prev.filter((_, i) => i !== idx) : prev);
   }
 
   function handleImport() {
-    if (parsed.length === 0) return;
+    if (!parsed || parsed.length === 0) return;
     startTransition(async () => {
       const result = await importParsedSections(
         sprintId,
@@ -497,11 +485,7 @@ function PasteParsePanel({
         currentSectionCount
       );
       if (result.success) {
-        // Build optimistic sections with temp IDs
-        const optimistic = parsed.map((s) => ({
-          ...s,
-          id: crypto.randomUUID(),
-        }));
+        const optimistic = parsed.map((s) => ({ ...s, id: crypto.randomUUID() }));
         onImported(optimistic);
         handleClose();
       } else {
@@ -510,208 +494,199 @@ function PasteParsePanel({
     });
   }
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center gap-2 px-4 py-3 border border-dashed border-[#0A0A0A]/20 text-[#0A0A0A]/40 font-mono text-xs hover:border-[#0A0A0A]/40 hover:text-[#0A0A0A]/60 transition-colors w-full mt-2"
-      >
-        <Sparkles size={12} />
-        Paste & parse notes with AI
-      </button>
-    );
-  }
-
-  const inputCls =
-    "w-full border-b border-[#0A0A0A]/20 py-1 font-mono text-sm bg-transparent focus:outline-none focus:border-[#0A0A0A]/50 placeholder:text-[#0A0A0A]/30";
+  const totalTasks = parsed?.reduce((n, s) => n + s.tasks.length, 0) ?? 0;
 
   return (
-    <div className="border border-[#0A0A0A]/20 bg-white mt-2">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3 border-b border-[#0A0A0A]/10">
-        <div className="flex items-center gap-2">
-          <Sparkles size={13} className="text-[#0A0A0A]/50" />
-          <span className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/60">
-            {step === "paste"
-              ? "Paste Notes"
-              : step === "parsing"
-              ? "Parsing..."
-              : "Review & Assign"}
-          </span>
-        </div>
-        <button
-          onClick={handleClose}
-          className="text-[#0A0A0A]/30 hover:text-[#0A0A0A]/60"
-        >
-          <X size={14} />
-        </button>
-      </div>
+    <>
+      {/* Trigger button — rendered inline by the parent */}
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-1.5 px-3 py-1.5 border border-[#0A0A0A]/15 text-[#0A0A0A]/50 font-mono text-xs hover:border-[#0A0A0A]/40 hover:text-[#0A0A0A]/70 transition-colors"
+      >
+        <Sparkles size={11} />
+        AI Parse
+      </button>
 
-      {/* ── Step 1: Paste ── */}
-      {(step === "paste" || step === "parsing") && (
-        <div className="p-5">
-          <p className="font-mono text-[10px] text-[#0A0A0A]/40 mb-3 uppercase tracking-wider">
-            Paste your notes below — AI will group tasks by project and extract
-            goals
-          </p>
-          <textarea
-            value={rawText}
-            onChange={(e) => setRawText(e.target.value)}
-            placeholder={`Trackr\n- Fix the tool cost sync\n- Update pricing page copy\n\nCursive\n- Onboard new client ABC\n- Fix lead import bug\n\nGeneral\n- Review contracts`}
-            rows={10}
-            className="w-full font-mono text-sm text-[#0A0A0A]/80 bg-[#F3F3EF] border border-[#0A0A0A]/10 p-4 focus:outline-none focus:border-[#0A0A0A]/30 resize-none placeholder:text-[#0A0A0A]/25 leading-relaxed"
-            disabled={step === "parsing"}
-          />
-          {error && (
-            <p className="font-mono text-xs text-red-600 mt-2">{error}</p>
-          )}
-          <div className="flex items-center gap-3 mt-4">
-            <button
-              onClick={handleParse}
-              disabled={!rawText.trim() || step === "parsing"}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0A0A0A] text-white font-mono text-xs disabled:opacity-40 hover:bg-[#0A0A0A]/80 transition-colors"
-            >
-              {step === "parsing" ? (
-                <>
-                  <Loader2 size={12} className="animate-spin" />
-                  Parsing...
-                </>
-              ) : (
-                <>
-                  <Sparkles size={12} />
-                  Parse with AI
-                </>
-              )}
-            </button>
-            <button
-              onClick={handleClose}
-              className="px-4 py-2 border border-[#0A0A0A]/20 font-mono text-xs"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── Step 2: Review & Assign ── */}
-      {step === "review" && (
-        <div className="p-5">
-          <p className="font-mono text-[10px] text-[#0A0A0A]/40 mb-4 uppercase tracking-wider">
-            {parsed.length} section{parsed.length !== 1 ? "s" : ""} parsed —
-            assign each section, edit tasks, then add to sprint
-          </p>
-
-          <div className="space-y-5">
-            {parsed.map((section, si) => (
-              <div
-                key={si}
-                className="border border-[#0A0A0A]/10 bg-[#F3F3EF]/50 p-4"
+      {/* Full-screen overlay modal */}
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-16 px-4">
+          <div className="w-full max-w-2xl bg-white border border-[#0A0A0A]/20 shadow-2xl max-h-[80vh] flex flex-col">
+            {/* Modal header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-[#0A0A0A]/10 shrink-0">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-[#0A0A0A]/50" />
+                <span className="font-serif font-bold text-[#0A0A0A]">
+                  AI Sprint Import
+                </span>
+              </div>
+              <button
+                onClick={handleClose}
+                className="text-[#0A0A0A]/30 hover:text-[#0A0A0A]"
               >
-                {/* Section header row */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1 mr-4">
-                    <p className="font-serif font-bold italic text-[#0A0A0A] text-sm mb-1">
-                      {section.projectName}
-                    </p>
-                    {section.goal && (
-                      <p className="font-mono text-[10px] text-[#0A0A0A]/50">
-                        {section.goal}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {/* Assignee picker */}
-                    <select
-                      value={section.assigneeName}
-                      onChange={(e) => updateAssignee(si, e.target.value)}
-                      className="border border-[#0A0A0A]/20 bg-white px-2 py-1 font-mono text-xs focus:outline-none focus:border-[#0A0A0A]/40"
-                    >
-                      <option value="">Unassigned</option>
-                      {teamMembers.map((m) => (
-                        <option key={m.id} value={m.name}>
-                          {m.name}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={() => removeSection(si)}
-                      className="text-[#0A0A0A]/20 hover:text-red-500 transition-colors"
-                      title="Remove section"
-                    >
-                      <X size={12} />
-                    </button>
-                  </div>
-                </div>
+                <X size={16} />
+              </button>
+            </div>
 
-                {/* Tasks */}
-                <div className="space-y-1">
-                  {section.tasks.map((task, ti) => (
-                    <div key={ti} className="flex items-center gap-2 group">
-                      <div className="w-3 h-3 border border-[#0A0A0A]/20 shrink-0" />
-                      <input
-                        value={task}
-                        onChange={(e) =>
-                          updateTaskText(si, ti, e.target.value)
-                        }
-                        className="flex-1 font-serif text-sm bg-transparent border-b border-transparent focus:border-[#0A0A0A]/20 focus:outline-none py-0.5"
-                      />
-                      <button
-                        onClick={() => removeTask(si, ti)}
-                        className="opacity-0 group-hover:opacity-100 text-[#0A0A0A]/30 hover:text-red-500 shrink-0"
-                      >
-                        <X size={11} />
-                      </button>
-                    </div>
-                  ))}
-                  {section.tasks.length === 0 && (
-                    <p className="font-mono text-[10px] text-[#0A0A0A]/30 italic">
-                      No tasks — section will be added with no tasks
-                    </p>
-                  )}
+            <div className="overflow-y-auto flex-1">
+              {/* ── Input area ── */}
+              <div className="p-6 border-b border-[#0A0A0A]/10">
+                <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-3">
+                  Paste your notes — include projects, tasks, assignees (@adam,
+                  @maggie), and goals. Any format works.
+                </p>
+                <textarea
+                  ref={textareaRef}
+                  value={rawText}
+                  onChange={(e) => setRawText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") handleParse();
+                  }}
+                  placeholder={
+                    "Trackr — @adam\ngoal: keep outbound running, fix cost sync\n[ ] Fix tool cost sync\n[ ] Update pricing page\n[ ] Review Stripe webhook\n\nCursive — @maggie\n[ ] Onboard ABC Corp\n[ ] Fix lead import bug\n[ ] Send weekly report\n\nGeneral\n[ ] Review contracts\n[ ] Team standup notes"
+                  }
+                  rows={10}
+                  className="w-full font-mono text-sm text-[#0A0A0A]/80 bg-[#F3F3EF] border border-[#0A0A0A]/10 p-4 focus:outline-none focus:border-[#0A0A0A]/30 resize-none placeholder:text-[#0A0A0A]/25 leading-relaxed"
+                />
+                {error && (
+                  <p className="font-mono text-xs text-red-600 mt-2">{error}</p>
+                )}
+                <div className="flex items-center gap-3 mt-4">
+                  <button
+                    onClick={handleParse}
+                    disabled={!rawText.trim() || isPending}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#0A0A0A] text-white font-mono text-xs disabled:opacity-40 hover:bg-[#0A0A0A]/80 transition-colors"
+                  >
+                    {isPending && !parsed ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        Parsing...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={12} />
+                        Parse
+                      </>
+                    )}
+                  </button>
+                  <span className="font-mono text-[10px] text-[#0A0A0A]/30">
+                    Cmd+Enter
+                  </span>
                 </div>
               </div>
-            ))}
-          </div>
 
-          {error && (
-            <p className="font-mono text-xs text-red-600 mt-3">{error}</p>
-          )}
+              {/* ── Parsed preview ── */}
+              {parsed && (
+                <div className="p-6">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-4">
+                    {parsed.length} project{parsed.length !== 1 ? "s" : ""},{" "}
+                    {totalTasks} task{totalTasks !== 1 ? "s" : ""} — assign each
+                    section then import
+                  </p>
 
-          <div className="flex items-center gap-3 mt-5">
-            <button
-              onClick={handleImport}
-              disabled={isPending || parsed.length === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0A0A0A] text-white font-mono text-xs disabled:opacity-40 hover:bg-[#0A0A0A]/80 transition-colors"
-            >
-              {isPending ? (
-                <>
-                  <Loader2 size={12} className="animate-spin" />
-                  Adding...
-                </>
-              ) : (
-                <>
-                  <Check size={12} />
-                  Add {parsed.length} section{parsed.length !== 1 ? "s" : ""}{" "}
-                  to sprint
-                </>
+                  <div className="space-y-3">
+                    {parsed.map((section, si) => (
+                      <div
+                        key={si}
+                        className="border border-[#0A0A0A]/10 p-4 flex items-start gap-4 bg-[#F3F3EF]/40"
+                      >
+                        {/* Left: project + tasks */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-serif font-bold italic text-[#0A0A0A] text-sm">
+                            {section.projectName}
+                          </p>
+                          {section.goal && (
+                            <p className="font-mono text-[10px] text-[#0A0A0A]/50 mt-0.5 mb-2">
+                              {section.goal}
+                            </p>
+                          )}
+                          <div className="mt-1.5 space-y-0.5">
+                            {section.tasks.slice(0, 5).map((t, ti) => (
+                              <div key={ti} className="flex items-start gap-1.5">
+                                <div className="w-2.5 h-2.5 border border-[#0A0A0A]/20 shrink-0 mt-1" />
+                                <span className="font-serif text-xs text-[#0A0A0A]/70 leading-snug">
+                                  {t}
+                                </span>
+                              </div>
+                            ))}
+                            {section.tasks.length > 5 && (
+                              <p className="font-mono text-[10px] text-[#0A0A0A]/30 pl-4">
+                                +{section.tasks.length - 5} more
+                              </p>
+                            )}
+                            {section.tasks.length === 0 && (
+                              <p className="font-mono text-[10px] text-[#0A0A0A]/30 italic">
+                                No tasks
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right: assignee + remove */}
+                        <div className="flex items-center gap-2 shrink-0">
+                          <select
+                            value={section.assigneeName}
+                            onChange={(e) => updateAssignee(si, e.target.value)}
+                            className="border border-[#0A0A0A]/20 bg-white px-2 py-1.5 font-mono text-xs focus:outline-none focus:border-[#0A0A0A]/40"
+                          >
+                            <option value="">Unassigned</option>
+                            {teamMembers.map((m) => (
+                              <option key={m.id} value={m.name}>
+                                {m.name}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => removeSection(si)}
+                            className="text-[#0A0A0A]/20 hover:text-red-500 transition-colors p-1"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
-            </button>
-            <button
-              onClick={() => setStep("paste")}
-              className="px-4 py-2 border border-[#0A0A0A]/20 font-mono text-xs"
-            >
-              Back
-            </button>
-            <button
-              onClick={handleClose}
-              className="font-mono text-xs text-[#0A0A0A]/40 hover:text-[#0A0A0A]"
-            >
-              Cancel
-            </button>
+            </div>
+
+            {/* Footer */}
+            {parsed && (
+              <div className="px-6 py-4 border-t border-[#0A0A0A]/10 flex items-center gap-3 shrink-0 bg-white">
+                <button
+                  onClick={handleImport}
+                  disabled={isPending || parsed.length === 0}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-[#0A0A0A] text-white font-mono text-xs disabled:opacity-40 hover:bg-[#0A0A0A]/80 transition-colors"
+                >
+                  {isPending ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      Importing...
+                    </>
+                  ) : (
+                    <>
+                      <Check size={12} />
+                      Import {parsed.length} section{parsed.length !== 1 ? "s" : ""} · {totalTasks} tasks
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={() => { setParsed(null); setError(null); }}
+                  className="px-4 py-2.5 border border-[#0A0A0A]/20 font-mono text-xs hover:bg-[#0A0A0A]/5"
+                >
+                  Re-parse
+                </button>
+                <button
+                  onClick={handleClose}
+                  className="font-mono text-xs text-[#0A0A0A]/40 hover:text-[#0A0A0A] ml-auto"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -1017,14 +992,25 @@ export function SprintEditor({
 
   return (
     <div className="max-w-3xl">
-      {/* Sprint title */}
-      <div className="mb-2">
-        <InlineEdit
-          value={title}
-          onSave={saveTitle}
-          className="text-3xl font-bold font-serif text-[#0A0A0A] tracking-tight block"
-          placeholder="Sprint title"
-        />
+      {/* Sprint title + AI Import button */}
+      <div className="flex items-start justify-between gap-4 mb-2">
+        <div className="flex-1">
+          <InlineEdit
+            value={title}
+            onSave={saveTitle}
+            className="text-3xl font-bold font-serif text-[#0A0A0A] tracking-tight block"
+            placeholder="Sprint title"
+          />
+        </div>
+        <div className="mt-2 shrink-0">
+          <SprintAIImport
+            sprintId={sprint.id}
+            projects={projects}
+            teamMembers={teamMembers}
+            currentSectionCount={sections.length}
+            onImported={handleImportSections}
+          />
+        </div>
       </div>
 
       {/* Weekly focus */}
@@ -1091,15 +1077,6 @@ export function SprintEditor({
         projects={projects}
         teamMembers={teamMembers}
         nextSortOrder={sections.length}
-      />
-
-      {/* Paste & Parse */}
-      <PasteParsePanel
-        sprintId={sprint.id}
-        projects={projects}
-        teamMembers={teamMembers}
-        currentSectionCount={sections.length}
-        onImported={handleImportSections}
       />
     </div>
   );
