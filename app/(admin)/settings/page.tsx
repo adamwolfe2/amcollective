@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NavSettings } from "./nav-settings";
 
 const TABS = [
   { label: "General", href: "/settings" },
@@ -78,7 +79,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Preferences Card */}
-      <div>
+      <div className="mb-8">
         <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
           Preferences
         </h2>
@@ -89,6 +90,19 @@ export default function SettingsPage() {
             <SettingRow label="Notifications" value="Email + In-App" />
             <SettingRow label="Theme" value="Light (Offset Brutalist)" />
           </div>
+        </div>
+      </div>
+
+      {/* Navigation Visibility */}
+      <div>
+        <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-1">
+          Sidebar Navigation
+        </h2>
+        <p className="font-mono text-xs text-[#0A0A0A]/40 mb-4">
+          Choose which pages appear in the sidebar navigation.
+        </p>
+        <div className="border border-[#0A0A0A]/10 bg-white p-6">
+          <NavSettings />
         </div>
       </div>
     </div>

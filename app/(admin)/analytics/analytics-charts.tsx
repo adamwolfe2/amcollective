@@ -72,6 +72,7 @@ export function AnalyticsCharts() {
     fetch("/api/analytics/overview")
       .then((r) => r.json())
       .then(setData)
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 

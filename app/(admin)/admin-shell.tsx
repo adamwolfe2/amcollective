@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { UserButton } from "@clerk/nextjs";
 import {
   LayoutDashboard,
@@ -16,7 +16,6 @@ import {
   Target,
   BarChart3,
   TrendingUp,
-  CalendarDays,
   MessageSquare,
   Sparkles,
   Bell,
@@ -59,7 +58,6 @@ const NAV_ITEMS = [
   { label: "Forecast", href: "/forecast", icon: TrendingUp },
   { label: "Analytics", href: "/analytics", icon: LineChart },
   { label: "Scorecard", href: "/scorecard", icon: BarChart3 },
-  { label: "Meetings", href: "/meetings", icon: CalendarDays },
   { label: "Messages", href: "/messages", icon: MessageSquare },
   { label: "Outreach", href: "/outreach", icon: Send },
   { label: "AI", href: "/ai", icon: Sparkles },
@@ -69,12 +67,26 @@ const NAV_ITEMS = [
   { label: "Settings", href: "/settings", icon: Settings },
 ] as const;
 
+const LS_KEY = "am_hidden_nav";
+
+function useVisibleNavItems() {
+  const [hidden, setHidden] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(LS_KEY);
+      if (stored) setHidden(JSON.parse(stored));
+    } catch {}
+  }, []);
+  return NAV_ITEMS.filter((item) => !hidden.includes(item.href));
+}
+
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
+  const visibleItems = useVisibleNavItems();
 
   return (
     <nav className="space-y-0.5 flex-1">
-      {NAV_ITEMS.map((item) => {
+      {visibleItems.map((item) => {
         const isActive =
           pathname === item.href ||
           (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
