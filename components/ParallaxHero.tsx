@@ -5,12 +5,10 @@
  *
  * Layer stack (back → front):
  *   mountain.png  — Full-color Mt. Hood + Portland photo. Solid, no blend.  multiplier: 0.15
- *   gradient      — White bottom-fade (z-10) for hero→page transition.
- *   fg.jpg        — Foreground evergreen trees (z-15), above gradient.       multiplier: 0.5
- *                   CSS mask fades the top (black sky area) so the mountain
- *                   shows through, and fades the bottom so the white gradient
- *                   below handles the page edge. No blend mode — trees keep
- *                   their natural deep-green color for a lush, opaque look.
+ *   fg.jpg        — Foreground evergreen trees, black bg → transparent       multiplier: 0.5
+ *                   via mix-blend-mode:screen. filter:brightness(2)contrast
+ *                   (1.5)saturate(1.3) boosts dark tree pixels so they render
+ *                   as lush green. Black bg pixels stay 0 → stay transparent.
  *
  * Entrance animation:
  *   Triggered by `animateIn` (set true when intro panel starts sliding up).
@@ -125,25 +123,18 @@ export function ParallaxHero({
         />
       </div>
 
-      {/* ── FG: Evergreen trees — above gradient, CSS mask fade ──────── */}
-      {/* Rendered without blend mode so trees keep their natural rich     */}
-      {/* deep-green color. A CSS mask fades the top (black sky area of    */}
-      {/* the source image) to transparent so the mountain shows through,  */}
-      {/* and also fades the very bottom so the page-edge white gradient   */}
-      {/* below (z-10) handles the hero→page transition naturally.         */}
+      {/* ── FG: Evergreen trees — screen blend + brightness boost ───────  */}
+      {/* mix-blend-mode:screen keeps the black bg transparent.            */}
+      {/* The filter boosts dark tree pixels enough to show through the    */}
+      {/* blend without affecting black (brightness on 0 = still 0).      */}
       <div
         ref={fgRef}
         className="absolute inset-0 will-change-transform overflow-hidden"
-        style={{ zIndex: 15, ...layerStyle(ANIM_DELAYS.fg) }}
+        style={{ mixBlendMode: "screen", ...layerStyle(ANIM_DELAYS.fg) }}
       >
         <div
           className="absolute bottom-0 left-0 right-0"
-          style={{
-            WebkitMaskImage:
-              "linear-gradient(to top, transparent 0%, black 18%, black 65%, transparent 100%)",
-            maskImage:
-              "linear-gradient(to top, transparent 0%, black 18%, black 65%, transparent 100%)",
-          }}
+          style={{ filter: "brightness(2) contrast(1.5) saturate(1.3)" }}
         >
           <Image
             src="/parallax/fg.jpg"
