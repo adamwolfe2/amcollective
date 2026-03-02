@@ -1,26 +1,109 @@
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { desc, eq, sql, and, gte, asc } from "drizzle-orm";
+import { desc, eq, sql, and, gte, asc, lte } from "drizzle-orm";
 import { formatCents } from "@/lib/stripe/format";
 import { CostTrendChart } from "./cost-trend-chart";
 import { SyncButton } from "./sync-button";
+import { SubscriptionManager } from "./subscription-manager";
+import * as stripeConnector from "@/lib/connectors/stripe";
+import Link from "next/link";
 
-async function getSubscriptionCosts() {
-  const subscriptions = await db
+// ─── Data Fetchers ────────────────────────────────────────────────────────────
+
+async function getCommandCenterMetrics() {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  // Total cash from Mercury accounts in DB
+  const accounts = await db
+    .select({ balance: schema.mercuryAccounts.balance })
+    .from(schema.mercuryAccounts);
+  const totalCash = accounts.reduce((s, a) => s + Number(a.balance), 0);
+
+  // Stripe MRR
+  const mrrResult = await stripeConnector.getMRR();
+  const mrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) / 100 : 0;
+
+  // Monthly subscription burn
+  const activeSubs = await db
+    .select({ amount: schema.subscriptionCosts.amount, billingCycle: schema.subscriptionCosts.billingCycle })
+    .from(schema.subscriptionCosts)
+    .where(eq(schema.subscriptionCosts.isActive, true));
+
+  const subscriptionBurn = activeSubs.reduce((sum, sub) => {
+    const monthly = sub.billingCycle === "annual"
+      ? Math.round(sub.amount / 12)
+      : sub.amount;
+    return sum + monthly;
+  }, 0);
+
+  // Tool costs this month (Vercel, Neon, Stripe fees, etc.)
+  const [toolCostResult] = await db
+    .select({ total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)` })
+    .from(schema.toolCosts)
+    .where(gte(schema.toolCosts.createdAt, monthStart));
+
+  const toolBurn = Number(toolCostResult?.total ?? 0);
+  const totalMonthlyBurn = subscriptionBurn + toolBurn;
+
+  // Runway = cash / monthly spend (from Mercury transactions last 60d)
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+  const [spendResult] = await db
+    .select({
+      totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)`,
+    })
+    .from(schema.mercuryTransactions)
+    .where(
+      and(
+        eq(schema.mercuryTransactions.direction, "debit"),
+        gte(schema.mercuryTransactions.postedAt, sixtyDaysAgo)
+      )
+    );
+  const monthlySpend = Number(spendResult?.totalSpend ?? 0) / 2;
+  const runway = monthlySpend > 0 ? totalCash / monthlySpend : null;
+
+  return {
+    totalCash,
+    mrr,
+    subscriptionBurn,
+    toolBurn,
+    totalMonthlyBurn,
+    net: mrr * 100 - totalMonthlyBurn, // in cents
+    runway,
+    monthlySpend,
+  };
+}
+
+async function getUpcomingCharges() {
+  const fourteenDaysOut = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+
+  const upcoming = await db
+    .select()
+    .from(schema.subscriptionCosts)
+    .where(
+      and(
+        eq(schema.subscriptionCosts.isActive, true),
+        lte(schema.subscriptionCosts.nextRenewal, fourteenDaysOut)
+      )
+    )
+    .orderBy(asc(schema.subscriptionCosts.nextRenewal));
+
+  return upcoming;
+}
+
+async function getSubscriptions() {
+  return db
     .select()
     .from(schema.subscriptionCosts)
     .where(eq(schema.subscriptionCosts.isActive, true))
     .orderBy(asc(schema.subscriptionCosts.nextRenewal));
-
-  return subscriptions;
 }
 
 async function getCostSummary() {
   const now = new Date();
   const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
 
-  // Get all tool accounts with their total costs for this period
-  const accounts = await db
+  return db
     .select({
       id: schema.toolAccounts.id,
       name: schema.toolAccounts.name,
@@ -36,19 +119,16 @@ async function getCostSummary() {
       )
     )
     .groupBy(schema.toolAccounts.id);
-
-  return accounts;
 }
 
 async function getPerProjectCosts() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const costs = await db
+  return db
     .select({
       projectId: schema.portfolioProjects.id,
       projectName: schema.portfolioProjects.name,
-      projectSlug: schema.portfolioProjects.slug,
       totalCost: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`.as("total_cost"),
     })
     .from(schema.portfolioProjects)
@@ -59,17 +139,14 @@ async function getPerProjectCosts() {
         gte(schema.toolCosts.createdAt, monthStart)
       )
     )
-    .groupBy(schema.portfolioProjects.id)
+    .groupBy(schema.portfolioProjects.id, schema.portfolioProjects.name)
     .orderBy(desc(sql`total_cost`));
-
-  return costs;
 }
 
 async function getClientMargins() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  // Get clients with their invoice revenue this month
   const clients = await db
     .select({
       clientId: schema.clients.id,
@@ -87,7 +164,6 @@ async function getClientMargins() {
     )
     .groupBy(schema.clients.id);
 
-  // Get project costs per client (via clientProjects join)
   const clientCosts = await db
     .select({
       clientId: schema.clientProjects.clientId,
@@ -123,7 +199,7 @@ async function getCostTrend() {
   const now = new Date();
   const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
 
-  const trend = await db
+  return db
     .select({
       month: sql<string>`TO_CHAR(${schema.toolCosts.createdAt}, 'YYYY-MM')`.as("month"),
       total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`.as("total"),
@@ -132,30 +208,49 @@ async function getCostTrend() {
     .where(gte(schema.toolCosts.createdAt, threeMonthsAgo))
     .groupBy(sql`TO_CHAR(${schema.toolCosts.createdAt}, 'YYYY-MM')`)
     .orderBy(sql`month`);
-
-  return trend;
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
 export default async function CostsPage() {
-  const [costSummary, projectCosts, clientMargins, costTrend, subscriptionCosts] =
-    await Promise.all([
-      getCostSummary(),
-      getPerProjectCosts(),
-      getClientMargins(),
-      getCostTrend(),
-      getSubscriptionCosts(),
-    ]);
+  const [
+    metrics,
+    upcomingCharges,
+    subscriptions,
+    costSummary,
+    projectCosts,
+    clientMargins,
+    costTrend,
+  ] = await Promise.all([
+    getCommandCenterMetrics(),
+    getUpcomingCharges(),
+    getSubscriptions(),
+    getCostSummary(),
+    getPerProjectCosts(),
+    getClientMargins(),
+    getCostTrend(),
+  ]);
 
-  // Calculate subscription monthly total (normalize annual → monthly)
-  const subscriptionMonthlyTotal = subscriptionCosts.reduce((sum, sub) => {
-    const monthly = sub.billingCycle === "annual" ? Math.round(sub.amount / 12) : sub.amount;
-    return sum + monthly;
-  }, 0);
+  // Serialize subscriptions for client component (dates → ISO strings)
+  const serializedSubscriptions = subscriptions.map((sub) => ({
+    ...sub,
+    amount: Number(sub.amount),
+    nextRenewal: sub.nextRenewal ? sub.nextRenewal.toISOString().slice(0, 10) : null,
+    createdAt: sub.createdAt.toISOString(),
+    updatedAt: sub.updatedAt.toISOString(),
+  }));
 
-  const totalMonthlySpend = costSummary.reduce(
-    (sum, a) => sum + Number(a.totalCost),
-    0
-  ) + subscriptionMonthlyTotal;
+  function formatCurrency(n: number) {
+    return n.toLocaleString("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    });
+  }
+
+  const netCents = metrics.net;
+  const netPositive = netCents >= 0;
 
   return (
     <div>
@@ -163,50 +258,160 @@ export default async function CostsPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-2xl font-bold font-serif tracking-tight">
-            Costs
+            Cost Command Center
           </h1>
           <p className="text-[#0A0A0A]/40 font-mono text-xs mt-1">
-            Infrastructure spend across all projects
+            Full-stack financial visibility across all companies
           </p>
         </div>
         <SyncButton />
       </div>
 
-      {/* Cost Overview Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+      {/* ── Command Center KPI Strip ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
         <div className="border border-[#0A0A0A]/10 bg-white p-5">
-          <p className="font-mono text-3xl font-bold text-[#0A0A0A] tracking-tight">
-            {formatCents(totalMonthlySpend)}
+          <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
+            Cash on Hand
           </p>
-          <p className="font-serif text-sm text-[#0A0A0A]/50 mt-2">
-            Total Monthly Spend
+          <p className="font-mono text-2xl font-bold text-[#0A0A0A] mt-1">
+            {formatCurrency(metrics.totalCash)}
+          </p>
+          <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-1">
+            Mercury
           </p>
         </div>
-        {costSummary.slice(0, 3).map((account) => (
-          <div
-            key={account.id}
-            className="border border-[#0A0A0A]/10 bg-white p-5"
+
+        <div className="border border-[#0A0A0A]/10 bg-white p-5">
+          <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
+            MRR
+          </p>
+          <p className="font-mono text-2xl font-bold text-emerald-600 mt-1">
+            {formatCurrency(metrics.mrr)}
+          </p>
+          <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-1">
+            Stripe
+          </p>
+        </div>
+
+        <div className="border border-[#0A0A0A]/10 bg-white p-5">
+          <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
+            Monthly Burn
+          </p>
+          <p className="font-mono text-2xl font-bold text-red-600 mt-1">
+            {formatCents(metrics.totalMonthlyBurn)}
+          </p>
+          <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-1">
+            Subs + Tools
+          </p>
+        </div>
+
+        <div className="border border-[#0A0A0A]/10 bg-white p-5">
+          <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
+            Net (MRR − Burn)
+          </p>
+          <p
+            className={`font-mono text-2xl font-bold mt-1 ${
+              netPositive ? "text-emerald-600" : "text-red-600"
+            }`}
           >
-            <p className="font-mono text-3xl font-bold text-[#0A0A0A] tracking-tight">
-              {formatCents(Number(account.totalCost))}
-            </p>
-            <p className="font-serif text-sm text-[#0A0A0A]/50 mt-2">
-              {account.name}
-            </p>
-            {account.monthlyBudget && (
-              <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-1">
-                Budget: {formatCents(account.monthlyBudget)}
-              </p>
-            )}
-          </div>
-        ))}
+            {netPositive ? "+" : ""}
+            {formatCents(netCents)}
+          </p>
+          <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-1">
+            /month
+          </p>
+        </div>
+
+        <div className="border border-[#0A0A0A]/10 bg-white p-5">
+          <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
+            Runway
+          </p>
+          <p className="font-mono text-2xl font-bold text-[#0A0A0A] mt-1">
+            {metrics.runway ? `${metrics.runway.toFixed(1)} mo` : "—"}
+          </p>
+          <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-1">
+            {metrics.monthlySpend > 0
+              ? `${formatCurrency(metrics.monthlySpend)}/mo spend`
+              : "No bank data"}
+          </p>
+        </div>
+
+        <div className="border border-[#0A0A0A]/10 bg-white p-5">
+          <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
+            Sub Burn
+          </p>
+          <p className="font-mono text-2xl font-bold text-[#0A0A0A] mt-1">
+            {formatCents(metrics.subscriptionBurn)}
+          </p>
+          <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-1">
+            {subscriptions.length} active
+          </p>
+        </div>
       </div>
 
-      {/* Tool Breakdown Table */}
-      {costSummary.length > 3 && (
-        <div className="mb-10">
+      {/* ── Upcoming Charges (next 14 days) ── */}
+      {upcomingCharges.length > 0 && (
+        <div className="mb-8">
           <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
-            All Tools
+            Upcoming Charges — Next 14 Days
+          </h2>
+          <div className="border border-amber-200 bg-amber-50">
+            <div className="divide-y divide-amber-100">
+              {upcomingCharges.map((charge) => {
+                const daysOut = charge.nextRenewal
+                  ? Math.ceil(
+                      (charge.nextRenewal.getTime() - Date.now()) /
+                        (1000 * 60 * 60 * 24)
+                    )
+                  : null;
+                const amount =
+                  charge.billingCycle === "annual"
+                    ? charge.amount
+                    : charge.amount;
+                return (
+                  <div
+                    key={charge.id}
+                    className="px-5 py-3 flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <p className="font-serif text-sm font-medium text-[#0A0A0A]">
+                          {charge.name}
+                        </p>
+                        <p className="font-mono text-[10px] text-amber-700">
+                          {charge.vendor} ·{" "}
+                          {charge.companyTag.replace(/_/g, " ")} ·{" "}
+                          {charge.billingCycle}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      <span className="font-mono text-xs text-amber-700 font-medium">
+                        {daysOut !== null
+                          ? daysOut === 0
+                            ? "Today"
+                            : daysOut === 1
+                              ? "Tomorrow"
+                              : `In ${daysOut}d`
+                          : "Soon"}
+                      </span>
+                      <span className="font-mono text-sm font-bold text-[#0A0A0A]">
+                        {formatCents(amount)}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tool Cost Breakdown ── */}
+      {costSummary.length > 0 && (
+        <div className="mb-8">
+          <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
+            Tool Costs (3 Months)
           </h2>
           <div className="border border-[#0A0A0A]/10 bg-white">
             <table className="w-full">
@@ -245,93 +450,22 @@ export default async function CostsPage() {
         </div>
       )}
 
-      {/* Subscriptions Table */}
-      {subscriptionCosts.length > 0 && (
-        <div className="mb-10">
-          <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
-            Subscriptions ({subscriptionCosts.length})
+      {/* ── Subscriptions — CRUD ── */}
+      <SubscriptionManager subscriptions={serializedSubscriptions} />
+
+      {/* ── Per-Project Costs ── */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-serif text-lg font-bold text-[#0A0A0A]">
+            Per-Project Costs (This Month)
           </h2>
-          <div className="border border-[#0A0A0A]/10 bg-white">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-[#0A0A0A]/10">
-                  <th className="text-left px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
-                    Name
-                  </th>
-                  <th className="text-left px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
-                    Project
-                  </th>
-                  <th className="text-left px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
-                    Category
-                  </th>
-                  <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
-                    Monthly
-                  </th>
-                  <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
-                    Cycle
-                  </th>
-                  <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
-                    Next Renewal
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#0A0A0A]/5">
-                {subscriptionCosts.map((sub) => {
-                  const monthlyCost = sub.billingCycle === "annual" ? Math.round(sub.amount / 12) : sub.amount;
-                  const now = new Date();
-                  const renewalSoon = sub.nextRenewal && (sub.nextRenewal.getTime() - now.getTime()) < 30 * 24 * 60 * 60 * 1000;
-
-                  return (
-                    <tr key={sub.id}>
-                      <td className="px-5 py-3 font-serif text-sm">
-                        {sub.name}
-                      </td>
-                      <td className="px-5 py-3">
-                        <span className="font-mono text-xs px-2 py-0.5 bg-[#0A0A0A]/5 text-[#0A0A0A]/60">
-                          {sub.companyTag}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 font-mono text-xs text-[#0A0A0A]/50">
-                        {sub.category ?? "--"}
-                      </td>
-                      <td className="px-5 py-3 text-right font-mono text-sm">
-                        {formatCents(monthlyCost)}
-                      </td>
-                      <td className="px-5 py-3 text-right font-mono text-xs text-[#0A0A0A]/50">
-                        {sub.billingCycle}
-                      </td>
-                      <td className={`px-5 py-3 text-right font-mono text-xs ${renewalSoon ? "text-amber-600 font-bold" : "text-[#0A0A0A]/50"}`}>
-                        {sub.nextRenewal
-                          ? sub.nextRenewal.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
-                          : "--"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr className="border-t border-[#0A0A0A]/10 bg-[#0A0A0A]/[0.02]">
-                  <td colSpan={3} className="px-5 py-3 font-serif text-sm font-bold">
-                    Subscription Total
-                  </td>
-                  <td className="px-5 py-3 text-right font-mono text-sm font-bold">
-                    {formatCents(subscriptionMonthlyTotal)}
-                  </td>
-                  <td colSpan={2} className="px-5 py-3 text-right font-mono text-xs text-[#0A0A0A]/50">
-                    /month
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+          <Link
+            href="/costs/api-usage"
+            className="font-mono text-xs text-[#0A0A0A]/50 underline underline-offset-2 hover:text-[#0A0A0A]"
+          >
+            AI Usage →
+          </Link>
         </div>
-      )}
-
-      {/* Per-Project Cost Table */}
-      <div className="mb-10">
-        <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
-          Per-Project Costs (This Month)
-        </h2>
         <div className="border border-[#0A0A0A]/10 bg-white">
           <table className="w-full">
             <thead>
@@ -340,7 +474,7 @@ export default async function CostsPage() {
                   Project
                 </th>
                 <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
-                  Total Cost
+                  Tool Costs
                 </th>
               </tr>
             </thead>
@@ -356,9 +490,14 @@ export default async function CostsPage() {
                 </tr>
               ) : (
                 projectCosts.map((p) => (
-                  <tr key={p.projectId}>
-                    <td className="px-5 py-3 font-serif text-sm">
-                      {p.projectName}
+                  <tr key={p.projectId} className="group hover:bg-[#F3F3EF]/50">
+                    <td className="px-5 py-3">
+                      <Link
+                        href={`/projects/${p.projectId}`}
+                        className="font-serif text-sm group-hover:underline underline-offset-2"
+                      >
+                        {p.projectName}
+                      </Link>
                     </td>
                     <td className="px-5 py-3 text-right font-mono text-sm">
                       {formatCents(Number(p.totalCost))}
@@ -371,11 +510,19 @@ export default async function CostsPage() {
         </div>
       </div>
 
-      {/* Per-Client Margin Table — THE KILLER FEATURE */}
-      <div className="mb-10">
-        <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
-          Client Margins (This Month)
-        </h2>
+      {/* ── Client Margins ── */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="font-serif text-lg font-bold text-[#0A0A0A]">
+            Client Margins (This Month)
+          </h2>
+          <Link
+            href="/costs/margins"
+            className="font-mono text-xs text-[#0A0A0A]/50 underline underline-offset-2 hover:text-[#0A0A0A]"
+          >
+            Full breakdown →
+          </Link>
+        </div>
         <div className="border border-[#0A0A0A]/10 bg-white">
           <table className="w-full">
             <thead>
@@ -393,7 +540,7 @@ export default async function CostsPage() {
                   Margin
                 </th>
                 <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
-                  Margin %
+                  %
                 </th>
               </tr>
             </thead>
@@ -410,8 +557,8 @@ export default async function CostsPage() {
               ) : (
                 clientMargins.map((c) => (
                   <tr key={c.clientId}>
-                    <td className="px-5 py-3">
-                      <span className="font-serif text-sm">{c.companyName || c.clientName}</span>
+                    <td className="px-5 py-3 font-serif text-sm">
+                      {c.companyName || c.clientName}
                     </td>
                     <td className="px-5 py-3 text-right font-mono text-sm">
                       {formatCents(c.revenue)}
@@ -443,15 +590,15 @@ export default async function CostsPage() {
         </div>
       </div>
 
-      {/* Cost Trend Chart */}
-      <div className="mb-10">
+      {/* ── Cost Trend Chart ── */}
+      <div className="mb-8">
         <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
-          Cost Trend (3 Months)
+          Tool Cost Trend (3 Months)
         </h2>
         {costTrend.length === 0 ? (
           <div className="border border-[#0A0A0A]/10 py-12 text-center">
             <p className="text-[#0A0A0A]/40 font-serif">
-              No cost data yet. Sync jobs will populate this automatically.
+              No cost data yet. Sync jobs populate this automatically.
             </p>
           </div>
         ) : (
