@@ -1,15 +1,13 @@
 "use client";
 
 /**
- * ParallaxHero — three-layer scroll parallax hero section.
+ * ParallaxHero — two-layer scroll parallax hero section.
  *
  * Layer stack (back → front):
  *   mountain.png  — Full-color Mt. Hood + Portland city photo. Solid bg.   multiplier: 0.15
- *   fg.jpg        — Evergreen trees. CSS mask reveals only left/right         multiplier: 0.4
- *                   tree clusters; black center is cropped out entirely.
- *                   No blend mode needed — mask handles transparency.
- *   cloud.png     — RGBA PNG clouds with built-in transparency.              multiplier: 0.25
- *                   Floats above the city scene.
+ *   fg.jpg        — Evergreen trees on left/right edges. CSS soft mask       multiplier: 0.4
+ *                   reveals only the tree clusters with wide feathered
+ *                   gradients so edges blend naturally into the scene.
  *
  * Entrance animation:
  *   Triggered by `animateIn` (set true when intro panel starts sliding up).
@@ -28,7 +26,7 @@ export interface ParallaxHeroProps {
   /** Flip to true when intro panel begins its exit — starts the rise animation */
   animateIn?: boolean;
   /** Per-layer scroll multipliers */
-  multipliers?: { bg: number; fg: number; cloud: number };
+  multipliers?: { bg: number; fg: number };
   /** Tailwind height classes for the hero section */
   height?: string;
   /** Rendered inside an absolute inset-0 z-20 div — use for login links, CTAs, etc. */
@@ -36,11 +34,11 @@ export interface ParallaxHeroProps {
   className?: string;
 }
 
-const DEFAULT_MULTIPLIERS = { bg: 0.15, fg: 0.4, cloud: 0.25 };
+const DEFAULT_MULTIPLIERS = { bg: 0.15, fg: 0.4 };
 
 // Animation timing — synced to SLIDE_DURATION_MS in marketing-page.tsx (700ms)
 const ANIM_DURATION_MS = 650;
-const ANIM_DELAYS = { bg: 0, cloud: 30, fg: 60 };
+const ANIM_DELAYS = { bg: 0, fg: 60 };
 const SCROLL_ACTIVE_DELAY_MS = ANIM_DELAYS.fg + ANIM_DURATION_MS + 30; // ~740ms
 
 export function ParallaxHero({
@@ -92,7 +90,6 @@ export function ParallaxHero({
 
   const bgRef = useParallax(multipliers.bg * scale, scrollDisabled);
   const fgRef = useParallax(multipliers.fg * scale, scrollDisabled);
-  const cloudRef = useParallax(multipliers.cloud * scale, scrollDisabled);
 
   function layerStyle(delay: number): CSSProperties {
     if (prefersReduced) return { opacity: 1 };
@@ -125,11 +122,11 @@ export function ParallaxHero({
         />
       </div>
 
-      {/* ── FG: Evergreen trees — CSS mask crops to left/right clusters ── */}
-      {/* fg.jpg has trees on the left and right edges with a black center. */}
-      {/* We use a horizontal mask to show only those two tree regions,     */}
-      {/* completely hiding the black center. A vertical mask fades the    */}
-      {/* top (sky) and bottom to blend naturally with the scene.          */}
+      {/* ── FG: Evergreen trees — soft CSS mask, no blend mode ─────────  */}
+      {/* fg.jpg has tree clusters on the left and right edges with a      */}
+      {/* black center. A wide, soft horizontal mask reveals only the tree */}
+      {/* regions while gently feathering into the background image.       */}
+      {/* The vertical mask hides the sky strip at top and blends at bottom*/}
       <div
         ref={fgRef}
         className="absolute inset-0 will-change-transform overflow-hidden"
@@ -138,44 +135,16 @@ export function ParallaxHero({
         <div
           className="absolute bottom-0 left-0 right-0"
           style={{
-            // Horizontal mask: reveal left ~24% and right ~24%, hide center
-            // Vertical mask: fade in from top, fade out at bottom
-            maskImage: `
-              linear-gradient(to right,
-                transparent 0%,
-                black 4%,
-                black 24%,
-                transparent 38%,
-                transparent 62%,
-                black 76%,
-                black 96%,
-                transparent 100%
-              ),
-              linear-gradient(to bottom,
-                transparent 0%,
-                black 12%,
-                black 70%,
-                transparent 100%
-              )
-            `,
-            WebkitMaskImage: `
-              linear-gradient(to right,
-                transparent 0%,
-                black 4%,
-                black 24%,
-                transparent 38%,
-                transparent 62%,
-                black 76%,
-                black 96%,
-                transparent 100%
-              ),
-              linear-gradient(to bottom,
-                transparent 0%,
-                black 12%,
-                black 70%,
-                transparent 100%
-              )
-            `,
+            // Horizontal: wide soft feather — show outer ~30% each side, hide center
+            // Vertical: hide top sky strip, fade at bottom
+            maskImage: [
+              "linear-gradient(to right, transparent 0%, black 3%, black 28%, transparent 42%, transparent 58%, black 72%, black 97%, transparent 100%)",
+              "linear-gradient(to bottom, transparent 0%, black 18%, black 72%, transparent 100%)",
+            ].join(", "),
+            WebkitMaskImage: [
+              "linear-gradient(to right, transparent 0%, black 3%, black 28%, transparent 42%, transparent 58%, black 72%, black 97%, transparent 100%)",
+              "linear-gradient(to bottom, transparent 0%, black 18%, black 72%, transparent 100%)",
+            ].join(", "),
             maskComposite: "intersect",
             WebkitMaskComposite: "source-in",
           }}
@@ -203,27 +172,9 @@ export function ParallaxHero({
         }}
       />
 
-      {/* ── Clouds: RGBA PNG layer — drifts above the city scene ─────── */}
-      {/* cloud.png is a transparent PNG so it composites naturally.      */}
-      <div
-        ref={cloudRef}
-        className="absolute inset-0 will-change-transform z-20"
-        style={layerStyle(ANIM_DELAYS.cloud)}
-      >
-        <Image
-          src="/cloud.png"
-          alt=""
-          aria-hidden="true"
-          fill
-          sizes="100vw"
-          className="object-cover object-[center_20%] select-none pointer-events-none opacity-80"
-          unoptimized
-        />
-      </div>
-
       {/* ── Overlay slot (login link, CTAs, etc.) ─────────────────────── */}
       {overlay && (
-        <div className="absolute inset-0 z-30">{overlay}</div>
+        <div className="absolute inset-0 z-20">{overlay}</div>
       )}
     </section>
   );
