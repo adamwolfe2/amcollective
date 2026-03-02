@@ -18,6 +18,9 @@ import {
   Link2Off,
   Copy,
   CheckCheck,
+  ChevronDown,
+  ChevronUp,
+  Lock,
 } from "lucide-react";
 import { MentionInput, type MentionOption } from "./mention-input";
 import {
@@ -32,8 +35,11 @@ import {
   parseSprintText,
   importParsedSections,
   toggleSprintShare,
+  closeSprint,
   type ParsedSprintSection,
 } from "@/lib/actions/sprints";
+import { updateSubtasks } from "@/lib/actions/tasks";
+import type { SubtaskItem } from "@/lib/db/schema";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,6 +48,7 @@ export type SprintTask = {
   content: string;
   isCompleted: boolean;
   sortOrder: number;
+  subtasks: SubtaskItem[];
 };
 
 export type SprintSection = {
@@ -59,6 +66,7 @@ export type SprintData = {
   weeklyFocus: string | null;
   topOfMind: string | null;
   shareToken: string | null;
+  closedAt: Date | null;
   sections: SprintSection[];
 };
 
@@ -153,75 +161,267 @@ function TaskRow({
   const [draft, setDraft] = useState(task.content);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Subtask state
+  const [subtasksExpanded, setSubtasksExpanded] = useState(
+    (task.subtasks?.length ?? 0) > 0
+  );
+  const [localSubtasks, setLocalSubtasks] = useState<SubtaskItem[]>(
+    task.subtasks ?? []
+  );
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     if (editing) inputRef.current?.focus();
   }, [editing]);
 
   function handleToggle() {
     onToggle(task.id, !task.isCompleted);
-    startTransition(async () => { await toggleTask(task.id, sprintId, !task.isCompleted); });
+    startTransition(async () => {
+      await toggleTask(task.id, sprintId, !task.isCompleted);
+    });
   }
 
   function commitEdit() {
     setEditing(false);
     if (draft.trim() && draft !== task.content) {
       onUpdate(task.id, draft.trim());
-      startTransition(async () => { await updateTask(task.id, sprintId, draft.trim()); });
+      startTransition(async () => {
+        await updateTask(task.id, sprintId, draft.trim());
+      });
     }
   }
 
   function handleDeleteTask() {
     onDelete(task.id);
-    startTransition(async () => { await deleteTask(task.id, sprintId); });
+    startTransition(async () => {
+      await deleteTask(task.id, sprintId);
+    });
   }
 
-  return (
-    <div className="flex items-start gap-2.5 py-1 group">
-      <button
-        onClick={handleToggle}
-        disabled={isPending}
-        className={`mt-0.5 shrink-0 w-4 h-4 border flex items-center justify-center transition-colors ${
-          task.isCompleted
-            ? "bg-[#0A0A0A] border-[#0A0A0A]"
-            : "border-[#0A0A0A]/30 hover:border-[#0A0A0A]/60"
-        }`}
-      >
-        {task.isCompleted && <Check size={10} className="text-white" />}
-      </button>
+  // ── Subtask helpers ──────────────────────────────────────────────────────
 
-      {editing ? (
-        <input
-          ref={inputRef}
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onBlur={commitEdit}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") commitEdit();
-            if (e.key === "Escape") {
-              setDraft(task.content);
-              setEditing(false);
-            }
-          }}
-          className="flex-1 font-serif text-sm bg-transparent border-b border-[#0A0A0A]/30 focus:outline-none"
-        />
-      ) : (
-        <span
-          onClick={() => setEditing(true)}
-          className={`flex-1 font-serif text-sm cursor-text leading-snug ${
+  function saveSubtasks(items: SubtaskItem[]) {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      startTransition(async () => {
+        await updateSubtasks(task.id, sprintId, items);
+      });
+    }, 500);
+  }
+
+  function toggleSubtask(id: string) {
+    const updated = localSubtasks.map((s) =>
+      s.id === id ? { ...s, isCompleted: !s.isCompleted } : s
+    );
+    setLocalSubtasks(updated);
+    saveSubtasks(updated);
+  }
+
+  function updateSubtaskContent(id: string, content: string) {
+    const updated = localSubtasks.map((s) =>
+      s.id === id ? { ...s, content } : s
+    );
+    setLocalSubtasks(updated);
+    saveSubtasks(updated);
+  }
+
+  function addSubtask(afterId?: string) {
+    const newItem: SubtaskItem = {
+      id: crypto.randomUUID(),
+      content: "",
+      isCompleted: false,
+    };
+    if (!afterId) {
+      const updated = [...localSubtasks, newItem];
+      setLocalSubtasks(updated);
+      saveSubtasks(updated);
+    } else {
+      const idx = localSubtasks.findIndex((s) => s.id === afterId);
+      const updated = [
+        ...localSubtasks.slice(0, idx + 1),
+        newItem,
+        ...localSubtasks.slice(idx + 1),
+      ];
+      setLocalSubtasks(updated);
+      saveSubtasks(updated);
+    }
+    return newItem.id;
+  }
+
+  function deleteSubtask(id: string) {
+    const updated = localSubtasks.filter((s) => s.id !== id);
+    setLocalSubtasks(updated);
+    saveSubtasks(updated);
+  }
+
+  const subtaskCount = localSubtasks.length;
+
+  return (
+    <div className="py-1 group">
+      {/* Main task row */}
+      <div className="flex items-start gap-2.5">
+        <button
+          onClick={handleToggle}
+          disabled={isPending}
+          className={`mt-0.5 shrink-0 w-4 h-4 border flex items-center justify-center transition-colors ${
             task.isCompleted
-              ? "line-through text-[#0A0A0A]/30"
-              : "text-[#0A0A0A]"
+              ? "bg-[#0A0A0A] border-[#0A0A0A]"
+              : "border-[#0A0A0A]/30 hover:border-[#0A0A0A]/60"
           }`}
         >
-          {task.content}
-        </span>
-      )}
+          {task.isCompleted && <Check size={10} className="text-white" />}
+        </button>
 
+        {editing ? (
+          <input
+            ref={inputRef}
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") commitEdit();
+              if (e.key === "Escape") {
+                setDraft(task.content);
+                setEditing(false);
+              }
+            }}
+            className="flex-1 font-serif text-sm bg-transparent border-b border-[#0A0A0A]/30 focus:outline-none"
+          />
+        ) : (
+          <span
+            onClick={() => setEditing(true)}
+            className={`flex-1 font-serif text-sm cursor-text leading-snug ${
+              task.isCompleted
+                ? "line-through text-[#0A0A0A]/30"
+                : "text-[#0A0A0A]"
+            }`}
+          >
+            {task.content}
+          </span>
+        )}
+
+        {/* Subtask expand toggle — shown on hover */}
+        {!task.isCompleted && (
+          <button
+            onClick={() => setSubtasksExpanded((v) => !v)}
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-[#0A0A0A]/30 hover:text-[#0A0A0A]/60 shrink-0 mt-0.5 flex items-center gap-0.5"
+            title={subtasksExpanded ? "Collapse subtasks" : "Expand subtasks"}
+          >
+            {subtaskCount > 0 && (
+              <span className="font-mono text-[9px] text-[#0A0A0A]/40">
+                {subtaskCount}
+              </span>
+            )}
+            {subtasksExpanded ? (
+              <ChevronUp size={11} />
+            ) : (
+              <ChevronDown size={11} />
+            )}
+          </button>
+        )}
+
+        <button
+          onClick={handleDeleteTask}
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-[#0A0A0A]/30 hover:text-red-500 shrink-0 mt-0.5"
+        >
+          <X size={12} />
+        </button>
+      </div>
+
+      {/* Subtask checklist */}
+      {subtasksExpanded && !task.isCompleted && (
+        <div className="ml-6.5 mt-1.5 space-y-1">
+          {localSubtasks.map((sub, idx) => (
+            <SubtaskItemRow
+              key={sub.id}
+              item={sub}
+              onToggle={() => toggleSubtask(sub.id)}
+              onUpdate={(content) => updateSubtaskContent(sub.id, content)}
+              onEnter={() => {
+                const newId = addSubtask(sub.id);
+                // Focus the new input after state update
+                setTimeout(() => {
+                  const el = document.getElementById(`subtask-${newId}`);
+                  el?.focus();
+                }, 10);
+              }}
+              onDelete={() => {
+                if (localSubtasks.length > 1 || sub.content) {
+                  deleteSubtask(sub.id);
+                }
+              }}
+            />
+          ))}
+          <button
+            onClick={() => {
+              const newId = addSubtask();
+              setTimeout(() => {
+                const el = document.getElementById(`subtask-${newId}`);
+                el?.focus();
+              }, 10);
+            }}
+            className="font-mono text-[10px] text-[#0A0A0A]/25 hover:text-[#0A0A0A]/50 transition-colors flex items-center gap-1 mt-0.5"
+          >
+            <Plus size={9} />
+            Add item
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Subtask Item Row ─────────────────────────────────────────────────────────
+
+function SubtaskItemRow({
+  item,
+  onToggle,
+  onUpdate,
+  onEnter,
+  onDelete,
+}: {
+  item: SubtaskItem;
+  onToggle: () => void;
+  onUpdate: (content: string) => void;
+  onEnter: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2 group/sub">
       <button
-        onClick={handleDeleteTask}
-        className="opacity-0 group-hover:opacity-100 transition-opacity text-[#0A0A0A]/30 hover:text-red-500 shrink-0 mt-0.5"
+        onClick={onToggle}
+        className={`shrink-0 w-3 h-3 border flex items-center justify-center transition-colors ${
+          item.isCompleted
+            ? "bg-[#0A0A0A]/60 border-[#0A0A0A]/60"
+            : "border-[#0A0A0A]/20 hover:border-[#0A0A0A]/40"
+        }`}
       >
-        <X size={12} />
+        {item.isCompleted && <Check size={7} className="text-white" />}
+      </button>
+      <input
+        id={`subtask-${item.id}`}
+        value={item.content}
+        onChange={(e) => onUpdate(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onEnter();
+          }
+          if (e.key === "Backspace" && !item.content) {
+            e.preventDefault();
+            onDelete();
+          }
+        }}
+        placeholder="Subtask..."
+        className={`flex-1 font-serif text-xs bg-transparent focus:outline-none placeholder:text-[#0A0A0A]/20 ${
+          item.isCompleted ? "line-through text-[#0A0A0A]/30" : "text-[#0A0A0A]/70"
+        }`}
+      />
+      <button
+        onClick={onDelete}
+        className="opacity-0 group-hover/sub:opacity-100 transition-opacity text-[#0A0A0A]/20 hover:text-red-400 shrink-0"
+      >
+        <X size={10} />
       </button>
     </div>
   );
@@ -279,7 +479,9 @@ function SectionBlock({
   function handleDeleteSection() {
     if (!confirm(`Remove "${section.projectName}" section?`)) return;
     onDeleteSection(section.id);
-    startTransition(async () => { await deleteSection(section.id, sprintId); });
+    startTransition(async () => {
+      await deleteSection(section.id, sprintId);
+    });
   }
 
   function saveProjectName(val: string) {
@@ -402,6 +604,58 @@ function SectionBlock({
   );
 }
 
+// ─── Close Sprint Button ──────────────────────────────────────────────────────
+
+function CloseSprintButton({
+  sprintId,
+  closedAt,
+}: {
+  sprintId: string;
+  closedAt: Date | null;
+}) {
+  const [isPending, startTransition] = useTransition();
+  const [localClosed, setLocalClosed] = useState(closedAt !== null);
+
+  if (localClosed) {
+    return (
+      <button
+        disabled
+        className="flex items-center gap-1.5 px-3 py-1.5 border border-[#0A0A0A]/10 text-[#0A0A0A]/30 font-mono text-xs cursor-default"
+      >
+        <Lock size={11} />
+        Closed
+      </button>
+    );
+  }
+
+  function handleClose() {
+    if (
+      !confirm(
+        "Close this sprint? A snapshot will be saved and this cannot be undone."
+      )
+    )
+      return;
+
+    startTransition(async () => {
+      const result = await closeSprint(sprintId);
+      if (result.success) {
+        setLocalClosed(true);
+      }
+    });
+  }
+
+  return (
+    <button
+      onClick={handleClose}
+      disabled={isPending}
+      className="flex items-center gap-1.5 px-3 py-1.5 border border-[#0A0A0A]/20 text-[#0A0A0A]/50 font-mono text-xs hover:border-[#0A0A0A]/40 hover:text-[#0A0A0A]/70 transition-colors disabled:opacity-40"
+    >
+      {isPending ? <Loader2 size={11} className="animate-spin" /> : <Lock size={11} />}
+      Close Sprint
+    </button>
+  );
+}
+
 // ─── Share Button ─────────────────────────────────────────────────────────────
 
 function SprintShareButton({
@@ -498,9 +752,9 @@ type ReviewSection = ParsedSprintSection & { assigneeName: string };
 /** Pre-process raw text before sending to AI — splits [ ] checkboxes onto separate lines */
 function normalizeSprintText(raw: string): string {
   return raw
-    .replace(/\[\s*x\s*\]/gi, "\n- [done] ")  // [x] → done bullet
-    .replace(/\[\s*\]/g, "\n- ")               // [ ] → new bullet line
-    .replace(/\n{3,}/g, "\n\n")               // collapse excessive blank lines
+    .replace(/\[\s*x\s*\]/gi, "\n- [done] ")
+    .replace(/\[\s*\]/g, "\n- ")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
@@ -547,7 +801,9 @@ function SprintAIImport({
         teamMembers.map((m) => m.name)
       );
       if (result.success && result.data) {
-        setParsed(result.data.map((s) => ({ ...s, assigneeName: s.assigneeName ?? "" })));
+        setParsed(
+          result.data.map((s) => ({ ...s, assigneeName: s.assigneeName ?? "" }))
+        );
       } else {
         setError(result.error ?? "Parse failed");
       }
@@ -556,12 +812,14 @@ function SprintAIImport({
 
   function updateAssignee(idx: number, val: string) {
     setParsed((prev) =>
-      prev ? prev.map((s, i) => (i === idx ? { ...s, assigneeName: val } : s)) : prev
+      prev
+        ? prev.map((s, i) => (i === idx ? { ...s, assigneeName: val } : s))
+        : prev
     );
   }
 
   function removeSection(idx: number) {
-    setParsed((prev) => prev ? prev.filter((_, i) => i !== idx) : prev);
+    setParsed((prev) => (prev ? prev.filter((_, i) => i !== idx) : prev));
   }
 
   function handleImport() {
@@ -591,7 +849,6 @@ function SprintAIImport({
 
   return (
     <>
-      {/* Trigger button — rendered inline by the parent */}
       <button
         onClick={() => setOpen(true)}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0A0A0A] text-white font-mono text-xs hover:bg-[#0A0A0A]/80 transition-colors shrink-0"
@@ -600,11 +857,9 @@ function SprintAIImport({
         AI Parse
       </button>
 
-      {/* Full-screen overlay modal */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-16 px-4">
           <div className="w-full max-w-2xl bg-white border border-[#0A0A0A]/20 shadow-2xl max-h-[80vh] flex flex-col">
-            {/* Modal header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#0A0A0A]/10 shrink-0">
               <div className="flex items-center gap-2">
                 <Sparkles size={14} className="text-[#0A0A0A]/50" />
@@ -621,7 +876,6 @@ function SprintAIImport({
             </div>
 
             <div className="overflow-y-auto flex-1">
-              {/* ── Input area ── */}
               <div className="p-6 border-b border-[#0A0A0A]/10">
                 <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-3">
                   Paste your notes — include projects, tasks, assignees (@adam,
@@ -632,7 +886,8 @@ function SprintAIImport({
                   value={rawText}
                   onChange={(e) => setRawText(e.target.value)}
                   onKeyDown={(e) => {
-                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") handleParse();
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter")
+                      handleParse();
                   }}
                   placeholder={
                     "Trackr — @adam\ngoal: keep outbound running, fix cost sync\n[ ] Fix tool cost sync\n[ ] Update pricing page\n[ ] Review Stripe webhook\n\nCursive — @maggie\n[ ] Onboard ABC Corp\n[ ] Fix lead import bug\n[ ] Send weekly report\n\nGeneral\n[ ] Review contracts\n[ ] Team standup notes"
@@ -667,13 +922,12 @@ function SprintAIImport({
                 </div>
               </div>
 
-              {/* ── Parsed preview ── */}
               {parsed && (
                 <div className="p-6">
                   <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-4">
                     {parsed.length} project{parsed.length !== 1 ? "s" : ""},{" "}
-                    {totalTasks} task{totalTasks !== 1 ? "s" : ""} — assign each
-                    section then import
+                    {totalTasks} task{totalTasks !== 1 ? "s" : ""} — assign
+                    each section then import
                   </p>
 
                   <div className="space-y-3">
@@ -682,7 +936,6 @@ function SprintAIImport({
                         key={si}
                         className="border border-[#0A0A0A]/10 p-4 flex items-start gap-4 bg-[#F3F3EF]/40"
                       >
-                        {/* Left: project + tasks */}
                         <div className="flex-1 min-w-0">
                           <p className="font-serif font-bold italic text-[#0A0A0A] text-sm">
                             {section.projectName}
@@ -714,7 +967,6 @@ function SprintAIImport({
                           </div>
                         </div>
 
-                        {/* Right: assignee + remove */}
                         <div className="flex items-center gap-2 shrink-0">
                           <select
                             value={section.assigneeName}
@@ -742,7 +994,6 @@ function SprintAIImport({
               )}
             </div>
 
-            {/* Footer */}
             {parsed && (
               <div className="px-6 py-4 border-t border-[#0A0A0A]/10 flex items-center gap-3 shrink-0 bg-white">
                 <button
@@ -758,12 +1009,16 @@ function SprintAIImport({
                   ) : (
                     <>
                       <Check size={12} />
-                      Import {parsed.length} section{parsed.length !== 1 ? "s" : ""} · {totalTasks} tasks
+                      Import {parsed.length} section
+                      {parsed.length !== 1 ? "s" : ""} · {totalTasks} tasks
                     </>
                   )}
                 </button>
                 <button
-                  onClick={() => { setParsed(null); setError(null); }}
+                  onClick={() => {
+                    setParsed(null);
+                    setError(null);
+                  }}
                   className="px-4 py-2.5 border border-[#0A0A0A]/20 font-mono text-xs hover:bg-[#0A0A0A]/5"
                 >
                   Re-parse
@@ -806,8 +1061,14 @@ function AddSectionForm({
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [goal, setGoal] = useState("");
 
-  const projectOptions: MentionOption[] = projects.map((p) => ({ id: p.id, name: p.name }));
-  const memberOptions: MentionOption[] = teamMembers.map((m) => ({ id: m.id, name: m.name }));
+  const projectOptions: MentionOption[] = projects.map((p) => ({
+    id: p.id,
+    name: p.name,
+  }));
+  const memberOptions: MentionOption[] = teamMembers.map((m) => ({
+    id: m.id,
+    name: m.name,
+  }));
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -822,8 +1083,10 @@ function AddSectionForm({
       tasks: [],
     };
     onAdd(tempSection);
-    setProjectName(""); setProjectId(null);
-    setAssigneeName(""); setAssigneeId(null);
+    setProjectName("");
+    setProjectId(null);
+    setAssigneeName("");
+    setAssigneeId(null);
     setGoal("");
     setOpen(false);
 
@@ -838,8 +1101,6 @@ function AddSectionForm({
       });
     });
   }
-
-  const inputCls = ""; // MentionInput applies its own styles
 
   if (!open) {
     return (
@@ -866,7 +1127,10 @@ function AddSectionForm({
           <MentionInput
             label="Project / Client *"
             value={projectName}
-            onChange={(v) => { setProjectName(v); if (!v) setProjectId(null); }}
+            onChange={(v) => {
+              setProjectName(v);
+              if (!v) setProjectId(null);
+            }}
             onSelect={(opt) => setProjectId(opt?.id ?? null)}
             options={projectOptions}
             placeholder="DevSwarm, SOHO, TVTC..."
@@ -882,7 +1146,10 @@ function AddSectionForm({
           <MentionInput
             label="Assignee"
             value={assigneeName}
-            onChange={(v) => { setAssigneeName(v); if (!v) setAssigneeId(null); }}
+            onChange={(v) => {
+              setAssigneeName(v);
+              if (!v) setAssigneeId(null);
+            }}
             onSelect={(opt) => setAssigneeId(opt?.id ?? null)}
             options={memberOptions}
             placeholder="@ Adam, Maggie..."
@@ -946,7 +1213,9 @@ function TopOfMindEditor({
     onChange(v);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
-      startTransition(async () => { await updateSprint(sprintId, { topOfMind: v }); });
+      startTransition(async () => {
+        await updateSprint(sprintId, { topOfMind: v });
+      });
     }, 800);
   }
 
@@ -984,25 +1253,26 @@ export function SprintEditor({
 }) {
   const [, startTransition] = useTransition();
 
-  // Local state for optimistic updates
   const [title, setTitle] = useState(sprint.title);
   const [weeklyFocus, setWeeklyFocus] = useState(sprint.weeklyFocus ?? "");
   const [topOfMind, setTopOfMind] = useState(sprint.topOfMind ?? "");
   const [sections, setSections] = useState<SprintSection[]>(sprint.sections);
   const shareToken = sprint.shareToken ?? null;
 
-  // Sprint header edits
   function saveTitle(val: string) {
     setTitle(val);
-    startTransition(async () => { await updateSprint(sprint.id, { title: val }); });
+    startTransition(async () => {
+      await updateSprint(sprint.id, { title: val });
+    });
   }
 
   function saveWeeklyFocus(val: string) {
     setWeeklyFocus(val);
-    startTransition(async () => { await updateSprint(sprint.id, { weeklyFocus: val }); });
+    startTransition(async () => {
+      await updateSprint(sprint.id, { weeklyFocus: val });
+    });
   }
 
-  // Section operations
   function handleAddSection(section: SprintSection) {
     setSections((prev) => [...prev, section]);
   }
@@ -1021,6 +1291,7 @@ export function SprintEditor({
         content,
         isCompleted: false,
         sortOrder: j,
+        subtasks: [],
       })),
     }));
     setSections((prev) => [...prev, ...newSections]);
@@ -1036,13 +1307,13 @@ export function SprintEditor({
     setSections((prev) => prev.filter((s) => s.id !== id));
   }
 
-  // Task operations (optimistic)
   function handleCreateTask(sectionId: string, content: string) {
     const newTask: SprintTask = {
       id: crypto.randomUUID(),
       content,
       isCompleted: false,
       sortOrder: 0,
+      subtasks: [],
     };
     setSections((prev) =>
       prev.map((s) =>
@@ -1098,7 +1369,7 @@ export function SprintEditor({
         />
       </div>
 
-      {/* Weekly focus + action buttons on same row */}
+      {/* Weekly focus + action buttons */}
       <div className="flex items-center gap-3 mb-2">
         <div className="flex-1">
           <InlineEdit
@@ -1116,6 +1387,7 @@ export function SprintEditor({
           currentSectionCount={sections.length}
           onImported={handleImportSections}
         />
+        <CloseSprintButton sprintId={sprint.id} closedAt={sprint.closedAt} />
       </div>
 
       {/* Progress bar */}
