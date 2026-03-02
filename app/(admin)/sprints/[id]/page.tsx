@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, and, isNull, sql } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
@@ -13,6 +13,7 @@ import {
 } from "./sprint-editor";
 
 async function getSprint(id: string): Promise<SprintData | null> {
+  // Step 1: Load sprint
   const [sprint] = await db
     .select()
     .from(schema.weeklySprints)
@@ -20,42 +21,79 @@ async function getSprint(id: string): Promise<SprintData | null> {
 
   if (!sprint) return null;
 
+  // Step 2: Load sections with FK-resolved names
   const sections = await db
-    .select()
+    .select({
+      id: schema.sprintSections.id,
+      projectName: sql<string>`COALESCE(${schema.portfolioProjects.name}, ${schema.sprintSections.projectName})`,
+      assigneeName: sql<string | null>`COALESCE(${schema.teamMembers.name}, ${schema.sprintSections.assigneeName})`,
+      goal: schema.sprintSections.goal,
+      sortOrder: schema.sprintSections.sortOrder,
+    })
     .from(schema.sprintSections)
+    .leftJoin(
+      schema.portfolioProjects,
+      eq(schema.sprintSections.projectId, schema.portfolioProjects.id)
+    )
+    .leftJoin(
+      schema.teamMembers,
+      eq(schema.sprintSections.assigneeId, schema.teamMembers.id)
+    )
     .where(eq(schema.sprintSections.sprintId, id))
     .orderBy(asc(schema.sprintSections.sortOrder));
 
-  // Load all tasks (no filtering — we group by sectionId in memory)
+  // Step 3: Load tasks via assignments
   const allTasks = await db
-    .select()
-    .from(schema.sprintTasks)
-    .orderBy(asc(schema.sprintTasks.sortOrder));
+    .select({
+      id: schema.tasks.id,
+      content: schema.tasks.title,
+      isCompleted: sql<boolean>`(${schema.tasks.status} = 'done')`,
+      sortOrder: schema.taskSprintAssignments.sortOrder,
+      subtasks: schema.tasks.subtasks,
+      sectionId: schema.taskSprintAssignments.sectionId,
+    })
+    .from(schema.taskSprintAssignments)
+    .innerJoin(
+      schema.tasks,
+      eq(schema.taskSprintAssignments.taskId, schema.tasks.id)
+    )
+    .where(
+      and(
+        eq(schema.taskSprintAssignments.sprintId, id),
+        isNull(schema.taskSprintAssignments.removedAt)
+      )
+    );
 
+  // Step 4: Group tasks by sectionId
   const tasksBySectionId = new Map<string, SprintTask[]>();
   for (const task of allTasks) {
-    if (!tasksBySectionId.has(task.sectionId)) {
-      tasksBySectionId.set(task.sectionId, []);
+    const sectionId = task.sectionId;
+    if (!sectionId) continue;
+    if (!tasksBySectionId.has(sectionId)) {
+      tasksBySectionId.set(sectionId, []);
     }
-    tasksBySectionId.get(task.sectionId)!.push({
+    tasksBySectionId.get(sectionId)!.push({
       id: task.id,
       content: task.content,
       isCompleted: task.isCompleted,
       sortOrder: task.sortOrder,
+      subtasks: task.subtasks ?? [],
     });
   }
 
+  // Step 5: Build SprintData
   return {
     id: sprint.id,
     title: sprint.title,
     weeklyFocus: sprint.weeklyFocus,
     topOfMind: sprint.topOfMind,
     shareToken: sprint.shareToken ?? null,
+    closedAt: sprint.closedAt ?? null,
     sections: sections.map(
       (s): SprintSection => ({
         id: s.id,
         projectName: s.projectName,
-        assigneeName: s.assigneeName,
+        assigneeName: s.assigneeName ?? null,
         goal: s.goal,
         sortOrder: s.sortOrder,
         tasks: tasksBySectionId.get(s.id) ?? [],

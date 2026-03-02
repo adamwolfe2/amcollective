@@ -8,7 +8,7 @@
 
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, desc, and, gte, sql, count } from "drizzle-orm";
+import { eq, desc, and, gte, sql, count, isNull } from "drizzle-orm";
 
 export type SprintWeek = {
   sprintId: string;
@@ -81,20 +81,27 @@ export async function getProjectContext(
     };
   }
 
-  // 3. Load all tasks for these sections in one query
+  // 3. Load all tasks for these sections via canonical task_sprint_assignments
   const sectionIds = sections.map((s) => s.sectionId);
   const allTasks = await db
     .select({
-      sectionId: schema.sprintTasks.sectionId,
-      content: schema.sprintTasks.content,
-      isCompleted: schema.sprintTasks.isCompleted,
+      sectionId: schema.taskSprintAssignments.sectionId,
+      content: schema.tasks.title,
+      isCompleted: sql<boolean>`(${schema.tasks.status} = 'done')`,
     })
-    .from(schema.sprintTasks)
+    .from(schema.taskSprintAssignments)
+    .innerJoin(
+      schema.tasks,
+      eq(schema.taskSprintAssignments.taskId, schema.tasks.id)
+    )
     .where(
-      sql`${schema.sprintTasks.sectionId} = ANY(ARRAY[${sql.join(
-        sectionIds.map((id) => sql`${id}::uuid`),
-        sql`, `
-      )}])`
+      and(
+        sql`${schema.taskSprintAssignments.sectionId} = ANY(ARRAY[${sql.join(
+          sectionIds.map((id) => sql`${id}::uuid`),
+          sql`, `
+        )}])`,
+        isNull(schema.taskSprintAssignments.removedAt)
+      )
     );
 
   // 4. Group tasks by sectionId
@@ -103,10 +110,12 @@ export async function getProjectContext(
     Array<{ content: string; isCompleted: boolean }>
   >();
   for (const task of allTasks) {
-    if (!tasksBySection.has(task.sectionId)) {
-      tasksBySection.set(task.sectionId, []);
+    const sid = task.sectionId;
+    if (!sid) continue;
+    if (!tasksBySection.has(sid)) {
+      tasksBySection.set(sid, []);
     }
-    tasksBySection.get(task.sectionId)!.push(task);
+    tasksBySection.get(sid)!.push({ content: task.content, isCompleted: task.isCompleted });
   }
 
   // 5. Build sprint history rows
