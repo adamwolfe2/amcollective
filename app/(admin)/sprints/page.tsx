@@ -56,7 +56,7 @@ export default async function SprintsPage() {
             Weekly Sprints
           </h1>
           <p className="text-[#0A0A0A]/40 font-mono text-xs mt-1">
-            Your weekly operating docs — replaces Notion
+            Weekly operating plan
           </p>
         </div>
         <form action={createSprint}>

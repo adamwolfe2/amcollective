@@ -14,9 +14,6 @@ import {
   X,
   Sparkles,
   Loader2,
-  ChevronDown,
-  ChevronUp,
-  GripVertical,
 } from "lucide-react";
 import {
   updateSprint,
