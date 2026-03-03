@@ -69,16 +69,7 @@ async function postSlackMessage(
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
 
-  // Verify Slack signing secret
-  const signingSecret = process.env.SLACK_SIGNING_SECRET;
-  if (signingSecret) {
-    const timestamp = req.headers.get("x-slack-request-timestamp") ?? "";
-    const signature = req.headers.get("x-slack-signature") ?? "";
-    if (!verifySlackSignature(rawBody, timestamp, signature, signingSecret)) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
-  }
-
+  // Parse early so we can handle url_verification before signature check
   let payload: {
     type: string;
     challenge?: string;
@@ -99,9 +90,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  // Handle URL verification challenge
+  // Handle URL verification challenge — must respond before signature check
   if (payload.type === "url_verification") {
     return NextResponse.json({ challenge: payload.challenge });
+  }
+
+  // Verify Slack signing secret for all other requests
+  const signingSecret = process.env.SLACK_SIGNING_SECRET;
+  if (signingSecret) {
+    const timestamp = req.headers.get("x-slack-request-timestamp") ?? "";
+    const signature = req.headers.get("x-slack-signature") ?? "";
+    if (!verifySlackSignature(rawBody, timestamp, signature, signingSecret)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
   }
 
   const event = payload.event;
