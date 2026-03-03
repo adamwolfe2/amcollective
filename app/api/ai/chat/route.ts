@@ -16,11 +16,12 @@ import {
   type UIMessage,
 } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
-import { allTools } from "@/lib/ai/tools-sdk";
+import { allTools, allCeoTools } from "@/lib/ai/tools-sdk";
 import { searchSimilar } from "@/lib/ai/embeddings";
+import { searchMemory } from "@/lib/ai/memory";
 import { runResearch } from "@/lib/ai/agents/research";
 import { getConversations, getConversationMessages } from "@/lib/ai/agents/chat";
-import { runCeoAgent, resolveUser } from "@/lib/ai/agents/ceo-agent";
+import { resolveUser } from "@/lib/ai/agents/ceo-agent";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -103,47 +104,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // CEO Agent mode — for Adam and Maggie, use the full CEO agent (non-streaming wrapper)
-  const ceoUser = resolveUser(userId);
-  if (ceoUser && action !== "research") {
-    const latestText = getTextFromMessage(messages[messages.length - 1]);
-    if (!latestText) {
-      return NextResponse.json({ error: "Message required" }, { status: 400 });
-    }
-
-    // Get existing conversation ID from headers or body
-    const convId = conversationId || req.headers.get("x-conversation-id") || undefined;
-
-    const result = await runCeoAgent({
-      userId: ceoUser.id,
-      userRole: ceoUser.role,
-      userFocus: ceoUser.focus,
-      userName: ceoUser.name,
-      message: latestText,
-      conversationId: convId,
-    }).catch((err) => {
-      captureError(err, { tags: { route: "POST /api/ai/chat", mode: "ceo" } });
-      return { response: "I encountered an error. Please try again.", conversationId: convId ?? "none" };
-    });
-
-    // Wrap in streaming format compatible with useChat
-    const stream = createUIMessageStream({
-      execute: async ({ writer }) => {
-        const textResult = streamText({
-          model: anthropic("claude-haiku-4-5-20251001"),
-          prompt: result.response,
-          system: "Output the input text verbatim, unchanged.",
-        });
-        writer.merge(textResult.toUIMessageStream());
-      },
-    });
-
-    return createUIMessageStreamResponse({
-      stream,
-      headers: { "X-Conversation-Id": result.conversationId },
-    });
-  }
-
   // Research mode — uses Tavily + Claude synthesis (non-streaming)
   if (action === "research") {
     const query = getTextFromMessage(messages[messages.length - 1]);
@@ -157,6 +117,9 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // Detect CEO users (Adam / Maggie) — they get CEO system prompt + tools + memory
+  const ceoUser = resolveUser(userId);
+
   // Get or create conversation
   let convId = conversationId;
   if (!convId) {
@@ -166,30 +129,58 @@ export async function POST(req: NextRequest) {
       .values({
         userId,
         title,
-        model: "claude-sonnet-4-5-20250929",
+        model: "claude-sonnet-4-6",
       })
       .returning();
     convId = conv.id;
   }
 
-  // Get RAG context for the latest user message
   const latestText = getTextFromMessage(messages[messages.length - 1]);
 
-  let ragContext = "";
-  if (latestText.length > 10) {
+  // Build context — memory search for CEO users, RAG for everyone
+  let contextBlock = "";
+  if (ceoUser && latestText.length > 10) {
+    try {
+      const memories = await searchMemory(latestText, 5);
+      if (memories.length > 0) {
+        contextBlock = `\n\n## Relevant Memory\n${memories
+          .map((m) => `[${m.path}]\n${m.content.slice(0, 400)}`)
+          .join("\n\n")}`;
+      }
+    } catch { /* memory not configured */ }
+  }
+  if (!contextBlock && latestText.length > 10) {
     try {
       const similar = await searchSimilar(latestText, 3);
       if (similar.length > 0) {
-        ragContext = `\n\nRelevant knowledge base context:\n${similar
+        contextBlock = `\n\nRelevant knowledge base context:\n${similar
           .map((s) => `[${s.sourceType}] ${s.content.slice(0, 300)}`)
           .join("\n")}`;
       }
-    } catch {
-      // RAG not configured, continue without
-    }
+    } catch { /* RAG not configured */ }
   }
 
-  const systemWithRag = ragContext ? SYSTEM_PROMPT + ragContext : SYSTEM_PROMPT;
+  // Build system prompt
+  const baseSystem = ceoUser
+    ? `You are ClaudeBot, the AI CEO of AM Collective Capital — strategic operating partner for Adam (CTO) and Maggie (COO).
+
+Current user: **${ceoUser.name}** (${ceoUser.role}) — focused on ${ceoUser.focus}.
+
+## Portfolio
+TBGC (wholesale food portal), Trackr (AI tool intel), Cursive (lead marketplace), TaskSpace (EOS platform), Wholesail (B2B portal template), Hook (viral content AI).
+
+## Rules
+- Direct and decisive — lead with the answer, no preamble
+- Use bullet points and tables for structured data
+- Format currency as $X,XXX — amounts from DB are in cents, divide by 100
+- Never fabricate data — only report what tools return
+- Use write_memory to persist important decisions, preferences, or facts
+- Use get_company_snapshot for broad status questions
+- Use get_current_sprint for weekly planning questions
+- Today: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}`
+    : SYSTEM_PROMPT;
+
+  const systemWithContext = contextBlock ? baseSystem + contextBlock : baseSystem;
 
   // Store user message
   await db.insert(schema.aiMessages).values({
@@ -198,15 +189,18 @@ export async function POST(req: NextRequest) {
     content: latestText,
   });
 
+  const activeTools = ceoUser ? allCeoTools : allTools;
+  const activeModel = ceoUser ? "claude-sonnet-4-6" : "claude-sonnet-4-5-20250929";
+
   // Stream response using Vercel AI SDK
   const stream = createUIMessageStream({
     execute: async ({ writer }) => {
       const result = streamText({
-        model: anthropic("claude-sonnet-4-5-20250929"),
-        system: systemWithRag,
+        model: anthropic(activeModel),
+        system: systemWithContext,
         messages: await convertToModelMessages(messages),
-        tools: allTools,
-        stopWhen: stepCountIs(5),
+        tools: activeTools,
+        stopWhen: stepCountIs(ceoUser ? 10 : 5),
         onFinish: async ({ text, usage, steps }) => {
           // Persist assistant message
           try {
