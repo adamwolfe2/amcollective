@@ -15,6 +15,8 @@ import * as schema from "@/lib/db/schema";
 import { eq, desc, and, sql, count, gte, lte, asc } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
+import * as stripeConnector from "@/lib/connectors/stripe";
+import * as mercuryConnector from "@/lib/connectors/mercury";
 
 export async function GET() {
   const userId = await checkAdmin();
@@ -29,12 +31,11 @@ export async function GET() {
   const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
   const [
-    // Revenue
-    mrrResult,
-    activeSubsResult,
+    // Revenue (live from Stripe)
+    stripeData,
     failedPaymentsResult,
-    // Cash
-    mercuryAccounts,
+    // Cash (live from Mercury)
+    mercuryResult,
     // Clients
     totalClientsResult,
     // Invoices
@@ -49,18 +50,8 @@ export async function GET() {
     // Stale clients (no kanban card movement in 7+ days)
     staleClients,
   ] = await Promise.all([
-    // MRR from active subscriptions
-    db
-      .select({
-        total: sql<string>`COALESCE(SUM(${schema.subscriptions.amount}), 0)`,
-      })
-      .from(schema.subscriptions)
-      .where(eq(schema.subscriptions.status, "active")),
-    // Active subscriptions count
-    db
-      .select({ value: count() })
-      .from(schema.subscriptions)
-      .where(eq(schema.subscriptions.status, "active")),
+    // MRR + active subscriptions — live from Stripe
+    stripeConnector.getMRR(),
     // Failed payments in last 14 days
     db
       .select({ value: count() })
@@ -71,8 +62,8 @@ export async function GET() {
           gte(schema.payments.paymentDate, fourteenDaysAgo)
         )
       ),
-    // Mercury accounts
-    db.select().from(schema.mercuryAccounts),
+    // Mercury accounts — live from API
+    mercuryConnector.getAccounts(),
     // Total clients
     db.select({ value: count() }).from(schema.clients),
     // Overdue invoices
@@ -165,13 +156,12 @@ export async function GET() {
   ]);
 
   // Process Mercury
-  const totalCash = mercuryAccounts.reduce(
-    (s, a) => s + Number(a.balance),
-    0
-  );
+  const mercuryAccounts = mercuryResult.success ? (mercuryResult.data ?? []) : [];
+  const totalCash = mercuryAccounts.reduce((s, a) => s + a.currentBalance, 0);
 
   // Process MRR
-  const mrr = Number(mrrResult[0]?.total ?? 0);
+  const mrr = stripeData.success ? (stripeData.data?.mrr ?? 0) : 0;
+  const activeSubscriptionsCount = stripeData.success ? (stripeData.data?.activeSubscriptions ?? 0) : 0;
   const arr = mrr * 12;
 
   // Process overdue invoices
@@ -256,7 +246,7 @@ export async function GET() {
     mrr: mrr / 100,
     arr: arr / 100,
     mrrChange,
-    activeSubscriptions: activeSubsResult[0]?.value ?? 0,
+    activeSubscriptions: activeSubscriptionsCount,
     failedPayments: failedPaymentsResult[0]?.value ?? 0,
     totalCash,
     cashChange,

@@ -10,6 +10,8 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, and, sql, desc, gte, count, asc, isNull } from "drizzle-orm";
 import * as vercelConnector from "@/lib/connectors/vercel";
+import * as stripeConnector from "@/lib/connectors/stripe";
+import * as mercuryConnector from "@/lib/connectors/mercury";
 import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { AiChat } from "@/components/ai-chat";
 import { currentUser } from "@clerk/nextjs/server";
@@ -48,20 +50,10 @@ function formatCurrency(amount: number) {
 
 const getCachedMrr = unstable_cache(
   async () => {
-    const [result] = await db
-      .select({
-        total: sql<string>`COALESCE(SUM(${schema.subscriptions.amount}), 0)`,
-      })
-      .from(schema.subscriptions)
-      .where(eq(schema.subscriptions.status, "active"));
-    const [subsCount] = await db
-      .select({ value: count() })
-      .from(schema.subscriptions)
-      .where(eq(schema.subscriptions.status, "active"));
-    return {
-      mrr: Number(result?.total ?? 0) / 100,
-      activeSubs: subsCount?.value ?? 0,
-    };
+    const result = await stripeConnector.getMRR();
+    const mrr = result.success ? (result.data?.mrr ?? 0) : 0;
+    const activeSubs = result.success ? (result.data?.activeSubscriptions ?? 0) : 0;
+    return { mrr: mrr / 100, activeSubs };
   },
   ["dashboard-mrr"],
   { revalidate: 300 }
@@ -285,10 +277,10 @@ async function SprintWidget() {
 
 async function MetricsStrip() {
   try {
-    const [mrrData, mercuryAccounts, totalClientsResult, overdueResult, spendResult] =
+    const [mrrData, mercuryResult, totalClientsResult, overdueResult, spendResult] =
       await Promise.all([
         getCachedMrr(),
-        db.select().from(schema.mercuryAccounts),
+        mercuryConnector.getAccounts(),
         db.select({ value: count() }).from(schema.clients),
         db
           .select({
@@ -313,10 +305,8 @@ async function MetricsStrip() {
           ),
       ]);
 
-    const totalCash = mercuryAccounts.reduce(
-      (s, a) => s + Number(a.balance),
-      0
-    );
+    const accounts = mercuryResult.success ? (mercuryResult.data ?? []) : [];
+    const totalCash = accounts.reduce((s, a) => s + a.currentBalance, 0);
     const monthlySpend = Number(spendResult[0]?.totalSpend ?? 0) / 2;
     const runway = monthlySpend > 0 ? totalCash / monthlySpend : null;
     const overdueCount = overdueResult[0]?.cnt ?? 0;

@@ -3,6 +3,7 @@ import * as schema from "@/lib/db/schema";
 import { desc, eq, and, gte, lte, sql, count } from "drizzle-orm";
 import { format } from "date-fns";
 import * as stripeConnector from "@/lib/connectors/stripe";
+import * as mercuryConnector from "@/lib/connectors/mercury";
 import { CashFlowChart } from "./cash-flow-chart";
 import { TransactionFeed } from "./transaction-feed";
 import { MercurySyncButton } from "./sync-button";
@@ -10,13 +11,11 @@ import { MercurySyncButton } from "./sync-button";
 const PAGE_SIZE = 50;
 
 async function getMetrics() {
-  // Mercury accounts from DB
-  const accounts = await db
-    .select()
-    .from(schema.mercuryAccounts)
-    .orderBy(desc(schema.mercuryAccounts.createdAt));
+  // Mercury accounts — live from API
+  const accountsResult = await mercuryConnector.getAccounts();
+  const accounts = accountsResult.success ? (accountsResult.data ?? []) : [];
 
-  const totalCash = accounts.reduce((s, a) => s + Number(a.balance), 0);
+  const totalCash = accounts.reduce((s, a) => s + a.currentBalance, 0);
 
   // Stripe MRR
   const mrrResult = await stripeConnector.getMRR();
@@ -437,7 +436,7 @@ export default async function FinancePage({
                   </span>
                 </div>
                 <div className="font-mono text-xl font-bold">
-                  {Number(account.balance).toLocaleString("en-US", {
+                  {account.currentBalance.toLocaleString("en-US", {
                     style: "currency",
                     currency: "USD",
                   })}
@@ -445,16 +444,14 @@ export default async function FinancePage({
                 <div className="flex items-center justify-between mt-2">
                   <span className="font-mono text-xs text-[#0A0A0A]/40">
                     Available:{" "}
-                    {Number(account.availableBalance).toLocaleString("en-US", {
+                    {account.availableBalance.toLocaleString("en-US", {
                       style: "currency",
                       currency: "USD",
                     })}
                   </span>
-                  {account.lastSyncedAt && (
-                    <span className="font-mono text-[10px] text-[#0A0A0A]/30">
-                      Synced {format(account.lastSyncedAt, "MMM d, h:mm a")}
-                    </span>
-                  )}
+                  <span className="font-mono text-[10px] text-[#0A0A0A]/30">
+                    Live
+                  </span>
                 </div>
               </div>
             ))}

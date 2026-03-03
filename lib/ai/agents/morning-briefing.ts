@@ -11,6 +11,7 @@ import { getAnthropicClient, MODEL_HAIKU, trackAIUsage } from "../client";
 import { searchSimilar } from "../embeddings";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as vercelConnector from "@/lib/connectors/vercel";
+import * as mercuryConnector from "@/lib/connectors/mercury";
 import { getUnresolvedCount } from "@/lib/db/repositories/alerts";
 import { getRocks } from "@/lib/db/repositories/rocks";
 import { getUnreadCount } from "@/lib/db/repositories/messages";
@@ -187,13 +188,17 @@ export async function storeDailySnapshot(data: BriefingData): Promise<void> {
   // to prevent 0-value baseline corruption.
   const dataComplete = data.mrr > 0;
 
+  // Fetch Mercury cash (dollars → cents for DB storage)
+  const mercuryResult = await mercuryConnector.getTotalCash().catch(() => ({ success: false, data: null }));
+  const totalCash = mercuryResult.success ? Math.round((mercuryResult.data ?? 0) * 100) : 0;
+
   await db
     .insert(schema.dailyMetricsSnapshots)
     .values({
       date: today,
       mrr: data.mrr,
       arr: data.mrr * 12,
-      totalCash: 0, // Mercury not always connected
+      totalCash,
       activeClients: 0,
       activeProjects: 0,
       activeSubscriptions: 0,
@@ -206,6 +211,7 @@ export async function storeDailySnapshot(data: BriefingData): Promise<void> {
       set: {
         mrr: data.mrr,
         arr: data.mrr * 12,
+        totalCash,
         overdueInvoices: data.overdueInvoices,
         overdueAmount: data.overdueAmount,
         dataComplete,
