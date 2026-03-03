@@ -49,7 +49,7 @@ export default async function SprintsPage() {
   const sprints = await getSprints();
 
   return (
-    <div>
+    <div className="max-w-3xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>

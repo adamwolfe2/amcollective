@@ -153,7 +153,7 @@ export default async function SprintPage({
   if (!sprint) notFound();
 
   return (
-    <div>
+    <div className="max-w-3xl mx-auto">
       {/* Back nav */}
       <div className="flex items-center gap-4 mb-8">
         <Link
