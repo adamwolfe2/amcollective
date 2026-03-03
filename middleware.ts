@@ -37,6 +37,7 @@ const isPublicRoute = createRouteMatcher([
   "/",
   "/sign-in(.*)",
   "/sign-up(.*)",
+  "/api/health",        // monitoring endpoint — intentionally public
   "/api/webhooks(.*)",
   "/api/contact",
   "/contracts/sign/(.*)",
