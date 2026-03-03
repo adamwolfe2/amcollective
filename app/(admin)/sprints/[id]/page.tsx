@@ -114,6 +114,7 @@ async function getSprint(id: string): Promise<SprintData | null> {
   return {
     id: sprint.id,
     title: sprint.title,
+    weekOf: sprint.weekOf ?? null,
     weeklyFocus: sprint.weeklyFocus,
     topOfMind: sprint.topOfMind,
     shareToken: sprint.shareToken ?? null,
@@ -163,7 +164,7 @@ export default async function SprintPage({
           Sprints
         </Link>
         <span className="font-mono text-[10px] text-[#0A0A0A]/20">
-          Week of {format(sprint.id ? new Date() : new Date(), "MMM d, yyyy")}
+          Week of {format(sprint.weekOf ?? new Date(), "MMM d, yyyy")}
         </span>
       </div>
 

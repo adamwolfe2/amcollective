@@ -63,6 +63,7 @@ export type SprintSection = {
 export type SprintData = {
   id: string;
   title: string;
+  weekOf: Date | null;
   weeklyFocus: string | null;
   topOfMind: string | null;
   shareToken: string | null;
@@ -113,17 +114,27 @@ function InlineEdit({
   }
 
   if (editing) {
-    const Tag = multiline ? "textarea" : "input";
+    const sharedProps = {
+      value: draft,
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setDraft(e.target.value),
+      onBlur: commit,
+      onKeyDown: handleKey,
+      className: `${className} bg-transparent border-b border-[#0A0A0A]/30 focus:outline-none w-full resize-none`,
+      placeholder,
+    };
+    if (multiline) {
+      return (
+        <textarea
+          ref={ref as React.RefObject<HTMLTextAreaElement>}
+          {...sharedProps}
+          rows={3}
+        />
+      );
+    }
     return (
-      <Tag
-        ref={ref as any}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        onKeyDown={handleKey}
-        className={`${className} bg-transparent border-b border-[#0A0A0A]/30 focus:outline-none w-full resize-none`}
-        placeholder={placeholder}
-        rows={multiline ? 3 : undefined}
+      <input
+        ref={ref as React.RefObject<HTMLInputElement>}
+        {...sharedProps}
       />
     );
   }

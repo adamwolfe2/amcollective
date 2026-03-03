@@ -96,7 +96,7 @@ export default async function IntegrationsPage() {
   ).length;
 
   // Fetch latest sync runs per service
-  let syncByService: Record<
+  const syncByService: Record<
     string,
     {
       status: string;

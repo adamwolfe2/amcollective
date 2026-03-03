@@ -91,61 +91,62 @@ const getCachedStaleClients = unstable_cache(
 
 // ─── Sprint Widget ───────────────────────────────────────────────────────────
 
-async function getCurrentSprint() {
-  const sprints = await db
-    .select()
-    .from(schema.weeklySprints)
-    .orderBy(desc(schema.weeklySprints.weekOf))
-    .limit(1);
+const getCachedCurrentSprint = unstable_cache(
+  async () => {
+    const sprints = await db
+      .select()
+      .from(schema.weeklySprints)
+      .orderBy(desc(schema.weeklySprints.weekOf))
+      .limit(1);
 
-  if (!sprints.length) return null;
-  const sprint = sprints[0];
+    if (!sprints.length) return null;
+    const sprint = sprints[0];
 
-  const sections = await db
-    .select()
-    .from(schema.sprintSections)
-    .where(eq(schema.sprintSections.sprintId, sprint.id))
-    .orderBy(asc(schema.sprintSections.sortOrder));
+    const sections = await db
+      .select()
+      .from(schema.sprintSections)
+      .where(eq(schema.sprintSections.sprintId, sprint.id))
+      .orderBy(asc(schema.sprintSections.sortOrder));
 
-  const tasks = await db
-    .select({
-      id: schema.tasks.id,
-      sectionId: schema.taskSprintAssignments.sectionId,
-      isCompleted: sql<boolean>`(${schema.tasks.status} = 'done')`,
-      sortOrder: schema.taskSprintAssignments.sortOrder,
-    })
-    .from(schema.taskSprintAssignments)
-    .innerJoin(schema.tasks, eq(schema.taskSprintAssignments.taskId, schema.tasks.id))
-    .where(
-      and(
-        eq(schema.taskSprintAssignments.sprintId, sprint.id),
-        isNull(schema.taskSprintAssignments.removedAt)
+    const tasks = await db
+      .select({
+        id: schema.tasks.id,
+        sectionId: schema.taskSprintAssignments.sectionId,
+        isCompleted: sql<boolean>`(${schema.tasks.status} = 'done')`,
+        sortOrder: schema.taskSprintAssignments.sortOrder,
+      })
+      .from(schema.taskSprintAssignments)
+      .innerJoin(schema.tasks, eq(schema.taskSprintAssignments.taskId, schema.tasks.id))
+      .where(
+        and(
+          eq(schema.taskSprintAssignments.sprintId, sprint.id),
+          isNull(schema.taskSprintAssignments.removedAt)
+        )
       )
-    )
-    .orderBy(asc(schema.taskSprintAssignments.sortOrder));
+      .orderBy(asc(schema.taskSprintAssignments.sortOrder));
 
-  const tasksBySectionId = new Map<
-    string,
-    { total: number; done: number }
-  >();
-  for (const task of tasks) {
-    const key = task.sectionId ?? "__none__";
-    const curr = tasksBySectionId.get(key) ?? { total: 0, done: 0 };
-    tasksBySectionId.set(key, {
-      total: curr.total + 1,
-      done: curr.done + (task.isCompleted ? 1 : 0),
-    });
-  }
+    const tasksBySectionId: Record<string, { total: number; done: number }> = {};
+    for (const task of tasks) {
+      const key = task.sectionId ?? "__none__";
+      const curr = tasksBySectionId[key] ?? { total: 0, done: 0 };
+      tasksBySectionId[key] = {
+        total: curr.total + 1,
+        done: curr.done + (task.isCompleted ? 1 : 0),
+      };
+    }
 
-  const totalTasks = tasks.length;
-  const doneTasks = tasks.filter((t) => t.isCompleted).length;
+    const totalTasks = tasks.length;
+    const doneTasks = tasks.filter((t) => t.isCompleted).length;
 
-  return { sprint, sections, tasksBySectionId, totalTasks, doneTasks };
-}
+    return { sprint, sections, tasksBySectionId, totalTasks, doneTasks };
+  },
+  ["dashboard-current-sprint"],
+  { revalidate: 60 }
+);
 
 async function SprintWidget() {
   try {
-    const data = await getCurrentSprint();
+    const data = await getCachedCurrentSprint();
     if (!data) {
       return (
         <div>
@@ -222,7 +223,7 @@ async function SprintWidget() {
           {/* Section list */}
           <div className="divide-y divide-[#0A0A0A]/5">
             {sections.slice(0, 6).map((section) => {
-              const counts = tasksBySectionId.get(section.id) ?? {
+              const counts = tasksBySectionId[section.id] ?? {
                 total: 0,
                 done: 0,
               };
