@@ -30,3 +30,7 @@ export { syncProjectMetrics } from "./sync-project-metrics";
 export { sprintSnapshot } from "./sprint-snapshot";
 export { handleComposioTrigger, handleComposioExpired } from "./handle-composio-trigger";
 export { syncStripeCosts } from "./sync-stripe-costs";
+export { eodWrap } from "./eod-wrap";
+export { sprintPrep } from "./sprint-prep";
+export { alertTriage } from "./alert-triage";
+export { backfillEmbeddings } from "./backfill-embeddings";

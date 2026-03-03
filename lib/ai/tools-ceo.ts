@@ -10,9 +10,10 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { readMemory, writeMemory, listMemory, searchMemory } from "./memory";
 import { sendMessage as blooSendMessage } from "@/lib/integrations/blooio";
+import { setMemory, getAllMemory } from "@/lib/db/repositories/bot-memory";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, ilike, or } from "drizzle-orm";
 import { sql, count } from "drizzle-orm";
 
 // ─── Tool Definitions ────────────────────────────────────────────────────────
@@ -84,6 +85,38 @@ export const CEO_TOOL_DEFINITIONS: Anthropic.Tool[] = [
         limit: { type: "number", description: "Max results (default 5)" },
       },
       required: ["query"],
+    },
+  },
+  {
+    name: "write_bot_memory",
+    description:
+      "Write or update a persistent structured fact in bot_memory — injected into EVERY future prompt. Use for short, stable facts that should always be available: preferences, baselines, decisions, project status, recurring patterns. NOT for session-specific context or data that changes daily.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        key: {
+          type: "string",
+          description: "Short snake_case key, e.g. 'tbgc_build_issue', 'adam_sprint_preference', 'cursive_mrr_baseline'",
+        },
+        value: {
+          type: "string",
+          description: "The fact to remember. Be specific and include dates when relevant.",
+        },
+        category: {
+          type: "string",
+          description: "Category for grouping: 'operations', 'finance', 'people', 'preferences', 'portfolio', 'general'",
+        },
+      },
+      required: ["key", "value"],
+    },
+  },
+  {
+    name: "read_bot_memory",
+    description: "Read all persistent bot_memory facts. Use to review what structured facts are currently stored.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
     },
   },
   {
@@ -189,6 +222,154 @@ export const CEO_TOOL_DEFINITIONS: Anthropic.Tool[] = [
       required: ["sprintId", "note"],
     },
   },
+  {
+    name: "update_task_status",
+    description:
+      "Update the status of a task by title (fuzzy match) or by ID. Use when Adam says a task is done, blocked, or in progress.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        taskTitle: {
+          type: "string",
+          description: "Partial title to search for (case-insensitive). Ignored if taskId is provided.",
+        },
+        taskId: { type: "string", description: "Exact task UUID (use if you have it)" },
+        status: {
+          type: "string",
+          enum: ["backlog", "todo", "in_progress", "in_review", "done", "cancelled"],
+          description: "New status",
+        },
+      },
+      required: ["status"],
+    },
+  },
+  {
+    name: "update_rock_status",
+    description:
+      "Update the status of a quarterly rock (goal) by title or ID. Use when Adam says a rock is on track, at risk, or complete.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        rockTitle: {
+          type: "string",
+          description: "Partial rock title to search for (case-insensitive). Ignored if rockId is provided.",
+        },
+        rockId: { type: "string", description: "Exact rock UUID (use if you have it)" },
+        status: {
+          type: "string",
+          enum: ["on_track", "at_risk", "off_track"],
+          description: "New status",
+        },
+      },
+      required: ["status"],
+    },
+  },
+  {
+    name: "update_lead",
+    description:
+      "Move a lead to a new pipeline stage and/or schedule the next follow-up. Use when Adam says a lead moved forward or needs a follow-up.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        leadId: { type: "string", description: "Exact lead UUID (use if you have it)" },
+        companyName: {
+          type: "string",
+          description: "Company name to search for (case-insensitive). Ignored if leadId provided.",
+        },
+        stage: {
+          type: "string",
+          enum: ["awareness", "interest", "consideration", "intent", "closed_won", "closed_lost", "nurture"],
+          description: "New pipeline stage",
+        },
+        nextFollowUpDays: {
+          type: "number",
+          description: "Set next follow-up N days from now (e.g. 3 = 3 days)",
+        },
+        notes: {
+          type: "string",
+          description: "Optional note to append to the lead's notes field",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "add_meeting_note",
+    description:
+      "Append a quick note to a meeting record by meeting title or client name. Use when Adam wants to capture something from a call.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        meetingTitle: {
+          type: "string",
+          description: "Partial meeting title to search for",
+        },
+        note: { type: "string", description: "Note content to append" },
+      },
+      required: ["note"],
+    },
+  },
+  {
+    name: "create_rock",
+    description:
+      "Create a new quarterly rock (90-day goal). Use when Adam sets a new quarterly objective. Quarter format: 'Q1 2026', 'Q2 2026', etc.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        title: { type: "string", description: "Rock title / goal statement" },
+        description: { type: "string", description: "Optional detail on what success looks like" },
+        quarter: { type: "string", description: "Quarter string, e.g. 'Q2 2026'. Default to current quarter if not specified." },
+        projectName: { type: "string", description: "Optional portfolio project name to link (TBGC, Trackr, Cursive, TaskSpace, Wholesail, Hook)" },
+        dueDateDays: { type: "number", description: "Days from now for the due date (default: end of quarter)" },
+      },
+      required: ["title"],
+    },
+  },
+  {
+    name: "search_leads",
+    description:
+      "Search and list CRM leads by stage, company name, or contact name. Use to answer questions like 'who are our hot leads?' or 'what's the pipeline look like?'",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        stage: {
+          type: "string",
+          enum: ["awareness", "interest", "consideration", "intent", "closed_won", "closed_lost", "nurture"],
+          description: "Filter by pipeline stage",
+        },
+        search: { type: "string", description: "Search by company or contact name" },
+        limit: { type: "number", description: "Max results (default 10)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "close_sprint",
+    description:
+      "Mark the current sprint as complete and take a snapshot for velocity tracking. Call this at end of week before creating a new sprint. This enables Phase 3 sprint velocity intelligence.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        sprintId: { type: "string", description: "Sprint ID to close. If not provided, closes the most recent sprint." },
+        retrospective: { type: "string", description: "Optional brief retro note to store on the sprint" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "create_sprint",
+    description:
+      "Create a new weekly sprint. Call after closing the previous one. Focus should be 1 sentence max — what is this week actually about?",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        title: { type: "string", description: "Sprint title, e.g. '3/10 Week Sprint'" },
+        weeklyFocus: { type: "string", description: "1-sentence focus for the week" },
+        weekOf: { type: "string", description: "Monday's date in YYYY-MM-DD format" },
+      },
+      required: ["title"],
+    },
+  },
 ];
 
 // ─── Tool Executor ────────────────────────────────────────────────────────────
@@ -225,6 +406,21 @@ export async function executeCeoTool(
           (input.limit as number) || 5
         );
         return JSON.stringify({ results });
+      }
+
+      case "write_bot_memory": {
+        await setMemory(
+          input.key as string,
+          input.value as string,
+          (input.category as string) || "general",
+          "ai"
+        );
+        return JSON.stringify({ success: true, key: input.key });
+      }
+
+      case "read_bot_memory": {
+        const rows = await getAllMemory();
+        return JSON.stringify({ count: rows.length, memory: rows });
       }
 
       case "send_to_slack": {
@@ -466,6 +662,295 @@ export async function executeCeoTool(
           .where(eq(schema.weeklySprints.id, input.sprintId as string));
 
         return JSON.stringify({ updated: true, sprintId: input.sprintId });
+      }
+
+      case "update_task_status": {
+        let task;
+        if (input.taskId) {
+          const [row] = await db
+            .select({ id: schema.tasks.id, title: schema.tasks.title })
+            .from(schema.tasks)
+            .where(eq(schema.tasks.id, input.taskId as string))
+            .limit(1);
+          task = row;
+        } else if (input.taskTitle) {
+          const [row] = await db
+            .select({ id: schema.tasks.id, title: schema.tasks.title })
+            .from(schema.tasks)
+            .where(ilike(schema.tasks.title, `%${input.taskTitle}%`))
+            .orderBy(desc(schema.tasks.updatedAt))
+            .limit(1);
+          task = row;
+        }
+        if (!task) return JSON.stringify({ error: "Task not found. Try a different title." });
+        await db
+          .update(schema.tasks)
+          .set({ status: input.status as "backlog" | "todo" | "in_progress" | "in_review" | "done" | "cancelled" })
+          .where(eq(schema.tasks.id, task.id));
+        return JSON.stringify({ updated: true, taskId: task.id, title: task.title, newStatus: input.status });
+      }
+
+      case "update_rock_status": {
+        let rock;
+        if (input.rockId) {
+          const [row] = await db
+            .select({ id: schema.rocks.id, title: schema.rocks.title })
+            .from(schema.rocks)
+            .where(eq(schema.rocks.id, input.rockId as string))
+            .limit(1);
+          rock = row;
+        } else if (input.rockTitle) {
+          const [row] = await db
+            .select({ id: schema.rocks.id, title: schema.rocks.title })
+            .from(schema.rocks)
+            .where(ilike(schema.rocks.title, `%${input.rockTitle}%`))
+            .orderBy(desc(schema.rocks.updatedAt))
+            .limit(1);
+          rock = row;
+        }
+        if (!rock) return JSON.stringify({ error: "Rock not found. Try a different title." });
+        await db
+          .update(schema.rocks)
+          .set({ status: input.status as "on_track" | "at_risk" | "off_track" })
+          .where(eq(schema.rocks.id, rock.id));
+        return JSON.stringify({ updated: true, rockId: rock.id, title: rock.title, newStatus: input.status });
+      }
+
+      case "update_lead": {
+        let lead;
+        if (input.leadId) {
+          const [row] = await db
+            .select({ id: schema.leads.id, contactName: schema.leads.contactName, companyName: schema.leads.companyName, notes: schema.leads.notes })
+            .from(schema.leads)
+            .where(eq(schema.leads.id, input.leadId as string))
+            .limit(1);
+          lead = row;
+        } else if (input.companyName) {
+          const [row] = await db
+            .select({ id: schema.leads.id, contactName: schema.leads.contactName, companyName: schema.leads.companyName, notes: schema.leads.notes })
+            .from(schema.leads)
+            .where(
+              or(
+                ilike(schema.leads.companyName, `%${input.companyName}%`),
+                ilike(schema.leads.contactName, `%${input.companyName}%`)
+              )
+            )
+            .orderBy(desc(schema.leads.updatedAt))
+            .limit(1);
+          lead = row;
+        }
+        if (!lead) return JSON.stringify({ error: "Lead not found." });
+
+        const updates: Record<string, unknown> = {};
+        if (input.stage) updates.stage = input.stage;
+        if (input.nextFollowUpDays) {
+          const d = new Date();
+          d.setDate(d.getDate() + (input.nextFollowUpDays as number));
+          updates.nextFollowUpAt = d;
+        }
+        if (input.notes) {
+          const existing = lead.notes as string | null;
+          const ts = new Date().toISOString().split("T")[0];
+          updates.notes = existing ? `${existing}\n[${ts}] ${input.notes}` : `[${ts}] ${input.notes}`;
+        }
+
+        if (Object.keys(updates).length === 0) return JSON.stringify({ error: "Nothing to update — provide stage, nextFollowUpDays, or notes." });
+
+        await db.update(schema.leads).set(updates).where(eq(schema.leads.id, lead.id));
+        return JSON.stringify({ updated: true, leadId: lead.id, contact: lead.contactName, company: lead.companyName, changes: Object.keys(updates) });
+      }
+
+      case "add_meeting_note": {
+        const [meeting] = await db
+          .select({ id: schema.meetings.id, title: schema.meetings.title, notes: schema.meetings.notes })
+          .from(schema.meetings)
+          .where(
+            input.meetingTitle
+              ? ilike(schema.meetings.title, `%${input.meetingTitle}%`)
+              : undefined
+          )
+          .orderBy(desc(schema.meetings.scheduledAt))
+          .limit(1);
+        if (!meeting) return JSON.stringify({ error: "Meeting not found." });
+
+        const existing = meeting.notes as string | null;
+        const ts = new Date().toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+        const newNotes = existing ? `${existing}\n\n[${ts}] ${input.note}` : `[${ts}] ${input.note}`;
+        await db.update(schema.meetings).set({ notes: newNotes }).where(eq(schema.meetings.id, meeting.id));
+        return JSON.stringify({ updated: true, meetingId: meeting.id, title: meeting.title });
+      }
+
+      case "create_rock": {
+        // Determine quarter: current if not specified
+        const now = new Date();
+        const qNum = Math.ceil((now.getMonth() + 1) / 3);
+        const defaultQuarter = `Q${qNum} ${now.getFullYear()}`;
+
+        // Resolve project ID from name if provided
+        let projectId: string | null = null;
+        if (input.projectName) {
+          const [proj] = await db
+            .select({ id: schema.portfolioProjects.id })
+            .from(schema.portfolioProjects)
+            .where(ilike(schema.portfolioProjects.name, `%${input.projectName}%`))
+            .limit(1);
+          projectId = proj?.id ?? null;
+        }
+
+        // Compute due date
+        let dueDate: Date | null = null;
+        if (input.dueDateDays) {
+          dueDate = new Date();
+          dueDate.setDate(dueDate.getDate() + (input.dueDateDays as number));
+        } else {
+          // Default: end of specified quarter
+          const qStr = (input.quarter as string) || defaultQuarter;
+          const qMatch = qStr.match(/Q(\d)\s+(\d{4})/);
+          if (qMatch) {
+            const q = parseInt(qMatch[1]);
+            const y = parseInt(qMatch[2]);
+            dueDate = new Date(y, q * 3, 0); // last day of quarter
+          }
+        }
+
+        const [rock] = await db
+          .insert(schema.rocks)
+          .values({
+            title: input.title as string,
+            description: (input.description as string) ?? null,
+            quarter: (input.quarter as string) || defaultQuarter,
+            projectId,
+            status: "on_track",
+            dueDate,
+          })
+          .returning();
+
+        return JSON.stringify({ created: true, rockId: rock.id, title: rock.title, quarter: rock.quarter });
+      }
+
+      case "search_leads": {
+        const conditions = [eq(schema.leads.isArchived, false)];
+        if (input.stage) {
+          conditions.push(eq(schema.leads.stage, input.stage as "awareness" | "interest" | "consideration" | "intent" | "closed_won" | "closed_lost" | "nurture"));
+        }
+
+        const baseQuery = db
+          .select({
+            id: schema.leads.id,
+            contactName: schema.leads.contactName,
+            companyName: schema.leads.companyName,
+            stage: schema.leads.stage,
+            nextFollowUpAt: schema.leads.nextFollowUpAt,
+          })
+          .from(schema.leads)
+          .where(and(...conditions))
+          .orderBy(desc(schema.leads.updatedAt))
+          .limit((input.limit as number) || 10);
+
+        const leads = input.search
+          ? await db
+              .select({
+                id: schema.leads.id,
+                contactName: schema.leads.contactName,
+                companyName: schema.leads.companyName,
+                stage: schema.leads.stage,
+                nextFollowUpAt: schema.leads.nextFollowUpAt,
+              })
+              .from(schema.leads)
+              .where(
+                and(
+                  eq(schema.leads.isArchived, false),
+                  or(
+                    ilike(schema.leads.companyName, `%${input.search}%`),
+                    ilike(schema.leads.contactName, `%${input.search}%`)
+                  )
+                )
+              )
+              .orderBy(desc(schema.leads.updatedAt))
+              .limit((input.limit as number) || 10)
+          : await baseQuery;
+
+        return JSON.stringify({ count: leads.length, leads });
+      }
+
+      case "close_sprint": {
+        // Find the sprint to close
+        const [sprint] = input.sprintId
+          ? await db.select().from(schema.weeklySprints).where(eq(schema.weeklySprints.id, input.sprintId as string)).limit(1)
+          : await db.select().from(schema.weeklySprints).orderBy(desc(schema.weeklySprints.weekOf)).limit(1);
+
+        if (!sprint) return JSON.stringify({ error: "No sprint found to close." });
+
+        // Get task stats for this sprint
+        const assignedTasks = await db
+          .select({ taskId: schema.taskSprintAssignments.taskId })
+          .from(schema.taskSprintAssignments)
+          .where(eq(schema.taskSprintAssignments.sprintId, sprint.id));
+
+        let doneCount = 0;
+        if (assignedTasks.length > 0) {
+          const taskIds = assignedTasks.map((t) => t.taskId);
+          const doneTasks = await db
+            .select({ id: schema.tasks.id })
+            .from(schema.tasks)
+            .where(and(eq(schema.tasks.status, "done"), sql`${schema.tasks.id} = ANY(ARRAY[${sql.raw(taskIds.map(id => `'${id}'::uuid`).join(","))}])`));
+          doneCount = doneTasks.length;
+        }
+
+        // Store retrospective note if provided
+        if (input.retrospective) {
+          const ts = new Date().toLocaleString("en-US", { month: "short", day: "numeric" });
+          const existingNote = sprint.topOfMind as string | null;
+          const newNote = existingNote
+            ? `${existingNote}\n\n[Retro ${ts}] ${input.retrospective}`
+            : `[Retro ${ts}] ${input.retrospective}`;
+          await db.update(schema.weeklySprints).set({ topOfMind: newNote }).where(eq(schema.weeklySprints.id, sprint.id));
+        }
+
+        // Write sprint snapshot for velocity tracking
+        const completionRate = assignedTasks.length > 0 ? Math.round((doneCount / assignedTasks.length) * 100) : 0;
+        await db.insert(schema.sprintSnapshots).values({
+          sprintId: sprint.id,
+          totalTasks: assignedTasks.length,
+          completedTasks: doneCount,
+          completionRate,
+          velocityLabel: completionRate >= 80 ? "high" : completionRate >= 50 ? "medium" : "low",
+        }).onConflictDoNothing();
+
+        return JSON.stringify({
+          closed: true,
+          sprintId: sprint.id,
+          title: sprint.title,
+          totalTasks: assignedTasks.length,
+          completedTasks: doneCount,
+          completionRate: assignedTasks.length > 0 ? `${Math.round((doneCount / assignedTasks.length) * 100)}%` : "no tasks tracked",
+        });
+      }
+
+      case "create_sprint": {
+        // Determine week_of: next Monday if not provided
+        const weekOfStr = input.weekOf as string | undefined;
+        let weekOf: Date;
+        if (weekOfStr) {
+          weekOf = new Date(weekOfStr + "T12:00:00Z");
+        } else {
+          weekOf = new Date();
+          const day = weekOf.getDay();
+          const daysToMonday = day === 0 ? 1 : 8 - day;
+          weekOf.setDate(weekOf.getDate() + daysToMonday);
+          weekOf.setHours(12, 0, 0, 0);
+        }
+
+        const [sprint] = await db
+          .insert(schema.weeklySprints)
+          .values({
+            title: input.title as string,
+            weeklyFocus: (input.weeklyFocus as string) ?? null,
+            weekOf,
+          })
+          .returning();
+
+        return JSON.stringify({ created: true, sprintId: sprint.id, title: sprint.title, weekOf: sprint.weekOf });
       }
 
       default:

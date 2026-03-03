@@ -13,6 +13,7 @@ import {
   jsonb,
   timestamp,
   uniqueIndex,
+  boolean,
 } from "drizzle-orm/pg-core";
 
 export const dailyMetricsSnapshots = pgTable(
@@ -29,6 +30,9 @@ export const dailyMetricsSnapshots = pgTable(
     overdueInvoices: integer("overdue_invoices").notNull().default(0),
     overdueAmount: integer("overdue_amount").notNull().default(0), // cents
     metadata: jsonb("metadata"),
+    // Phase 3 guard: only true when all key metrics are real (Stripe connected, etc.)
+    // Anomaly detection MUST only query rows where data_complete = true.
+    dataComplete: boolean("data_complete").notNull().default(false),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [

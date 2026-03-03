@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc, and, count } from "drizzle-orm";
 import { createAuditLog } from "./audit";
+import { inngest } from "@/lib/inngest/client";
 
 export async function getAlerts(filters?: {
   severity?: string;
@@ -68,6 +69,23 @@ export async function createAlert(data: {
     })
     .returning();
 
+  // Fire event for warning/critical so alert-triage job can DM Adam immediately
+  if (data.severity === "warning" || data.severity === "critical") {
+    inngest
+      .send({
+        name: "alert/created",
+        data: {
+          alertId: alert.id,
+          type: data.type,
+          severity: data.severity,
+          title: data.title,
+          message: data.message ?? null,
+          projectId: data.projectId ?? null,
+        },
+      })
+      .catch(() => {});
+  }
+
   return alert;
 }
 
@@ -93,6 +111,17 @@ export async function resolveAlert(id: string, actorId: string) {
   }
 
   return alert ?? null;
+}
+
+/**
+ * Snooze an alert — suppresses re-DM until the given time.
+ * Prevents alert fatigue when an issue is acknowledged but not yet resolved.
+ */
+export async function snoozeAlert(id: string, until: Date) {
+  await db
+    .update(schema.alerts)
+    .set({ snoozedUntil: until })
+    .where(eq(schema.alerts.id, id));
 }
 
 export async function getUnresolvedCount() {

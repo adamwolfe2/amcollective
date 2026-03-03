@@ -185,6 +185,8 @@ export const alerts = pgTable(
     isResolved: boolean("is_resolved").default(false).notNull(),
     resolvedAt: timestamp("resolved_at", { mode: "date" }),
     resolvedBy: varchar("resolved_by", { length: 255 }),
+    // Snooze: if set, alert-triage skips re-DMing until this time passes
+    snoozedUntil: timestamp("snoozed_until", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
   },
   (table) => [

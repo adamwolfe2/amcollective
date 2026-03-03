@@ -38,6 +38,10 @@ import {
   handleComposioTrigger,
   handleComposioExpired,
   syncStripeCosts,
+  eodWrap,
+  sprintPrep,
+  alertTriage,
+  backfillEmbeddings,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -73,5 +77,9 @@ export const { GET, POST, PUT } = serve({
     handleComposioTrigger,
     handleComposioExpired,
     syncStripeCosts,
+    eodWrap,
+    sprintPrep,
+    alertTriage,
+    backfillEmbeddings,
   ],
 });
