@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createSprint } from "@/lib/actions/sprints";
 import { Plus, ChevronRight } from "lucide-react";
 import { SprintDeleteButton } from "./sprint-delete-button";
+import { SprintCalendar } from "./sprint-calendar";
 import { format, isThisWeek } from "date-fns";
 
 async function getSprints() {
@@ -45,8 +46,14 @@ async function getSprints() {
   });
 }
 
-export default async function SprintsPage() {
+export default async function SprintsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
+  const { view } = await searchParams;
   const sprints = await getSprints();
+  const isCalendarView = view === "calendar";
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -60,15 +67,41 @@ export default async function SprintsPage() {
             Weekly operating plan
           </p>
         </div>
-        <form action={createSprint}>
-          <button
-            type="submit"
-            className="flex items-center gap-1.5 px-4 py-2 bg-[#0A0A0A] text-white font-mono text-xs hover:bg-[#0A0A0A]/80 transition-colors"
-          >
-            <Plus size={13} />
-            New Sprint
-          </button>
-        </form>
+        <div className="flex items-center gap-2">
+          {/* View toggle */}
+          <div className="flex border border-[#0A0A0A]/10">
+            <Link
+              href="/sprints"
+              className={`px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+                !isCalendarView
+                  ? "bg-[#0A0A0A] text-white"
+                  : "text-[#0A0A0A]/50 hover:text-[#0A0A0A]"
+              }`}
+            >
+              List
+            </Link>
+            <Link
+              href="/sprints?view=calendar"
+              className={`px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-colors ${
+                isCalendarView
+                  ? "bg-[#0A0A0A] text-white"
+                  : "text-[#0A0A0A]/50 hover:text-[#0A0A0A]"
+              }`}
+            >
+              Calendar
+            </Link>
+          </div>
+
+          <form action={createSprint}>
+            <button
+              type="submit"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#0A0A0A] text-white font-mono text-xs hover:bg-[#0A0A0A]/80 transition-colors"
+            >
+              <Plus size={13} />
+              New Sprint
+            </button>
+          </form>
+        </div>
       </div>
 
       {sprints.length === 0 ? (
@@ -88,6 +121,8 @@ export default async function SprintsPage() {
             </button>
           </form>
         </div>
+      ) : isCalendarView ? (
+        <SprintCalendar sprints={sprints} />
       ) : (
         <div className="space-y-2">
           {sprints.map((sprint) => {

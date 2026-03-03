@@ -20,6 +20,7 @@ import { allTools } from "@/lib/ai/tools-sdk";
 import { searchSimilar } from "@/lib/ai/embeddings";
 import { runResearch } from "@/lib/ai/agents/research";
 import { getConversations, getConversationMessages } from "@/lib/ai/agents/chat";
+import { runCeoAgent, resolveUser } from "@/lib/ai/agents/ceo-agent";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -100,6 +101,47 @@ export async function POST(req: NextRequest) {
       { error: "Messages array required" },
       { status: 400 }
     );
+  }
+
+  // CEO Agent mode — for Adam and Maggie, use the full CEO agent (non-streaming wrapper)
+  const ceoUser = resolveUser(userId);
+  if (ceoUser && action !== "research") {
+    const latestText = getTextFromMessage(messages[messages.length - 1]);
+    if (!latestText) {
+      return NextResponse.json({ error: "Message required" }, { status: 400 });
+    }
+
+    // Get existing conversation ID from headers or body
+    const convId = conversationId || req.headers.get("x-conversation-id") || undefined;
+
+    const result = await runCeoAgent({
+      userId: ceoUser.id,
+      userRole: ceoUser.role,
+      userFocus: ceoUser.focus,
+      userName: ceoUser.name,
+      message: latestText,
+      conversationId: convId,
+    }).catch((err) => {
+      captureError(err, { tags: { route: "POST /api/ai/chat", mode: "ceo" } });
+      return { response: "I encountered an error. Please try again.", conversationId: convId ?? "none" };
+    });
+
+    // Wrap in streaming format compatible with useChat
+    const stream = createUIMessageStream({
+      execute: async ({ writer }) => {
+        const textResult = streamText({
+          model: anthropic("claude-haiku-4-5-20251001"),
+          prompt: result.response,
+          system: "Output the input text verbatim, unchanged.",
+        });
+        writer.merge(textResult.toUIMessageStream());
+      },
+    });
+
+    return createUIMessageStreamResponse({
+      stream,
+      headers: { "X-Conversation-Id": result.conversationId },
+    });
   }
 
   // Research mode — uses Tavily + Claude synthesis (non-streaming)
