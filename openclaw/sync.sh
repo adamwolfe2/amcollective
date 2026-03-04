@@ -11,7 +11,8 @@ echo "Syncing OpenClaw workspace..."
 
 mkdir -p "$WORKSPACE/skills"
 
-cp openclaw/openclaw.json ~/.openclaw/openclaw.json
+# Note: openclaw.json is NOT copied here — it contains real secrets and lives
+# only in ~/.openclaw/. Edit it directly there. The repo copy is a template.
 cp openclaw/AGENTS.md    "$WORKSPACE/AGENTS.md"
 cp openclaw/SOUL.md      "$WORKSPACE/SOUL.md"
 cp openclaw/HEARTBEAT.md "$WORKSPACE/HEARTBEAT.md"
