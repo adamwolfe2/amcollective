@@ -393,6 +393,24 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
       required: ["to", "subject", "body"],
     },
   },
+  {
+    name: "get_taskspace_data",
+    description: "Query TaskSpace (the team EOS platform) for EOD reports, team members, tasks, and rocks across all workspaces. Use this to get end-of-day reports, check team task status, see who submitted EODs, and monitor rocks/goals per org.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        query: {
+          type: "string",
+          enum: ["eod_reports", "team_members", "tasks", "rocks", "org_summary"],
+          description: "What to fetch: eod_reports (today's check-ins), team_members (all users per org), tasks (active/completed tasks), rocks (quarterly goals), org_summary (high-level snapshot of all orgs)",
+        },
+        org_slug: { type: "string", description: "Filter to a specific org slug (optional — omit for all orgs)" },
+        date: { type: "string", description: "Date filter for EOD reports in YYYY-MM-DD format (defaults to today)" },
+        limit: { type: "number", description: "Max results to return (default 20)" },
+      },
+      required: ["query"],
+    },
+  },
   ...VERCEL_TOOL_DEFINITIONS,
   ...POSTHOG_TOOL_DEFINITIONS,
   ...MERCURY_TOOL_DEFINITIONS,
@@ -1046,6 +1064,93 @@ export async function executeTool(
           return executeLinearTool(name, input);
         }
         return JSON.stringify({ error: `Unknown tool: ${name}` });
+      }
+
+      case "get_taskspace_data": {
+        const tsUrl = process.env.TASKSPACE_DATABASE_URL;
+        if (!tsUrl) return JSON.stringify({ error: "TASKSPACE_DATABASE_URL not configured" });
+        const { neon: tsNeon } = await import("@neondatabase/serverless");
+        const tsSql = tsNeon(tsUrl);
+        const tsQuery = input.query as string;
+        const tsOrgSlug = input.org_slug as string | undefined;
+        const tsLimit = (input.limit as number) || 20;
+        const tsDate = (input.date as string) || new Date().toISOString().split("T")[0];
+
+        if (tsQuery === "org_summary") {
+          const { getSnapshot } = await import("@/lib/connectors/taskspace");
+          const snap = await getSnapshot();
+          if (!snap.success) return JSON.stringify({ error: snap.error });
+          return JSON.stringify(snap.data);
+        }
+
+        if (tsQuery === "eod_reports") {
+          const rows = await tsSql(
+            `SELECT er.id, er.date, er.summary, er.wins, er.blockers, er.mood, er.energy_level,
+                    er.needs_escalation, er.created_at,
+                    u.name as user_name, u.email as user_email,
+                    o.name as org_name, o.slug as org_slug
+             FROM eod_reports er
+             JOIN users u ON er.user_id = u.id
+             JOIN organizations o ON er.organization_id = o.id
+             WHERE er.date = $1
+             ${tsOrgSlug ? "AND o.slug = $2" : ""}
+             ORDER BY er.created_at DESC
+             LIMIT $${tsOrgSlug ? 3 : 2}`,
+            tsOrgSlug ? [tsDate, tsOrgSlug, tsLimit] : [tsDate, tsLimit]
+          );
+          return JSON.stringify({ date: tsDate, reports: rows, count: rows.length });
+        }
+
+        if (tsQuery === "team_members") {
+          const rows = await tsSql(
+            `SELECT u.id, u.name, u.email, u.role, om.status,
+                    o.name as org_name, o.slug as org_slug
+             FROM organization_members om
+             JOIN users u ON om.user_id = u.id
+             JOIN organizations o ON om.organization_id = o.id
+             WHERE om.status = 'active'
+             ${tsOrgSlug ? "AND o.slug = $1" : ""}
+             ORDER BY o.name, u.name
+             LIMIT $${tsOrgSlug ? 2 : 1}`,
+            tsOrgSlug ? [tsOrgSlug, tsLimit] : [tsLimit]
+          );
+          return JSON.stringify({ members: rows, count: rows.length });
+        }
+
+        if (tsQuery === "tasks") {
+          const rows = await tsSql(
+            `SELECT at.id, at.title, at.description, at.status, at.priority,
+                    at.due_date, at.completed_at, at.estimated_minutes, at.actual_minutes,
+                    u.name as assignee_name, o.name as org_name, o.slug as org_slug
+             FROM assigned_tasks at
+             JOIN users u ON at.user_id = u.id
+             JOIN organizations o ON at.organization_id = o.id
+             WHERE at.status NOT IN ('cancelled')
+             ${tsOrgSlug ? "AND o.slug = $1" : ""}
+             ORDER BY at.due_date ASC NULLS LAST, at.created_at DESC
+             LIMIT $${tsOrgSlug ? 2 : 1}`,
+            tsOrgSlug ? [tsOrgSlug, tsLimit] : [tsLimit]
+          );
+          return JSON.stringify({ tasks: rows, count: rows.length });
+        }
+
+        if (tsQuery === "rocks") {
+          const rows = await tsSql(
+            `SELECT r.id, r.title, r.description, r.status, r.progress,
+                    r.due_date, r.quarter,
+                    u.name as owner_name, o.name as org_name, o.slug as org_slug
+             FROM rocks r
+             LEFT JOIN users u ON r.user_id = u.id
+             JOIN organizations o ON r.organization_id = o.id
+             ${tsOrgSlug ? "WHERE o.slug = $1" : ""}
+             ORDER BY o.name, r.status, r.due_date ASC
+             LIMIT $${tsOrgSlug ? 2 : 1}`,
+            tsOrgSlug ? [tsOrgSlug, tsLimit] : [tsLimit]
+          );
+          return JSON.stringify({ rocks: rows, count: rows.length });
+        }
+
+        return JSON.stringify({ error: `Unknown query type: ${tsQuery}` });
       }
     }
   } catch (error) {
