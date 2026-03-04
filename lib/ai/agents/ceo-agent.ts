@@ -264,13 +264,13 @@ export async function runCeoAgent(
     convId = conv.id;
   }
 
-  // Load conversation history (last 20 messages for context)
+  // Load conversation history (last 10 messages — more is wasteful for Haiku)
   const historyRows = await db
     .select()
     .from(schema.aiMessages)
     .where(eq(schema.aiMessages.conversationId, convId))
     .orderBy(desc(schema.aiMessages.createdAt))
-    .limit(20);
+    .limit(10);
 
   const history: Anthropic.MessageParam[] = historyRows
     .reverse()
@@ -320,7 +320,7 @@ export async function runCeoAgent(
   // Run CEO agent loop (up to 10 iterations)
   let response = await anthropic.messages.create({
     model: CEO_MODEL,
-    max_tokens: 4096,
+    max_tokens: 512,
     system: systemPrompt,
     tools: selectedTools,
     messages: anthropicMessages,
@@ -354,7 +354,7 @@ export async function runCeoAgent(
 
     response = await anthropic.messages.create({
       model: CEO_MODEL,
-      max_tokens: 4096,
+      max_tokens: 512,
       system: systemPrompt,
       tools: selectedTools,
       messages: anthropicMessages,
