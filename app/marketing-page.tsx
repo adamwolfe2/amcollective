@@ -74,7 +74,7 @@ const TEAM = [
     instagram: "https://instagram.com/adamwolfe",
     github: "https://github.com/adamwolfe2",
     linkedin: "https://linkedin.com/in/adamwolfe2",
-    telegram: "#",
+    telegram: "",
   },
   {
     name: "maggie byrne",
@@ -83,7 +83,7 @@ const TEAM = [
     instagram: "https://instagram.com/maggiebyrne",
     github: "https://github.com/maggiebyrne",
     linkedin: "https://linkedin.com/in/maggiebyrne",
-    telegram: "#",
+    telegram: "",
   },
 ];
 
@@ -487,14 +487,16 @@ function TeamTab() {
             >
               <Linkedin className="h-4 w-4" />
             </a>
-            <a
-              href={person.telegram}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[#0A0A0A]/30 hover:text-[#0A0A0A] transition-colors"
-            >
-              <Send className="h-4 w-4" />
-            </a>
+            {person.telegram && (
+              <a
+                href={person.telegram}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#0A0A0A]/30 hover:text-[#0A0A0A] transition-colors"
+              >
+                <Send className="h-4 w-4" />
+              </a>
+            )}
           </div>
         </div>
       ))}

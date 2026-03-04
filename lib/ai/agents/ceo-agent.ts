@@ -25,14 +25,117 @@ import { eq, desc } from "drizzle-orm";
 // Model to use for CEO agent — Haiku for cost efficiency
 const CEO_MODEL = "claude-haiku-4-5-20251001";
 
-// All tools available to the CEO agent
-const ALL_CEO_TOOLS: Anthropic.Tool[] = [
-  ...TOOL_DEFINITIONS,
-  ...CEO_TOOL_DEFINITIONS,
+// CEO tool names for routing (all CEO tools, not just selected ones)
+const CEO_TOOL_NAMES = new Set(CEO_TOOL_DEFINITIONS.map((t) => t.name));
+
+// ─── Tiered Tool Selection ─────────────────────────────────────────────────
+// Instead of sending all 73 tools every request (expensive for Haiku),
+// we always include a ~14-tool core set and add modules by keyword match.
+// Reduces input tokens by ~60% on average.
+
+const CORE_TOOL_NAMES = new Set([
+  // CEO tools — always critical
+  "get_company_snapshot", "get_current_sprint",
+  "write_bot_memory", "read_bot_memory", "search_memory",
+  "send_to_slack", "send_sms",
+  "update_task_status", "create_delegation", "search_leads",
+  // Base tools — always critical
+  "get_alerts", "search_knowledge", "get_rocks", "get_status_summary",
+]);
+
+const TOOL_MODULES: Array<{ keywords: string[]; toolNames: string[] }> = [
+  {
+    keywords: ["invoice", "revenue", "mrr", "stripe", "payment", "billing", "cash", "finance", "money", "overdue", "spend", "cost", "budget", "forecast", "paid"],
+    toolNames: ["get_revenue_data", "get_invoices", "get_recurring_invoices", "get_forecast", "get_costs"],
+  },
+  {
+    keywords: ["lead", "prospect", "client", "customer", "pipeline", "deal", "company", "contact", "proposal", "follow"],
+    toolNames: ["search_clients", "get_client_detail", "get_leads", "create_lead", "update_lead", "get_proposals"],
+  },
+  {
+    keywords: ["task", "sprint", "todo", "rock", "goal", "quarter", "assign", "delegate", "retro", "velocity", "close sprint"],
+    toolNames: ["get_tasks", "update_rock_status", "create_rock", "update_sprint_note", "close_sprint", "create_sprint", "add_meeting_note"],
+  },
+  {
+    keywords: ["deploy", "vercel", "build", "error", "fail", "server", "domain", "cdn", "deployment", "project"],
+    toolNames: ["get_deploy_status", "get_portfolio_overview", "list_vercel_projects", "get_vercel_project_costs", "redeploy_vercel_project", "get_vercel_build_logs", "check_vercel_domain_status"],
+  },
+  {
+    keywords: ["analytics", "posthog", "metric", "stat", "user", "growth", "traffic", "funnel", "click"],
+    toolNames: ["get_analytics", "get_scorecard", "get_posthog_analytics", "get_posthog_funnel", "get_posthog_top_pages", "get_posthog_user_count"],
+  },
+  {
+    keywords: ["email", "gmail", "mail", "inbox", "thread", "subject"],
+    toolNames: ["search_gmail", "read_gmail_thread", "send_gmail", "draft_email", "search_sent_emails"],
+  },
+  {
+    keywords: ["knowledge", "sop", "note", "doc", "brief", "remember", "recall", "write memory"],
+    toolNames: ["write_memory", "read_memory", "list_memories", "get_knowledge_articles"],
+  },
+  {
+    keywords: ["mercury", "bank", "account", "balance", "transaction"],
+    toolNames: ["get_mercury_balance", "get_mercury_transactions", "get_cash_position", "search_mercury_transactions"],
+  },
+  {
+    keywords: ["linear", "issue", "ticket", "bug", "cycle", "engineering"],
+    toolNames: ["get_linear_issues", "get_linear_my_issues", "get_linear_cycle", "get_linear_projects", "get_linear_teams", "create_linear_issue", "update_linear_issue", "add_linear_comment"],
+  },
+  {
+    keywords: ["taskspace", "eod", "end of day", "checkin", "check-in", "team report", "workspace"],
+    toolNames: ["get_taskspace_data"],
+  },
+  {
+    keywords: ["time", "hours", "billable", "log time"],
+    toolNames: ["log_time", "get_unbilled_time"],
+  },
+  {
+    keywords: ["contract", "signed", "signature", "agreement"],
+    toolNames: ["get_contracts"],
+  },
+  {
+    keywords: ["audit", "compliance", "activity", "history"],
+    toolNames: ["get_audit_logs"],
+  },
+  {
+    keywords: ["voice", "brief", "summary", "overview", "status"],
+    toolNames: ["get_voice_briefing"],
+  },
 ];
 
-// CEO tool names for routing
-const CEO_TOOL_NAMES = new Set(CEO_TOOL_DEFINITIONS.map((t) => t.name));
+// Build name→definition lookup (computed once, used across requests)
+let _toolsMap: Map<string, Anthropic.Tool> | null = null;
+function getToolsMap(): Map<string, Anthropic.Tool> {
+  if (!_toolsMap) {
+    _toolsMap = new Map();
+    for (const t of [...TOOL_DEFINITIONS, ...CEO_TOOL_DEFINITIONS]) {
+      _toolsMap.set(t.name, t);
+    }
+  }
+  return _toolsMap;
+}
+
+/**
+ * Returns ~14 core tools plus any modules relevant to the message.
+ * Typically 14–35 tools vs the full 73 — saves significant Haiku input tokens.
+ */
+function selectToolsForQuery(message: string): Anthropic.Tool[] {
+  const lower = message.toLowerCase();
+  const map = getToolsMap();
+  const selected = new Set<string>(CORE_TOOL_NAMES);
+
+  for (const module of TOOL_MODULES) {
+    if (module.keywords.some((kw) => lower.includes(kw))) {
+      for (const name of module.toolNames) selected.add(name);
+    }
+  }
+
+  // Preserve original definition order
+  const result: Anthropic.Tool[] = [];
+  for (const t of [...TOOL_DEFINITIONS, ...CEO_TOOL_DEFINITIONS]) {
+    if (selected.has(t.name)) result.push(t);
+  }
+  return result;
+}
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
 
@@ -211,12 +314,15 @@ export async function runCeoAgent(
     { role: "user", content: message },
   ];
 
+  // Select tools relevant to this message (~14–35 instead of all 73)
+  const selectedTools = selectToolsForQuery(message);
+
   // Run CEO agent loop (up to 10 iterations)
   let response = await anthropic.messages.create({
     model: CEO_MODEL,
     max_tokens: 4096,
     system: systemPrompt,
-    tools: ALL_CEO_TOOLS,
+    tools: selectedTools,
     messages: anthropicMessages,
   });
 
@@ -250,7 +356,7 @@ export async function runCeoAgent(
       model: CEO_MODEL,
       max_tokens: 4096,
       system: systemPrompt,
-      tools: ALL_CEO_TOOLS,
+      tools: selectedTools,
       messages: anthropicMessages,
     });
   }
