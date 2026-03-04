@@ -1,0 +1,142 @@
+// ~/.openclaw/openclaw.json
+// OpenClaw configuration for AM Collective CEO agent (ClaudeBot)
+// JSON5 format — comments are supported
+// REPLACE all PLACEHOLDER values before running `openclaw onboard`
+
+{
+  // ─── Agent Identity ────────────────────────────────────────────────────────
+  agent: {
+    id: "am-collective-ceo",
+    name: "ClaudeBot",
+
+    // Primary model — Sonnet for most tasks (cost-effective, very capable)
+    model: "anthropic/claude-sonnet-4-6",
+
+    // Fast model — Haiku for heartbeat checks and quick classification
+    fastModel: "anthropic/claude-haiku-4-5-20251001",
+
+    maxTokens: 4096,
+  },
+
+  // ─── Channels ──────────────────────────────────────────────────────────────
+  channels: {
+    slack: {
+      enabled: true,
+
+      // Socket mode = no public URL needed. The gateway connects to Slack's servers.
+      // Requires a Slack App with Socket Mode enabled.
+      mode: "socket",
+
+      // From your Slack App settings → Socket Mode → App-Level Token (xapp-...)
+      appToken: "PLACEHOLDER_SLACK_APP_TOKEN",
+
+      // From your Slack App settings → OAuth & Permissions → Bot Token (xoxb-...)
+      botToken: "PLACEHOLDER_SLACK_BOT_TOKEN",
+
+      // Only respond to users who have paired with the bot (/openclaw pair)
+      dmPolicy: "pairing",
+
+      // Only operate in explicitly allowlisted channels
+      groupPolicy: "allowlist",
+
+      // Show partial response while generating (live preview)
+      streaming: "partial",
+    },
+  },
+
+  // ─── Scheduled Jobs (Crons) ────────────────────────────────────────────────
+  crons: [
+    {
+      name: "Morning Briefing",
+      cron: "0 7 * * 1-5",        // 7:00 AM CT, Mon–Fri
+      tz: "America/Chicago",
+      skill: "morning-briefing",
+      session: "isolated",         // Clean session for each run
+      model: "anthropic/claude-sonnet-4-6",
+      announce: true,              // Sends the result as a DM to Adam
+    },
+    {
+      name: "EOD Wrap",
+      cron: "0 18 * * 1-5",       // 6:00 PM CT, Mon–Fri
+      tz: "America/Chicago",
+      skill: "eod-wrap",
+      session: "isolated",
+      model: "anthropic/claude-haiku-4-5-20251001",
+      announce: true,
+    },
+    {
+      name: "Sprint Prep (Monday)",
+      cron: "0 9 * * 1",          // 9:00 AM CT, Mondays only
+      tz: "America/Chicago",
+      skill: "sprint-prep",
+      session: "isolated",
+      model: "anthropic/claude-sonnet-4-6",
+      announce: true,
+    },
+  ],
+
+  // ─── Heartbeat ─────────────────────────────────────────────────────────────
+  heartbeat: {
+    enabled: true,
+    intervalMinutes: 30,
+
+    // Uses the fast model for cost efficiency
+    model: "anthropic/claude-haiku-4-5-20251001",
+  },
+
+  // ─── Webhooks (incoming from AM Collective) ────────────────────────────────
+  // AM Collective POSTs to http://localhost:18789/hooks/agent when alerts fire.
+  // Expose this endpoint via Tailscale for remote access.
+  webhooks: {
+    agent: {
+      enabled: true,
+
+      // Optional: verify webhook source
+      // Must match X-OpenClaw-Source header sent by AM Collective
+      trustedSources: ["am-collective-alerts"],
+    },
+  },
+
+  // ─── Skills ────────────────────────────────────────────────────────────────
+  // Skills files live in ~/.openclaw/workspaces/am-collective-ceo/skills/
+  skills: [
+    "am-collective",
+    "morning-briefing",
+    "eod-wrap",
+    "sprint-prep",
+  ],
+
+  // ─── Environment Variables ─────────────────────────────────────────────────
+  // These are injected into the agent's shell environment.
+  // NEVER commit real values — use your system keychain or 1Password CLI.
+  env: {
+    ANTHROPIC_API_KEY: "PLACEHOLDER_ANTHROPIC_API_KEY",
+
+    // Must match OPENCLAW_SHARED_SECRET in Vercel/AM Collective environment
+    AMCOLLECTIVE_API_SECRET: "PLACEHOLDER_OPENCLAW_SHARED_SECRET",
+
+    // AM Collective portal URL (production)
+    AMCOLLECTIVE_API_URL: "https://app.amcollectivecapital.com",
+  },
+
+  // ─── Security ──────────────────────────────────────────────────────────────
+  security: {
+    // Run our own skills without Docker overhead
+    dockerSandbox: false,
+
+    // ClaudeBot needs shell access to call curl (AM Collective API)
+    allowShell: true,
+
+    // Browser access for portal tasks
+    allowBrowser: true,
+
+    // Filesystem access for memory and workspace files
+    allowFileSystem: true,
+  },
+
+  // ─── Memory ────────────────────────────────────────────────────────────────
+  memory: {
+    enabled: true,
+    backend: "sqlite",             // Local SQLite — no external service needed
+  },
+}

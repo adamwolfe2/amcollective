@@ -84,6 +84,35 @@ export async function createAlert(data: {
         },
       })
       .catch(() => {});
+
+    // Also fire directly to OpenClaw Mac mini for instant notification.
+    // Bypasses Inngest's queue delay — OpenClaw gets it in under 1 second.
+    // OPENCLAW_WEBHOOK_URL = http://mac-mini:18789/hooks/agent (or Tailscale URL)
+    const clawWebhookUrl = process.env.OPENCLAW_WEBHOOK_URL;
+    if (clawWebhookUrl) {
+      fetch(clawWebhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-OpenClaw-Source": "am-collective-alerts",
+        },
+        body: JSON.stringify({
+          event: "am_collective_alert",
+          severity: data.severity,
+          title: data.title,
+          message: data.message ?? null,
+          type: data.type,
+          alertId: alert.id,
+          timestamp: new Date().toISOString(),
+          // Instruction tells OpenClaw what to do with this webhook
+          instruction:
+            data.severity === "critical"
+              ? "Alert Adam immediately via Slack DM. This is urgent."
+              : "Note this alert. Include in the next update to Adam unless it resolves.",
+        }),
+        signal: AbortSignal.timeout(3000),
+      }).catch(() => {});
+    }
   }
 
   return alert;
