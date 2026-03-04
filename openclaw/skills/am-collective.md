@@ -3,6 +3,11 @@
 This skill connects OpenClaw to the AM Collective admin platform. Use it for ALL
 business data queries and actions. Never make up business data — always query first.
 
+**IMPORTANT**: The CEO agent at POST /api/bot/claw is the ONLY interface you need.
+Do NOT probe or call other API endpoints directly. The CEO agent has 73 tools
+covering everything: clients, tasks, leads, invoices, rocks, sprints, cash, MRR,
+Vercel deployments, PostHog analytics, Linear issues, Gmail, and more.
+
 ---
 
 ## Environment Variables Required
@@ -16,8 +21,8 @@ AMCOLLECTIVE_API_SECRET   — Bearer token (matches OPENCLAW_SHARED_SECRET in Ve
 
 ## Query the CEO Agent (Any Question or Action)
 
-Send any message to the CEO agent — it has full access to all company data
-and can take real actions (create tasks, update rocks, move leads, etc.).
+Send any message in natural language. The CEO agent handles everything — no need
+to call other endpoints. Just ask what you need.
 
 ```bash
 response=$(curl -s -X POST "${AMCOLLECTIVE_API_URL}/api/bot/claw" \
@@ -52,10 +57,46 @@ curl -s -X POST "${AMCOLLECTIVE_API_URL}/api/bot/claw" \
 
 ---
 
-## Get Raw Status Snapshot (for heartbeat/cron decisions)
+## What the CEO Agent Can Do (73 Tools)
 
-Returns a machine-readable JSON snapshot — do NOT send this to Adam directly.
-Use it to make decisions before generating a message.
+Ask in plain English — examples of what works:
+
+**Financial:**
+- "What's our MRR and cash position?"
+- "How much runway do we have?"
+- "Show me overdue invoices"
+- "What did we spend on Vercel last month?"
+
+**Operations:**
+- "What tasks are in this sprint?"
+- "Which rocks are at risk?"
+- "What leads need follow-up this week?"
+- "Show me all open proposals"
+
+**Actions (it can take real actions):**
+- "Mark the [task name] task as done"
+- "Move the Acme lead to proposal stage"
+- "Create a rock: Launch Cursive paid tier, Q2 2026"
+- "Create a task: Fix auth bug, assign to Adam"
+
+**Infrastructure:**
+- "Any failed Vercel deploys today?"
+- "What's the build status for TBGC?"
+
+**Analytics:**
+- "How many active users does Trackr have?"
+- "Show me the lead funnel this month"
+
+**Alerts:**
+- "What are the unresolved critical alerts?"
+- "Summarize what happened today"
+
+---
+
+## Get Raw Status Snapshot (lightweight — use for decisions, not to send directly)
+
+Returns machine-readable JSON. Do NOT forward raw JSON to Adam. Use it to
+decide whether anything is worth a message, then summarize in plain language.
 
 ```bash
 curl -s "${AMCOLLECTIVE_API_URL}/api/bot/claw/status" \
@@ -63,54 +104,23 @@ curl -s "${AMCOLLECTIVE_API_URL}/api/bot/claw/status" \
 ```
 
 Key fields:
-- `mrr` — Monthly recurring revenue in dollars (null = Stripe not yet connected)
-- `cash` — Total Mercury bank balance in dollars
-- `criticalAlerts` — Unresolved critical alerts (act immediately if > 0)
-- `warningAlerts` — Unresolved warning alerts
+- `mrr` — Monthly recurring revenue in dollars
+- `cash` — Total Mercury bank balance
+- `criticalAlerts` — Act immediately if > 0
+- `warningAlerts` — Flag in next update
 - `failedDeploys` — Failed Vercel deploys in last 24h
 - `atRiskRocks` — Quarterly goals at risk
 - `overdueInvoices` — Count of overdue invoices
 - `overdueAmountDollars` — Total overdue in dollars
-- `mrrDeltaPct` — MRR change vs prior snapshot (positive = growth)
-- `anomaliesDetected` — Whether Phase 3 anomaly detection fired
-- `anomalies` — Array of human-readable anomaly descriptions
-
----
-
-## Common Queries
-
-Ask the CEO agent in natural language — these are examples, not the only things
-you can do:
-
-**Business state:**
-- "What's our MRR and how does it compare to last week?"
-- "Give me a company snapshot"
-- "How much cash do we have and what's the runway?"
-
-**Operations:**
-- "What tasks are due this sprint?"
-- "Which rocks are at risk?"
-- "What leads need follow-up?"
-
-**Actions:**
-- "Mark the TBGC API task as done"
-- "Move the Acme lead to proposal stage"
-- "Create a rock: Launch Cursive paid tier, Q2 2026"
-- "Close this sprint and create next week's"
-
-**Alerts & issues:**
-- "What are the unresolved alerts?"
-- "Summarize what happened today"
 
 ---
 
 ## Health Check
 
-Verify connectivity before use:
 ```bash
 curl -s "${AMCOLLECTIVE_API_URL}/api/bot/claw" \
   -H "Authorization: Bearer ${AMCOLLECTIVE_API_SECRET}"
-# Should return: {"ok":true,"service":"am-collective-ceo","timestamp":"..."}
+# Returns: {"ok":true,"service":"am-collective-ceo","timestamp":"..."}
 ```
 
 ---
@@ -118,6 +128,6 @@ curl -s "${AMCOLLECTIVE_API_URL}/api/bot/claw" \
 ## Error Handling
 
 - `401 Unauthorized` — AMCOLLECTIVE_API_SECRET is wrong or not set
-- `500 Internal Server Error` — CEO agent failed; try once more, then report
-- Network timeout — The Vercel deployment may be cold-starting; wait 10s and retry once
-- Empty response — Check `jq -r '.error // .response'` for the actual error message
+- `500 Internal Server Error` — CEO agent failed; try once more, then report to Adam
+- Network timeout — Vercel may be cold-starting; wait 10s and retry once
+- Empty response — Run: `jq -r '.error // .response'` on the raw response

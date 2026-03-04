@@ -22,8 +22,8 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 
-// Model to use for CEO agent (latest Sonnet)
-const CEO_MODEL = "claude-sonnet-4-6";
+// Model to use for CEO agent — Haiku for cost efficiency
+const CEO_MODEL = "claude-haiku-4-5-20251001";
 
 // All tools available to the CEO agent
 const ALL_CEO_TOOLS: Anthropic.Tool[] = [
