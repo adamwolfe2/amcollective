@@ -73,6 +73,15 @@
       model: "anthropic/claude-sonnet-4-6",
       announce: true,
     },
+    {
+      name: "Weekly Review (Friday)",
+      cron: "0 16 * * 5",         // 4:00 PM CT, Fridays only
+      tz: "America/Chicago",
+      skill: "weekly-review",
+      session: "isolated",
+      model: "anthropic/claude-sonnet-4-6",
+      announce: true,
+    },
   ],
 
   // ─── Heartbeat ─────────────────────────────────────────────────────────────
@@ -104,6 +113,7 @@
     "morning-briefing",
     "eod-wrap",
     "sprint-prep",
+    "weekly-review",
   ],
 
   // ─── Environment Variables ─────────────────────────────────────────────────
