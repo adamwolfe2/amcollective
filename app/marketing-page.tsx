@@ -52,7 +52,7 @@ const VENTURES = [
       "Productized campus distribution infrastructure for startups. Plug & play your product into our evangelist programs, ambassador playbooks, and top-down/bottom-up distribution systems.",
     logo: "/CampusGTM Logo.png",
     social: "/campusgtm social.png",
-    url: "#",
+    url: "https://www.campusgtm.com",
   },
   {
     name: "Hook",
