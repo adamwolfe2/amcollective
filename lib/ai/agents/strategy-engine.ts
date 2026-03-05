@@ -511,9 +511,29 @@ function computeHealthScore(data: StrategyEngineData): number {
     else score -= 5;
   }
 
-  // Revenue concentration
-  if (data.concentrationPct > 60) score -= 10;
+  // Revenue concentration — single product carrying everything is fragile
+  if (data.concentrationPct >= 95) score -= 20;
+  else if (data.concentrationPct > 60) score -= 10;
   else if (data.concentrationPct > 40) score -= 5;
+
+  // Pre-revenue launched products: -5 per product live >60d with $0 MRR (max -25)
+  // "building" stage products are excluded — they're not expected to have revenue yet
+  const stuckProducts = data.products.filter(
+    (p) =>
+      p.mrrCents === 0 &&
+      p.stage !== "building" &&
+      p.stage !== "idea" &&
+      p.daysLive !== null &&
+      p.daysLive > 60
+  );
+  score -= Math.min(25, stuckProducts.length * 5);
+
+  // Absolute platform MRR is very low relative to portfolio size
+  const launchedCount = data.products.filter(
+    (p) => p.stage === "launched" || p.stage === "scaling" || p.stage === "mature"
+  ).length;
+  if (launchedCount >= 3 && data.totalMrrCents < 500_00) score -= 10; // <$500 across 3+ launched
+  else if (launchedCount >= 2 && data.totalMrrCents < 100_00) score -= 5; // <$100 across 2+ launched
 
   // At-risk rocks
   if (data.atRiskRocks > 3) score -= 10;
