@@ -5,10 +5,12 @@
  * Answers "What should we do?" not just "What happened?"
  *
  * Data sources:
- *   - All product connectors (Trackr, TaskSpace, Wholesail, Cursive)
+ *   - All 6 product connectors (Trackr, TaskSpace, Wholesail, Cursive, TBGC, Hook)
  *   - Stripe MRR by company
  *   - Mercury cash + burn from subscriptionCosts
  *   - Daily metrics snapshots (for MRR growth trajectory)
+ *   - Portfolio project metadata (stage, launch date, monthly goals)
+ *   - Sprint context from getProjectContextSummary()
  *   - Invoices, proposals, rocks, alerts
  *
  * Output: 5-9 recommendations + computed strategy metrics, stored in DB.
@@ -20,9 +22,13 @@ import * as mercuryConnector from "@/lib/connectors/mercury";
 import * as trackrConnector from "@/lib/connectors/trackr";
 import * as taskspaceConnector from "@/lib/connectors/taskspace";
 import * as wholesailConnector from "@/lib/connectors/wholesail";
+import * as cursiveConnector from "@/lib/connectors/cursive";
+import * as tbgcConnector from "@/lib/connectors/tbgc";
+import * as hookConnector from "@/lib/connectors/hook";
+import { getProjectContextSummary } from "@/lib/intelligence/project-context";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { sql, eq, gte, desc, and, count, inArray, lte } from "drizzle-orm";
+import { sql, eq, gte, desc, and, count } from "drizzle-orm";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +40,16 @@ export interface ProductMetrics {
   marginPct: number;
   trend: "up" | "down" | "flat" | "unknown";
   notes: string[]; // notable items (e.g., "3 trials expiring this week")
+  // Product lifecycle metadata
+  stage: string | null;       // "idea" | "building" | "beta" | "launched" | "scaling" | "mature"
+  daysLive: number | null;    // days since launch date
+  monthlyGoalCents: number | null;
+  targetMarket: string | null;
+}
+
+export interface SprintContextSummary {
+  projectName: string;
+  sprintSummary: string; // text blob from getProjectContextSummary()
 }
 
 export interface StrategyEngineData {
@@ -50,7 +66,7 @@ export interface StrategyEngineData {
   // Revenue concentration (top product % of total)
   concentrationPct: number;
 
-  // Revenue trend (last 3 months, for forecasting)
+  // Revenue trend (last 6 months from daily_metrics_snapshots)
   revenueTrend: Array<{ month: string; revenue: number }>;
 
   // Overdue + pipeline
@@ -69,6 +85,9 @@ export interface StrategyEngineData {
 
   // Invoice aging (days outstanding distribution)
   invoiceAging: { under30: number; days30to60: number; over60: number };
+
+  // Sprint context per active project
+  sprintContexts: SprintContextSummary[];
 }
 
 export interface StrategyRecommendation {
@@ -106,31 +125,36 @@ export interface StrategyEngineResult {
 export async function gatherStrategyData(): Promise<StrategyEngineData> {
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
 
   // Run all data fetches in parallel
   const [
-    mrrResult,
     mrrByCompanyResult,
-    revenueTrendResult,
     cashResult,
     trackrResult,
     taskspaceResult,
     wholesailResult,
+    cursiveResult,
+    tbgcResult,
+    hookResult,
     subscriptionCosts,
     overdueData,
     openProposals,
     unresolvedAlerts,
     atRiskRocks,
     recentSnapshots,
+    revenueTrendRows,
     invoiceAgingData,
+    activeProjects,
   ] = await Promise.all([
-    stripeConnector.getMRR(),
     stripeConnector.getMRRByCompany(),
-    stripeConnector.getRevenueTrend(3),
     mercuryConnector.getTotalCash().catch(() => ({ success: false as const, data: null })),
     trackrConnector.getSnapshot().catch(() => ({ success: false as const, data: null })),
     taskspaceConnector.getSnapshot().catch(() => ({ success: false as const, data: null })),
     wholesailConnector.getSnapshot().catch(() => ({ success: false as const, data: null })),
+    cursiveConnector.getSnapshot().catch(() => ({ success: false as const, data: null })),
+    tbgcConnector.getSnapshot().catch(() => ({ success: false as const, data: null })),
+    hookConnector.getSnapshot().catch(() => ({ success: false as const, data: null })),
 
     // Monthly SaaS/infra costs grouped by product tag
     db
@@ -185,6 +209,17 @@ export async function gatherStrategyData(): Promise<StrategyEngineData> {
       .orderBy(desc(schema.dailyMetricsSnapshots.date))
       .limit(45),
 
+    // Revenue trend: last 6 months from daily_metrics_snapshots (more complete than Stripe)
+    db
+      .select({
+        month: sql<string>`to_char(date_trunc('month', ${schema.dailyMetricsSnapshots.date}), 'YYYY-MM')`,
+        revenue: sql<number>`COALESCE(MAX(${schema.dailyMetricsSnapshots.mrr}), 0)`,
+      })
+      .from(schema.dailyMetricsSnapshots)
+      .where(gte(schema.dailyMetricsSnapshots.date, sixMonthsAgo))
+      .groupBy(sql`date_trunc('month', ${schema.dailyMetricsSnapshots.date})`)
+      .orderBy(sql`date_trunc('month', ${schema.dailyMetricsSnapshots.date})`),
+
     // Invoice aging breakdown
     db
       .select({
@@ -195,6 +230,21 @@ export async function gatherStrategyData(): Promise<StrategyEngineData> {
       .from(schema.invoices)
       .where(eq(schema.invoices.status, "overdue"))
       .catch(() => [{ under30: 0, days30to60: 0, over60: 0 }]),
+
+    // Active portfolio projects with product metadata for sprint context + stage
+    db
+      .select({
+        id: schema.portfolioProjects.id,
+        name: schema.portfolioProjects.name,
+        slug: schema.portfolioProjects.slug,
+        launchDate: schema.portfolioProjects.launchDate,
+        productStage: schema.portfolioProjects.productStage,
+        targetMarket: schema.portfolioProjects.targetMarket,
+        monthlyGoalCents: schema.portfolioProjects.monthlyGoalCents,
+        velocityLabel: schema.portfolioProjects.velocityLabel,
+      })
+      .from(schema.portfolioProjects)
+      .where(eq(schema.portfolioProjects.status, "active")),
   ]);
 
   // ── Compute costs by tag ──────────────────────────────────────────────────
@@ -207,27 +257,20 @@ export async function gatherStrategyData(): Promise<StrategyEngineData> {
     totalMonthlyCosts += amt;
   }
 
-  // ── Compute MRR growth ────────────────────────────────────────────────────
-  const currentMrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) : 0;
-  let mrrGrowthPct: number | null = null;
+  // ── Build project metadata lookup ─────────────────────────────────────────
+  const projectMeta = new Map(activeProjects.map((p) => [p.slug, p]));
 
-  if (recentSnapshots.length >= 2) {
-    const oldest = recentSnapshots[recentSnapshots.length - 1];
-    const priorMrr = oldest.mrr;
-    if (priorMrr > 0) {
-      mrrGrowthPct = Math.round(((currentMrr - priorMrr) / priorMrr) * 100 * 10) / 10;
-    }
+  function getDaysLive(launchDate: Date | null | undefined): number | null {
+    if (!launchDate) return null;
+    return Math.floor((now.getTime() - new Date(launchDate).getTime()) / (1000 * 60 * 60 * 24));
   }
 
   // ── Cash + runway ─────────────────────────────────────────────────────────
   const totalCashCents = cashResult.success && cashResult.data
     ? Math.round(cashResult.data * 100)
     : 0;
-  const runwayMonths = totalMonthlyCosts > 0 && totalCashCents > 0
-    ? Math.round((totalCashCents / totalMonthlyCosts) * 10) / 10
-    : null;
 
-  // ── Per-product metrics ───────────────────────────────────────────────────
+  // ── Per-product metrics from connectors ──────────────────────────────────
   const mrrByCompany = mrrByCompanyResult.success ? (mrrByCompanyResult.data ?? []) : [];
 
   const getCompanyMrr = (tag: string): number => {
@@ -236,6 +279,7 @@ export async function gatherStrategyData(): Promise<StrategyEngineData> {
   };
 
   const products: ProductMetrics[] = [];
+  const nowMs = now.getTime();
 
   // Trackr
   if (trackrResult.success && trackrResult.data) {
@@ -247,7 +291,15 @@ export async function gatherStrategyData(): Promise<StrategyEngineData> {
     if (d.trialingSubscriptions > 0) notes.push(`${d.trialingSubscriptions} trials in progress`);
     if (d.pendingArchitectApplications > 0) notes.push(`${d.pendingArchitectApplications} architect applications pending`);
     if (d.auditPipelinePending > 0) notes.push(`${d.auditPipelinePending} audits in queue`);
-    products.push({ name: "Trackr", tag: "trackr", mrrCents: mrr, monthlyCostCents: cost, marginPct: margin, trend: "unknown", notes });
+    const meta = projectMeta.get("trackr");
+    products.push({
+      name: "Trackr", tag: "trackr", mrrCents: mrr, monthlyCostCents: cost, marginPct: margin,
+      trend: "unknown", notes,
+      stage: meta?.productStage ?? null,
+      daysLive: getDaysLive(meta?.launchDate),
+      monthlyGoalCents: meta?.monthlyGoalCents ?? null,
+      targetMarket: meta?.targetMarket ?? null,
+    });
   }
 
   // TaskSpace
@@ -260,7 +312,15 @@ export async function gatherStrategyData(): Promise<StrategyEngineData> {
     if (d.rocksAtRisk > 0) notes.push(`${d.rocksAtRisk} customer rocks at risk`);
     if (d.eodRate7Day < 0.5) notes.push(`Low EOD rate: ${Math.round(d.eodRate7Day * 100)}%`);
     if (d.payingOrgs > 0) notes.push(`${d.payingOrgs} paying orgs`);
-    products.push({ name: "TaskSpace", tag: "taskspace", mrrCents: mrr, monthlyCostCents: cost, marginPct: margin, trend: "unknown", notes });
+    const meta = projectMeta.get("taskspace");
+    products.push({
+      name: "TaskSpace", tag: "taskspace", mrrCents: mrr, monthlyCostCents: cost, marginPct: margin,
+      trend: "unknown", notes,
+      stage: meta?.productStage ?? null,
+      daysLive: getDaysLive(meta?.launchDate),
+      monthlyGoalCents: meta?.monthlyGoalCents ?? null,
+      targetMarket: meta?.targetMarket ?? null,
+    });
   }
 
   // Wholesail
@@ -273,48 +333,131 @@ export async function gatherStrategyData(): Promise<StrategyEngineData> {
     if (d.stuckProjects > 0) notes.push(`${d.stuckProjects} builds stuck >14 days`);
     if (d.overdueProjects > 0) notes.push(`${d.overdueProjects} overdue builds`);
     if (d.intake.pending > 0) notes.push(`${d.intake.pending} intakes awaiting review`);
-    products.push({ name: "Wholesail", tag: "wholesail", mrrCents: mrr, monthlyCostCents: cost, marginPct: margin, trend: "unknown", notes });
+    const meta = projectMeta.get("wholesail");
+    products.push({
+      name: "Wholesail", tag: "wholesail", mrrCents: mrr, monthlyCostCents: cost, marginPct: margin,
+      trend: "unknown", notes,
+      stage: meta?.productStage ?? null,
+      daysLive: getDaysLive(meta?.launchDate),
+      monthlyGoalCents: meta?.monthlyGoalCents ?? null,
+      targetMarket: meta?.targetMarket ?? null,
+    });
   }
 
-  // Cursive (via Stripe since no direct connector read here)
-  const cursiveMrr = getCompanyMrr("cursive");
-  if (cursiveMrr > 0) {
+  // Cursive — use connector data (includes pipeline, bookings, pixels)
+  if (cursiveResult.success && cursiveResult.data) {
+    const d = cursiveResult.data;
+    const mrr = getCompanyMrr("cursive"); // Cursive MRR comes via Stripe
     const cost = costsByTag["cursive"] ?? 0;
-    const margin = Math.round(((cursiveMrr - cost) / cursiveMrr) * 100);
-    products.push({ name: "Cursive", tag: "cursive", mrrCents: cursiveMrr, monthlyCostCents: cost, marginPct: margin, trend: "unknown", notes: [] });
+    const margin = mrr > 0 ? Math.round(((mrr - cost) / mrr) * 100) : 0;
+    const notes: string[] = [];
+    if (d.pixels.trialsExpiringWeek > 0) notes.push(`${d.pixels.trialsExpiringWeek} pixel trials expiring this week`);
+    if (d.pipeline.at_risk > 0) notes.push(`${d.pipeline.at_risk} workspaces at risk`);
+    if (d.bookings.thisWeek > 0) notes.push(`${d.bookings.thisWeek} bookings this week`);
+    if (d.affiliates.pendingApplications > 0) notes.push(`${d.affiliates.pendingApplications} affiliate applications pending`);
+    const meta = projectMeta.get("cursive");
+    products.push({
+      name: "Cursive", tag: "cursive", mrrCents: mrr, monthlyCostCents: cost, marginPct: margin,
+      trend: "unknown", notes,
+      stage: meta?.productStage ?? null,
+      daysLive: getDaysLive(meta?.launchDate),
+      monthlyGoalCents: meta?.monthlyGoalCents ?? null,
+      targetMarket: meta?.targetMarket ?? null,
+    });
+  } else {
+    // Cursive connector unavailable — use Stripe data only
+    const mrr = getCompanyMrr("cursive");
+    const cost = costsByTag["cursive"] ?? 0;
+    const margin = mrr > 0 ? Math.round(((mrr - cost) / mrr) * 100) : 0;
+    const meta = projectMeta.get("cursive");
+    products.push({
+      name: "Cursive", tag: "cursive", mrrCents: mrr, monthlyCostCents: cost, marginPct: margin,
+      trend: "unknown", notes: ["Cursive connector unavailable — using Stripe data only"],
+      stage: meta?.productStage ?? null,
+      daysLive: getDaysLive(meta?.launchDate),
+      monthlyGoalCents: meta?.monthlyGoalCents ?? null,
+      targetMarket: meta?.targetMarket ?? null,
+    });
   }
 
-  // TBGC / Hook (any remaining Stripe MRR)
-  for (const account of mrrByCompany) {
-    if (!["trackr", "taskspace", "wholesail", "cursive"].includes(account.companyTag)) {
-      const cost = costsByTag[account.companyTag] ?? 0;
-      const margin = account.mrr > 0 ? Math.round(((account.mrr - cost) / account.mrr) * 100) : 0;
-      if (account.mrr > 0) {
-        products.push({
-          name: account.name,
-          tag: account.companyTag,
-          mrrCents: account.mrr,
-          monthlyCostCents: cost,
-          marginPct: margin,
-          trend: "unknown",
-          notes: [],
-        });
-      }
+  // TBGC — always include (building stage)
+  {
+    const d = tbgcResult.success ? tbgcResult.data : null;
+    const mrr = d?.mrrCents ?? getCompanyMrr("tbgc");
+    const cost = costsByTag["tbgc"] ?? 0;
+    const margin = mrr > 0 ? Math.round(((mrr - cost) / mrr) * 100) : 0;
+    const notes = d?.notes ?? ["TBGC in active development"];
+    const meta = projectMeta.get("tbgc");
+    products.push({
+      name: "TBGC", tag: "tbgc", mrrCents: mrr, monthlyCostCents: cost, marginPct: margin,
+      trend: "unknown", notes,
+      stage: meta?.productStage ?? "building",
+      daysLive: getDaysLive(meta?.launchDate),
+      monthlyGoalCents: meta?.monthlyGoalCents ?? null,
+      targetMarket: meta?.targetMarket ?? null,
+    });
+  }
+
+  // Hook — always include (beta stage)
+  {
+    const d = hookResult.success ? hookResult.data : null;
+    const mrr = d?.mrrCents ?? getCompanyMrr("hook");
+    const cost = costsByTag["hook"] ?? 0;
+    const margin = mrr > 0 ? Math.round(((mrr - cost) / mrr) * 100) : 0;
+    const notes = d?.notes ?? ["Hook in beta"];
+    const meta = projectMeta.get("hook");
+    products.push({
+      name: "Hook", tag: "hook", mrrCents: mrr, monthlyCostCents: cost, marginPct: margin,
+      trend: "unknown", notes,
+      stage: meta?.productStage ?? "beta",
+      daysLive: getDaysLive(meta?.launchDate),
+      monthlyGoalCents: meta?.monthlyGoalCents ?? null,
+      targetMarket: meta?.targetMarket ?? null,
+    });
+  }
+
+  // ── Use connector-derived product MRR as platform total (more accurate than Stripe-only) ──
+  const totalProductMrr = products.reduce((s, p) => s + p.mrrCents, 0);
+
+  // ── Compute MRR growth from snapshots ─────────────────────────────────────
+  let mrrGrowthPct: number | null = null;
+  if (recentSnapshots.length >= 2) {
+    const oldest = recentSnapshots[recentSnapshots.length - 1];
+    const priorMrr = oldest.mrr;
+    if (priorMrr > 0) {
+      mrrGrowthPct = Math.round(((totalProductMrr - priorMrr) / priorMrr) * 100 * 10) / 10;
     }
   }
 
+  // ── Revenue trend from daily_metrics_snapshots ────────────────────────────
+  const revenueTrend = revenueTrendRows.length >= 2
+    ? revenueTrendRows.map((r) => ({ month: r.month, revenue: Number(r.revenue) }))
+    : [];
+
+  // ── Cash runway ───────────────────────────────────────────────────────────
+  const runwayMonths = totalMonthlyCosts > 0 && totalCashCents > 0
+    ? Math.round((totalCashCents / totalMonthlyCosts) * 10) / 10
+    : null;
+
   // ── Concentration risk ────────────────────────────────────────────────────
-  const totalProductMrr = products.reduce((s, p) => s + p.mrrCents, 0);
   const topProductMrr = products.length > 0 ? Math.max(...products.map((p) => p.mrrCents)) : 0;
   const concentrationPct = totalProductMrr > 0
     ? Math.round((topProductMrr / totalProductMrr) * 100)
     : 0;
 
-  // ── Revenue trend ─────────────────────────────────────────────────────────
-  const revenueTrend = revenueTrendResult.success ? (revenueTrendResult.data ?? []) : [];
+  // ── Sprint context for active projects ────────────────────────────────────
+  const sprintContexts: SprintContextSummary[] = [];
+  await Promise.allSettled(
+    activeProjects.map(async (project) => {
+      const summary = await getProjectContextSummary(project.id).catch(() => "");
+      if (summary) {
+        sprintContexts.push({ projectName: project.name, sprintSummary: summary });
+      }
+    })
+  );
 
   return {
-    totalMrrCents: currentMrr,
+    totalMrrCents: totalProductMrr,
     mrrGrowthPct,
     totalCashCents,
     monthlyBurnCents: totalMonthlyCosts,
@@ -335,6 +478,7 @@ export async function gatherStrategyData(): Promise<StrategyEngineData> {
       days30to60: Number(invoiceAgingData[0]?.days30to60 ?? 0),
       over60: Number(invoiceAgingData[0]?.over60 ?? 0),
     },
+    sprintContexts,
   };
 }
 
@@ -448,38 +592,56 @@ export async function generateStrategyRecommendations(
   const fmt = (cents: number) => `$${Math.round(cents / 100).toLocaleString()}`;
   const model = useOpus ? MODEL_OPUS : MODEL_SONNET;
 
-  const productSection = data.products.map((p) =>
-    `  ${p.name}: MRR ${fmt(p.mrrCents)} | Cost ${fmt(p.monthlyCostCents)}/mo | Margin ${p.marginPct}%${p.notes.length > 0 ? ` | Notes: ${p.notes.join(", ")}` : ""}`
-  ).join("\n");
+  // Build product section with lifecycle context
+  const productSection = data.products.map((p) => {
+    const stageInfo = p.stage ? ` | Stage: ${p.stage}` : "";
+    const ageInfo = p.daysLive !== null ? ` | ${p.daysLive}d live` : (p.stage === "building" ? " | Not yet launched" : "");
+    const goalInfo = p.monthlyGoalCents ? ` | Goal: ${fmt(p.monthlyGoalCents)}/mo` : "";
+    const mrrInfo = p.mrrCents > 0 ? `MRR ${fmt(p.mrrCents)}` : "Pre-revenue";
+    const marginInfo = p.mrrCents > 0 ? ` | Margin ${p.marginPct}%` : "";
+    const notesStr = p.notes.length > 0 ? ` | Notes: ${p.notes.join(", ")}` : "";
+    return `  ${p.name}${stageInfo}${ageInfo}${goalInfo}: ${mrrInfo} | Cost ${fmt(p.monthlyCostCents)}/mo${marginInfo}${notesStr}`;
+  }).join("\n");
 
-  const revenueTrendSection = data.revenueTrend.length > 0
+  const revenueTrendSection = data.revenueTrend.length > 1
     ? data.revenueTrend.map((t) => `  ${t.month}: ${fmt(t.revenue)}`).join("\n")
-    : "  No trend data available";
+    : "  Insufficient historical data";
 
-  const systemPrompt = `You are the Chief Strategy Officer for AM Collective Capital. You have access to real-time financial and operational data across 4-6 portfolio software products. Your job is to generate specific, data-driven, prioritized recommendations that will directly increase revenue, reduce costs, improve margins, or mitigate risks.
+  const sprintSection = data.sprintContexts.length > 0
+    ? data.sprintContexts.map((s) => `\n${s.sprintSummary}`).join("\n---\n")
+    : "  No sprint data available";
 
-CRITICAL RULES:
-- Every recommendation must have a SPECIFIC action (not "consider improving X" but "raise TaskSpace pricing from $175 to $249 for new signups")
-- Quantify dollar impact wherever possible
-- Lead with the most urgent item (unpaid invoices, cash risk, churn risk)
-- Do NOT restate numbers as recommendations — translate them into actions
-- Be direct and specific — this is for the founder, not a board presentation
-- No emojis, no markdown headers, no bullet points inside text fields`;
+  const systemPrompt = `You are the Chief Strategy Officer for AM Collective Capital. You have access to real-time financial and operational data across 6 portfolio software products. Your job is to generate specific, data-driven, prioritized recommendations that will directly increase revenue, reduce costs, improve margins, or mitigate risks.
+
+CRITICAL RULES — you must follow these without exception:
+1. NEVER recommend sunsetting, shutting down, or discontinuing ANY product that was launched within the last 180 days. For recently launched products, focus on what would make them successful given their current stage.
+2. For "building" stage products: focus ONLY on launch readiness, build quality, and time-to-launch — not revenue.
+3. For "beta" stage products: focus on retention, engagement, and product-market fit signals — not aggressive growth tactics.
+4. For "launched" stage products under 90 days live: focus on first 10 paying customers and initial traction signals.
+5. For "launched" stage products 90-180 days live: focus on repeatable acquisition and improving conversion.
+6. For "scaling" or "mature" stage products: focus on CAC, LTV, channel efficiency, and margin expansion.
+7. Sprint velocity is a leading indicator of product momentum — factor it into health assessment.
+8. Every recommendation must have a SPECIFIC action (not "consider improving X" but "raise TaskSpace pricing from $175 to $249 for new signups").
+9. Quantify dollar impact wherever possible.
+10. Lead with the most urgent item (unpaid invoices, cash risk, churn risk).
+11. Be direct and specific — this is for the founder, not a board presentation.
+12. No emojis, no markdown headers, no bullet points inside text fields.`;
 
   const userPrompt = `Analyze this week's business data and generate strategic recommendations for AM Collective.
 
 PLATFORM OVERVIEW:
-- Total MRR: ${fmt(data.totalMrrCents)}/mo
+- Total MRR: ${fmt(data.totalMrrCents)}/mo (connector-derived, includes all 6 products)
 - MRR Growth (30d): ${data.mrrGrowthPct !== null ? `${data.mrrGrowthPct > 0 ? "+" : ""}${data.mrrGrowthPct}%` : "insufficient data"}
 - Cash on Hand: ${data.totalCashCents > 0 ? fmt(data.totalCashCents) : "Mercury not synced"}
 - Monthly Infrastructure Costs: ${fmt(data.monthlyBurnCents)}
 - Cash Runway: ${data.runwayMonths !== null ? `${data.runwayMonths} months` : "unknown"}
 - Revenue Concentration: Top product = ${data.concentrationPct}% of MRR
+- Platform Health Score: ${healthScore}/100
 
-PRODUCT PROFITABILITY:
+PRODUCT PORTFOLIO (6 products):
 ${productSection}
 
-REVENUE TREND (last 3 months):
+REVENUE TREND (last 6 months from platform snapshots):
 ${revenueTrendSection}
 
 OVERDUE INVOICES: ${data.overdueInvoices} invoices, ${fmt(data.overdueAmountCents)} total
@@ -491,6 +653,9 @@ OPERATIONS: ${data.unresolvedAlerts} unresolved alerts, ${data.atRiskRocks} quar
 
 COST BREAKDOWN BY PRODUCT:
 ${Object.entries(data.costsByTag).map(([tag, cost]) => `  ${tag}: ${fmt(cost)}/mo`).join("\n") || "  No cost data"}
+
+SPRINT VELOCITY & EXECUTION (current week open tasks per product):
+${sprintSection}
 
 Return ONLY raw JSON (no markdown wrapping), in this exact structure:
 {
@@ -517,7 +682,8 @@ Rules:
 - At least one recommendation per category: risk, revenue_opportunity, cost_reduction
 - If runway is under 12 months, include at least one cash-preservation recommendation
 - If any invoice is >60 days overdue, that is always priority 2
-- If MRR growth is negative, lead with a revenue recovery recommendation`;
+- If MRR growth is negative, lead with a revenue recovery recommendation
+- Never recommend sunsetting products launched in the last 180 days`;
 
   try {
     const response = await anthropic.messages.create({
@@ -633,7 +799,7 @@ export async function persistStrategyResult(
 function buildFallbackSummary(data: StrategyEngineData, healthScore: number): string {
   const fmt = (cents: number) => `$${Math.round(cents / 100).toLocaleString()}`;
   const parts: string[] = [];
-  parts.push(`Platform MRR: ${fmt(data.totalMrrCents)}/mo`);
+  parts.push(`Platform MRR: ${fmt(data.totalMrrCents)}/mo (6 products)`);
   if (data.mrrGrowthPct !== null) parts.push(`${data.mrrGrowthPct > 0 ? "+" : ""}${data.mrrGrowthPct}% growth (30d)`);
   if (data.runwayMonths !== null) parts.push(`${data.runwayMonths}mo runway`);
   if (data.overdueAmountCents > 0) parts.push(`${fmt(data.overdueAmountCents)} overdue`);
