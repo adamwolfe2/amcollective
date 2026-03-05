@@ -128,6 +128,14 @@ export const sprintSnapshot = inngest.createFunction(
           velocityLabel,
           locked: true,
         });
+
+        // Write velocity back to portfolioProjects so products page + strategy engine see it
+        if (velocityLabel) {
+          await db
+            .update(schema.portfolioProjects)
+            .set({ velocityLabel })
+            .where(eq(schema.portfolioProjects.id, projectId));
+        }
       });
     }
 
