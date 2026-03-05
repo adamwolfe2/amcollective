@@ -35,6 +35,7 @@ import {
   Send,
   Zap,
   KeyRound,
+  Package,
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { CompanySwitcher } from "@/components/company-switcher";
@@ -45,6 +46,7 @@ const NAV_ITEMS = [
   { label: "Sprints", href: "/sprints", icon: Zap },
   { label: "Leads", href: "/leads", icon: Crosshair },
   { label: "Clients", href: "/clients", icon: Users },
+  { label: "Products", href: "/products", icon: Package },
   { label: "Projects", href: "/projects", icon: FolderKanban },
   { label: "Tasks", href: "/tasks", icon: ListTodo },
   { label: "Contracts", href: "/contracts", icon: FileCheck },
