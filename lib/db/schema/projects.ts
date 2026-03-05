@@ -43,6 +43,13 @@ export const portfolioProjects = pgTable(
     githubRepo: varchar("github_repo", { length: 255 }),
     status: projectStatusEnum("status").default("active").notNull(),
     healthScore: integer("health_score"),
+    // Product lifecycle metadata
+    launchDate: timestamp("launch_date", { mode: "date" }),
+    productStage: varchar("product_stage", { length: 30 }),
+    // "idea" | "building" | "beta" | "launched" | "scaling" | "mature"
+    description: text("description"),
+    targetMarket: varchar("target_market", { length: 200 }),
+    monthlyGoalCents: integer("monthly_goal_cents"),
     // Materialized sprint metrics (updated by sync-project-metrics Inngest job)
     openTaskCount: integer("open_task_count").notNull().default(0),
     last30dCompletionRate: integer("last_30d_completion_rate").notNull().default(0),
