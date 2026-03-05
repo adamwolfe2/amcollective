@@ -145,9 +145,9 @@ function selectToolsForQuery(message: string): Anthropic.Tool[] {
   const map = getToolsMap();
   const selected = new Set<string>(CORE_TOOL_NAMES);
 
-  for (const module of TOOL_MODULES) {
-    if (module.keywords.some((kw) => lower.includes(kw))) {
-      for (const name of module.toolNames) selected.add(name);
+  for (const mod of TOOL_MODULES) {
+    if (mod.keywords.some((kw) => lower.includes(kw))) {
+      for (const name of mod.toolNames) selected.add(name);
     }
   }
 

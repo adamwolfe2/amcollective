@@ -18,6 +18,7 @@ import * as trackrConnector from "@/lib/connectors/trackr";
 import * as taskspaceConnector from "@/lib/connectors/taskspace";
 import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { FloatingChatBar } from "@/components/floating-chat-bar";
+import { SprintWidgetClient } from "@/components/sprint-widget-client";
 import { currentUser } from "@clerk/nextjs/server";
 import {
   Users,
@@ -108,8 +109,9 @@ const getCachedCurrentSprint = unstable_cache(
     const tasks = await db
       .select({
         id: schema.tasks.id,
+        title: schema.tasks.title,
+        status: schema.tasks.status,
         sectionId: schema.taskSprintAssignments.sectionId,
-        isCompleted: sql<boolean>`(${schema.tasks.status} = 'done')`,
         sortOrder: schema.taskSprintAssignments.sortOrder,
       })
       .from(schema.taskSprintAssignments)
@@ -122,20 +124,10 @@ const getCachedCurrentSprint = unstable_cache(
       )
       .orderBy(asc(schema.taskSprintAssignments.sortOrder));
 
-    const tasksBySectionId: Record<string, { total: number; done: number }> = {};
-    for (const task of tasks) {
-      const key = task.sectionId ?? "__none__";
-      const curr = tasksBySectionId[key] ?? { total: 0, done: 0 };
-      tasksBySectionId[key] = {
-        total: curr.total + 1,
-        done: curr.done + (task.isCompleted ? 1 : 0),
-      };
-    }
-
     const totalTasks = tasks.length;
-    const doneTasks = tasks.filter((t) => t.isCompleted).length;
+    const doneTasks = tasks.filter((t) => t.status === "done").length;
 
-    return { sprint, sections, tasksBySectionId, totalTasks, doneTasks };
+    return { sprint, sections, tasks, totalTasks, doneTasks };
   },
   ["dashboard-current-sprint"],
   { revalidate: 60 }
@@ -152,125 +144,39 @@ async function SprintWidget() {
               <Zap size={10} />
               Weekly Sprint
             </h3>
-            <Link
-              href="/sprints"
-              className="font-mono text-[10px] text-[#0A0A0A]/40 hover:text-[#0A0A0A]/60"
-            >
+            <Link href="/sprints" className="font-mono text-[10px] text-[#0A0A0A]/40 hover:text-[#0A0A0A]/60">
               New sprint →
             </Link>
           </div>
           <div className="border border-dashed border-[#0A0A0A]/10 py-4 text-center">
             <p className="font-mono text-[10px] text-[#0A0A0A]/30">
               No sprint this week.{" "}
-              <Link href="/sprints" className="underline">
-                Create one →
-              </Link>
+              <Link href="/sprints" className="underline">Create one →</Link>
             </p>
           </div>
         </div>
       );
     }
 
-    const { sprint, sections, tasksBySectionId, totalTasks, doneTasks } = data;
-    const pct =
-      totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
+    const { sprint, sections, tasks, totalTasks, doneTasks } = data;
 
     return (
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 flex items-center gap-1.5">
-            <Zap size={10} />
-            Weekly Sprint
-          </h3>
-          <Link
-            href={`/sprints/${sprint.id}`}
-            className="font-mono text-[10px] text-[#0A0A0A]/40 hover:text-[#0A0A0A]/60"
-          >
-            Open →
-          </Link>
-        </div>
-        <div className="border border-[#0A0A0A]/10 bg-white">
-          {/* Sprint header */}
-          <div className="px-3 py-2.5 border-b border-[#0A0A0A]/5">
-            <p className="font-serif font-bold text-[#0A0A0A] text-sm">
-              {sprint.title}
-            </p>
-            {sprint.weeklyFocus && (
-              <p className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 mt-0.5">
-                {sprint.weeklyFocus}
-              </p>
-            )}
-          </div>
-          {/* Progress bar */}
-          {totalTasks > 0 && (
-            <div className="px-3 py-2 border-b border-[#0A0A0A]/5">
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-1 bg-[#0A0A0A]/10">
-                  <div
-                    className="h-full bg-[#0A0A0A] transition-all"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <span className="font-mono text-[9px] text-[#0A0A0A]/40 shrink-0">
-                  {doneTasks}/{totalTasks}
-                </span>
-              </div>
-            </div>
-          )}
-          {/* Section list */}
-          <div className="divide-y divide-[#0A0A0A]/5">
-            {sections.slice(0, 6).map((section) => {
-              const counts = tasksBySectionId[section.id] ?? {
-                total: 0,
-                done: 0,
-              };
-              const secPct =
-                counts.total > 0
-                  ? Math.round((counts.done / counts.total) * 100)
-                  : 0;
-
-              return (
-                <div
-                  key={section.id}
-                  className="px-3 py-2 flex items-center justify-between"
-                >
-                  <p className="font-serif text-[11px] italic font-medium text-[#0A0A0A]">
-                    {section.projectName}
-                  </p>
-                  <div className="flex items-center gap-2">
-                    {counts.total > 0 && (
-                      <>
-                        <div className="w-12 h-1 bg-[#0A0A0A]/10">
-                          <div
-                            className="h-full bg-[#0A0A0A]"
-                            style={{ width: `${secPct}%` }}
-                          />
-                        </div>
-                        <span className="font-mono text-[9px] text-[#0A0A0A]/40">
-                          {counts.done}/{counts.total}
-                        </span>
-                      </>
-                    )}
-                    {counts.total > 0 && counts.done === counts.total && (
-                      <Check size={10} className="text-emerald-500" />
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            {sections.length > 6 && (
-              <div className="px-3 py-1.5">
-                <Link
-                  href={`/sprints/${sprint.id}`}
-                  className="font-mono text-[9px] text-[#0A0A0A]/40 hover:text-[#0A0A0A]/60"
-                >
-                  +{sections.length - 6} more sections →
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+      <SprintWidgetClient
+        sprintId={sprint.id}
+        sprintTitle={sprint.title}
+        weeklyFocus={sprint.weeklyFocus}
+        sprintPageUrl={`/sprints/${sprint.id}`}
+        sections={sections.map((s) => ({ id: s.id, projectName: s.projectName }))}
+        initialTasks={tasks.map((t) => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          sectionId: t.sectionId,
+          sortOrder: t.sortOrder,
+        }))}
+        totalTasks={totalTasks}
+        doneTasks={doneTasks}
+      />
     );
   } catch (err) {
     console.error("[Dashboard] SprintWidget failed:", err);
@@ -365,11 +271,11 @@ async function MetricsStrip() {
 function PlatformCardHeader({
   label,
   tag,
-  href,
+  internalHref,
 }: {
   label: string;
   tag: string;
-  href?: string;
+  internalHref: string;
 }) {
   return (
     <div className="px-4 py-2.5 border-b border-[#0A0A0A]/5 flex items-center justify-between">
@@ -379,16 +285,12 @@ function PlatformCardHeader({
         </span>
         <span className="font-serif font-bold text-sm text-[#0A0A0A]">{label}</span>
       </div>
-      {href && (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 font-mono text-[9px] text-[#0A0A0A]/40 hover:text-[#0A0A0A]/70 transition-colors"
-        >
-          open <ExternalLink size={9} />
-        </a>
-      )}
+      <Link
+        href={internalHref}
+        className="font-mono text-[9px] text-[#0A0A0A]/40 hover:text-[#0A0A0A]/70 transition-colors"
+      >
+        details →
+      </Link>
     </div>
   );
 }
@@ -442,45 +344,37 @@ async function WholesailCard() {
 
     return (
       <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
-        <PlatformCardHeader
-          label="Wholesail"
-          tag="W"
-          href="https://wholesailhub.com/admin"
-        />
+        <PlatformCardHeader label="Wholesail" tag="W" internalHref="/projects?platform=wholesail" />
         {d ? (
           <div className="p-4 space-y-3 flex-1">
-            <div className="grid grid-cols-3 gap-3">
-              <CardStat label="Active" value={String(d.activeBuilds)} />
-              <CardStat label="Live" value={String(d.liveClients)} />
-              <CardStat
-                label="Intake"
-                value={String(d.intake.pending)}
-                sub="pending"
-                alert={d.intake.pending > 0}
-              />
+            {/* Build pipeline */}
+            <div className="grid grid-cols-4 gap-2">
+              <CardStat label="Builds" value={String(d.activeBuilds)} sub="active" />
+              <CardStat label="Live" value={String(d.liveClients)} sub="clients" />
+              <CardStat label="Total" value={String(Object.values(d.buildsByStatus).reduce((s, n) => s + n, 0))} sub="all time" />
+              <CardStat label="Stuck" value={String(d.stuckProjects)} sub=">14d" alert={d.stuckProjects > 0} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <CardStat
-                label="Pipeline"
-                value={formatCurrency(d.pipelineValue)}
-              />
-              <CardStat
-                label="MRR"
-                value={formatCurrency(d.mrrFromRetainers)}
-              />
+            {/* Revenue */}
+            <div className="grid grid-cols-3 gap-2">
+              <CardStat label="Pipeline" value={formatCurrency(d.pipelineValue)} />
+              <CardStat label="MRR" value={formatCurrency(d.mrrFromRetainers)} sub="retainers" />
+              <CardStat label="Overdue" value={String(d.overdueProjects)} sub="builds" alert={d.overdueProjects > 0} />
             </div>
-            {/* Pipeline bar */}
-            {Object.keys(d.buildsByStatus).length > 0 && (
-              <div className="flex gap-0.5 h-1.5">
-                {Object.entries(d.buildsByStatus).map(([status, cnt]) => (
-                  <div
-                    key={status}
-                    className="h-full bg-[#0A0A0A]/20 flex-1"
-                    title={`${status}: ${cnt}`}
-                  />
-                ))}
+            {/* Intake funnel */}
+            <div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Intake funnel</span>
+              <div className="grid grid-cols-4 gap-2">
+                <CardStat label="Pending" value={String(d.intake.pending)} alert={d.intake.pending > 0} />
+                <CardStat label="Reviewed" value={String(d.intake.reviewed)} />
+                <CardStat label="Converted" value={String(d.intake.converted)} />
+                <CardStat label="Total" value={String(d.intake.total)} />
               </div>
-            )}
+            </div>
+            {/* Costs */}
+            <div className="grid grid-cols-2 gap-2">
+              <CardStat label="Build Costs MTD" value={formatCurrency(d.buildCostsMtdCents / 100)} />
+              <CardStat label="Build Costs All-Time" value={formatCurrency(d.buildCostsAllTimeCents / 100)} />
+            </div>
           </div>
         ) : (
           <PlatformUnavailable />
@@ -491,7 +385,7 @@ async function WholesailCard() {
     console.error("[Dashboard] WholesailCard failed:", err);
     return (
       <div className="border border-[#0A0A0A]/10 bg-white">
-        <PlatformCardHeader label="Wholesail" tag="W" />
+        <PlatformCardHeader label="Wholesail" tag="W" internalHref="/projects" />
         <PlatformUnavailable />
       </div>
     );
@@ -507,50 +401,47 @@ async function CursiveCard() {
 
     return (
       <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
-        <PlatformCardHeader
-          label="Cursive"
-          tag="C"
-          href="https://leads.meetcursive.com/admin"
-        />
+        <PlatformCardHeader label="Cursive" tag="C" internalHref="/leads?platform=cursive" />
         {d ? (
           <div className="p-4 space-y-3 flex-1">
-            <div className="grid grid-cols-3 gap-3">
-              <CardStat
-                label="Workspaces"
-                value={String(d.totalWorkspaces)}
-              />
-              <CardStat
-                label="Active"
-                value={String(d.pipeline.active + d.pipeline.trial)}
-                sub="incl. trial"
-              />
-              <CardStat
-                label="New"
-                value={String(d.pipeline.new)}
-                sub="this wk"
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <CardStat
-                label="Leads"
-                value={String(d.leads.total)}
-                sub={`+${d.leads.createdThisWeek} wk`}
-              />
-              <CardStat
-                label="Bookings"
-                value={String(d.bookings.thisWeek)}
-                sub="this wk"
-              />
-            </div>
-            {d.pixels.trialsExpiringWeek > 0 && (
-              <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                <span className="font-mono text-[10px] text-[#0A0A0A]/60">
-                  {d.pixels.trialsExpiringWeek} pixel trial
-                  {d.pixels.trialsExpiringWeek !== 1 ? "s" : ""} expiring
-                </span>
+            {/* Workspace pipeline */}
+            <div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Workspace pipeline</span>
+              <div className="grid grid-cols-4 gap-2">
+                <CardStat label="Total" value={String(d.totalWorkspaces)} />
+                <CardStat label="Active" value={String(d.pipeline.active)} />
+                <CardStat label="Trial" value={String(d.pipeline.trial)} />
+                <CardStat label="New" value={String(d.pipeline.new)} sub="unstarted" />
               </div>
-            )}
+            </div>
+            {/* Leads */}
+            <div className="grid grid-cols-3 gap-2">
+              <CardStat label="Total Leads" value={String(d.leads.total)} />
+              <CardStat label="New Leads" value={String(d.leads.createdThisWeek)} sub="this wk" />
+              <CardStat label="At-Risk" value={String(d.pipeline.at_risk)} sub="workspaces" alert={d.pipeline.at_risk > 0} />
+            </div>
+            {/* Bookings */}
+            <div className="grid grid-cols-3 gap-2">
+              <CardStat label="Bookings Today" value={String(d.bookings.today)} />
+              <CardStat label="This Week" value={String(d.bookings.thisWeek)} />
+              <CardStat label="This Month" value={String(d.bookings.thisMonth)} />
+            </div>
+            {/* Pixels */}
+            <div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Pixels</span>
+              <div className="grid grid-cols-4 gap-2">
+                <CardStat label="Installed" value={String(d.pixels.totalInstalls)} />
+                <CardStat label="Active Trial" value={String(d.pixels.activeTrials)} />
+                <CardStat label="Expiring" value={String(d.pixels.trialsExpiringWeek)} sub="7d" alert={d.pixels.trialsExpiringWeek > 0} />
+                <CardStat label="Expired" value={String(d.pixels.trialsExpired)} />
+              </div>
+            </div>
+            {/* Affiliates */}
+            <div className="grid grid-cols-3 gap-2">
+              <CardStat label="Affiliates" value={String(d.affiliates.activeAffiliates)} sub="active" />
+              <CardStat label="Applications" value={String(d.affiliates.pendingApplications)} sub="pending" alert={d.affiliates.pendingApplications > 0} />
+              <CardStat label="Commissions" value={formatCurrency(d.affiliates.pendingCommissionsCents / 100)} sub="pending" />
+            </div>
           </div>
         ) : (
           <PlatformUnavailable />
@@ -561,7 +452,7 @@ async function CursiveCard() {
     console.error("[Dashboard] CursiveCard failed:", err);
     return (
       <div className="border border-[#0A0A0A]/10 bg-white">
-        <PlatformCardHeader label="Cursive" tag="C" />
+        <PlatformCardHeader label="Cursive" tag="C" internalHref="/leads" />
         <PlatformUnavailable />
       </div>
     );
@@ -577,38 +468,46 @@ async function TrackrCard() {
 
     return (
       <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
-        <PlatformCardHeader
-          label="Trackr"
-          tag="T"
-          href="https://trytrackr.com"
-        />
+        <PlatformCardHeader label="Trackr" tag="T" internalHref="/analytics?platform=trackr" />
         {d ? (
           <div className="p-4 space-y-3 flex-1">
-            <div className="grid grid-cols-3 gap-3">
-              <CardStat
-                label="Workspaces"
-                value={String(d.totalWorkspaces)}
-                sub={`+${d.newWorkspacesWeek} wk`}
-              />
-              <CardStat
-                label="Paying"
-                value={String(d.activeSubscriptions)}
-              />
-              <CardStat
-                label="Trialing"
-                value={String(d.trialingSubscriptions)}
-              />
+            {/* Users */}
+            <div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Users</span>
+              <div className="grid grid-cols-4 gap-2">
+                <CardStat label="Workspaces" value={String(d.totalWorkspaces)} />
+                <CardStat label="New" value={String(d.newWorkspacesWeek)} sub="this wk" />
+                <CardStat label="Paying" value={String(d.activeSubscriptions)} />
+                <CardStat label="Trialing" value={String(d.trialingSubscriptions)} />
+              </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <CardStat
-                label="MRR"
-                value={formatCurrency(d.mrrCents / 100)}
-              />
-              <CardStat
-                label="Tools"
-                value={String(d.totalToolsResearched)}
-                sub="researched"
-              />
+            {/* Revenue — plan breakdown */}
+            <div className="grid grid-cols-2 gap-2">
+              <CardStat label="MRR" value={formatCurrency(d.mrrCents / 100)} />
+              <CardStat label="Free" value={String(d.planBreakdown.free ?? 0)} sub="workspaces" />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <CardStat label="Team" value={String(d.planBreakdown.team ?? 0)} sub="plan" />
+              <CardStat label="Startup" value={String(d.planBreakdown.startup ?? 0)} sub="plan" />
+              <CardStat label="Enterprise" value={String(d.planBreakdown.enterprise ?? 0)} sub="plan" />
+            </div>
+            {/* Product */}
+            <div className="grid grid-cols-2 gap-2">
+              <CardStat label="Tools Researched" value={String(d.totalToolsResearched)} />
+              <CardStat label="Audits Pending" value={String(d.auditPipelinePending)} alert={d.auditPipelinePending > 0} />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <CardStat label="API Cost MTD" value={formatCurrency(d.apiCostsMtdCents / 100)} />
+              <CardStat label="API Cost Today" value={formatCurrency(d.apiCostsTodayCents / 100)} />
+            </div>
+            {/* Architect program */}
+            <div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Architect program</span>
+              <div className="grid grid-cols-3 gap-2">
+                <CardStat label="Active" value={String(d.activeArchitects)} />
+                <CardStat label="Applications" value={String(d.pendingArchitectApplications)} sub="pending" alert={d.pendingArchitectApplications > 0} />
+                <CardStat label="Commissions" value={formatCurrency(d.pendingCommissionsCents / 100)} sub="pending" />
+              </div>
             </div>
           </div>
         ) : (
@@ -620,7 +519,7 @@ async function TrackrCard() {
     console.error("[Dashboard] TrackrCard failed:", err);
     return (
       <div className="border border-[#0A0A0A]/10 bg-white">
-        <PlatformCardHeader label="Trackr" tag="T" />
+        <PlatformCardHeader label="Trackr" tag="T" internalHref="/analytics" />
         <PlatformUnavailable />
       </div>
     );
@@ -636,71 +535,53 @@ async function TaskSpaceCard() {
 
     return (
       <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
-        <PlatformCardHeader
-          label="TaskSpace"
-          tag="TS"
-          href="https://trytaskspace.com"
-        />
+        <PlatformCardHeader label="TaskSpace" tag="TS" internalHref="/team?platform=taskspace" />
         {d ? (
           <div className="p-4 space-y-3 flex-1">
-            <div className="grid grid-cols-3 gap-3">
+            {/* Orgs & users */}
+            <div className="grid grid-cols-3 gap-2">
               <CardStat label="Orgs" value={String(d.totalOrgs)} />
               <CardStat label="Members" value={String(d.totalMembers)} />
-              <CardStat
-                label="EOD Rate"
-                value={`${d.eodRate7Day}%`}
-                sub="7d"
-                alert={d.eodRate7Day < 50}
-              />
+              <CardStat label="Paying Orgs" value={String(d.payingOrgs)} />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <CardStat
-                label="On-Track"
-                value={String(d.rocksOnTrack)}
-                sub="rocks"
-              />
-              <CardStat
-                label="At-Risk"
-                value={String(d.rocksAtRisk + d.rocksBlocked)}
-                sub="rocks"
-                alert={d.rocksAtRisk + d.rocksBlocked > 0}
-              />
+            {/* Revenue */}
+            <div className="grid grid-cols-3 gap-2">
+              <CardStat label="MRR" value={formatCurrency(d.mrrCents / 100)} />
+              <CardStat label="Team Plan" value={String(d.planBreakdown.team)} />
+              <CardStat label="Business Plan" value={String(d.planBreakdown.business)} />
             </div>
-            {/* Rock progress bar */}
-            {d.rocksOnTrack + d.rocksAtRisk + d.rocksBlocked + d.rocksCompleted > 0 && (
-              <div className="flex gap-0.5 h-1.5">
-                {d.rocksOnTrack > 0 && (
-                  <div
-                    className="h-full bg-emerald-400"
-                    style={{
-                      flex: d.rocksOnTrack,
-                    }}
-                    title={`On-track: ${d.rocksOnTrack}`}
-                  />
-                )}
-                {d.rocksAtRisk > 0 && (
-                  <div
-                    className="h-full bg-amber-400"
-                    style={{ flex: d.rocksAtRisk }}
-                    title={`At-risk: ${d.rocksAtRisk}`}
-                  />
-                )}
-                {d.rocksBlocked > 0 && (
-                  <div
-                    className="h-full bg-red-400"
-                    style={{ flex: d.rocksBlocked }}
-                    title={`Blocked: ${d.rocksBlocked}`}
-                  />
-                )}
-                {d.rocksCompleted > 0 && (
-                  <div
-                    className="h-full bg-[#0A0A0A]/15"
-                    style={{ flex: d.rocksCompleted }}
-                    title={`Completed: ${d.rocksCompleted}`}
-                  />
-                )}
+            {/* EOD activity */}
+            <div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">EOD Reports</span>
+              <div className="grid grid-cols-3 gap-2">
+                <CardStat label="Today" value={String(d.eodsToday)} />
+                <CardStat label="7-Day Rate" value={`${d.eodRate7Day}%`} alert={d.eodRate7Day < 50} />
+                <CardStat label="Escalations" value={String(d.openEscalations)} sub="open" alert={d.openEscalations > 0} />
               </div>
-            )}
+            </div>
+            {/* Tasks */}
+            <div className="grid grid-cols-2 gap-2">
+              <CardStat label="Active Tasks" value={String(d.activeTasks)} />
+              <CardStat label="Completed" value={String(d.completedTasksThisWeek)} sub="this wk" />
+            </div>
+            {/* Rocks */}
+            <div>
+              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Rocks (quarterly goals)</span>
+              <div className="grid grid-cols-4 gap-2">
+                <CardStat label="On-Track" value={String(d.rocksOnTrack)} />
+                <CardStat label="At-Risk" value={String(d.rocksAtRisk)} alert={d.rocksAtRisk > 0} />
+                <CardStat label="Blocked" value={String(d.rocksBlocked)} alert={d.rocksBlocked > 0} />
+                <CardStat label="Done" value={String(d.rocksCompleted)} />
+              </div>
+              {d.rocksOnTrack + d.rocksAtRisk + d.rocksBlocked + d.rocksCompleted > 0 && (
+                <div className="flex gap-0.5 h-1 mt-2">
+                  {d.rocksOnTrack > 0 && <div className="h-full bg-emerald-400" style={{ flex: d.rocksOnTrack }} title={`On-track: ${d.rocksOnTrack}`} />}
+                  {d.rocksAtRisk > 0 && <div className="h-full bg-amber-400" style={{ flex: d.rocksAtRisk }} title={`At-risk: ${d.rocksAtRisk}`} />}
+                  {d.rocksBlocked > 0 && <div className="h-full bg-red-400" style={{ flex: d.rocksBlocked }} title={`Blocked: ${d.rocksBlocked}`} />}
+                  {d.rocksCompleted > 0 && <div className="h-full bg-[#0A0A0A]/15" style={{ flex: d.rocksCompleted }} title={`Completed: ${d.rocksCompleted}`} />}
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <PlatformUnavailable />
@@ -711,7 +592,7 @@ async function TaskSpaceCard() {
     console.error("[Dashboard] TaskSpaceCard failed:", err);
     return (
       <div className="border border-[#0A0A0A]/10 bg-white">
-        <PlatformCardHeader label="TaskSpace" tag="TS" />
+        <PlatformCardHeader label="TaskSpace" tag="TS" internalHref="/team" />
         <PlatformUnavailable />
       </div>
     );
