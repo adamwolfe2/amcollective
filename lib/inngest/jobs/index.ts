@@ -34,3 +34,4 @@ export { eodWrap } from "./eod-wrap";
 export { sprintPrep } from "./sprint-prep";
 export { alertTriage } from "./alert-triage";
 export { backfillEmbeddings } from "./backfill-embeddings";
+export { strategyAnalysis } from "./strategy-analysis";

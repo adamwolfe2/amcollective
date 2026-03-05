@@ -41,6 +41,7 @@ import { CompanySwitcher } from "@/components/company-switcher";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Strategy", href: "/strategy", icon: TrendingUp },
   { label: "Sprints", href: "/sprints", icon: Zap },
   { label: "Leads", href: "/leads", icon: Crosshair },
   { label: "Clients", href: "/clients", icon: Users },

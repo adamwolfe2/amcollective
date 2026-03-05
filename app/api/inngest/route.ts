@@ -42,6 +42,7 @@ import {
   sprintPrep,
   alertTriage,
   backfillEmbeddings,
+  strategyAnalysis,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -81,5 +82,6 @@ export const { GET, POST, PUT } = serve({
     sprintPrep,
     alertTriage,
     backfillEmbeddings,
+    strategyAnalysis,
   ],
 });

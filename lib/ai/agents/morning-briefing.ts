@@ -48,6 +48,8 @@ export interface BriefingData {
   overdueAmount: number;
   overdueFollowUps: FollowUpLead[];
   composio: ComposioActivity;
+  // Strategic priority (from strategy_recommendations table)
+  topStrategicPriority: { title: string; recommendation: string } | null;
 }
 
 // ─── Composio Activity ───────────────────────────────────────────────────────
@@ -90,7 +92,7 @@ export async function gatherBriefingData(): Promise<BriefingData> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [mrrResult, deploysResult, unresolvedAlerts, unreadMessages, rocks, overdueResult, followUps, composio, priorSnapshot] =
+  const [mrrResult, deploysResult, unresolvedAlerts, unreadMessages, rocks, overdueResult, followUps, composio, priorSnapshot, topStrategicRec] =
     await Promise.all([
       stripeConnector.getMRR(),
       vercelConnector.getRecentDeployments(20),
@@ -110,6 +112,14 @@ export async function gatherBriefingData(): Promise<BriefingData> {
         .where(lt(schema.dailyMetricsSnapshots.date, today))
         .orderBy(desc(schema.dailyMetricsSnapshots.date))
         .limit(1),
+
+      // Top active urgent strategic recommendation
+      db.select({ title: schema.strategyRecommendations.title, recommendation: schema.strategyRecommendations.recommendation })
+        .from(schema.strategyRecommendations)
+        .where(and(eq(schema.strategyRecommendations.status, "active"), eq(schema.strategyRecommendations.priority, 2)))
+        .orderBy(desc(schema.strategyRecommendations.createdAt))
+        .limit(1)
+        .catch(() => []),
     ]);
 
   const mrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) : null;
@@ -134,6 +144,7 @@ export async function gatherBriefingData(): Promise<BriefingData> {
     overdueAmount: overdueResult[0]?.total ?? 0,
     overdueFollowUps: followUps,
     composio,
+    topStrategicPriority: topStrategicRec[0] ?? null,
   };
 }
 
@@ -258,17 +269,34 @@ export async function generateBriefing(
     }
   }
 
-  const systemPrompt = `You are ClaudeBot texting Adam. Casual, direct — like a smart colleague, not a corporate assistant. No headers. No bold. No markdown. No emojis unless they genuinely add meaning (usually they don't). 1-4 short sentences max. Lead with the most important thing. If nothing notable, say so in one line. Money: $X,XXX format, no cents.
+  const systemPrompt = `You are ClaudeBot texting Adam. Direct, strategic — like a business partner who did the morning prep work before Adam woke up.
 
-GOOD: "Morning. MRR's at $42K, up $1K from last week. TBGC build failed overnight — same env var issue as last time."
+TONE RULES:
+- Casual but sharp. No emojis. No headers. No bold. No markdown.
+- 2-4 short sentences max.
+- Lead with the ONE thing that needs Adam's attention or action today.
+- End with a specific suggested action when there is one.
+- If nothing notable, say so in one line.
+- Money: $X,XXX format, no cents.
+
+STRUCTURE: [Situation] + [Why it matters] + [What to do]
+
+GOOD: "Morning. MRR's at $42K, up $1K WoW. Acme's invoice is 47 days past due at $8K — worth a 2-minute call today before it gets awkward."
+GOOD: "Clean morning — no alerts, no failed builds. Trackr had 3 new signups overnight, worth checking if any are high-intent for Startup tier outreach."
+GOOD: "TBGC build failed overnight. Same env var issue as last month. Fix in lib/config — should take 10 min."
 
 BAD: "🚨 Good morning! Here is your daily briefing: • MRR: $42,000.00 • Alerts: 3"
+BAD: "Morning briefing: MRR is $42K. There are 3 alerts. 2 overdue invoices."
 
-IMPORTANT: Use the Persistent Memory, Conversation History, and Relevant Context (if provided) to surface patterns and avoid repeating things already addressed.`;
+IMPORTANT: Use the Persistent Memory and Relevant Context (if provided) to surface patterns. If you saw the same issue yesterday, say so. Don't repeat recommendations Adam has already acted on.`;
 
   const sections: string[] = [];
   if (memoryContext) sections.push(memoryContext);
   if (ragContext) sections.push(`## Relevant Context (from knowledge base)\n${ragContext}`);
+
+  const strategicPrioritySection = data.topStrategicPriority
+    ? `\nTop Strategic Priority: ${data.topStrategicPriority.title}\nSuggested action: ${data.topStrategicPriority.recommendation}`
+    : "";
 
   const prompt = `${sections.length > 0 ? sections.join("\n\n") + "\n\n" : ""}Morning briefing data:
 
@@ -279,9 +307,9 @@ Unread Messages: ${data.unreadMessages}
 At-Risk Rocks: ${data.atRiskRocks}
 Overdue Invoices: ${data.overdueInvoices} ($${Math.round(data.overdueAmount / 100).toLocaleString()})
 Pipeline Follow-ups Due: ${data.overdueFollowUps.length}${data.overdueFollowUps.length > 0 ? "\n" + data.overdueFollowUps.map((l) => `  - ${l.contactName}${l.companyName ? ` / ${l.companyName}` : ""} (${l.stage})`).join("\n") : ""}
-${composioSection ? `\nConnected Tools (24h):\n${composioSection}` : ""}
+${composioSection ? `\nConnected Tools (24h):\n${composioSection}` : ""}${strategicPrioritySection}
 
-Keep it under 4 sentences. Lead with anything urgent or notable. If all clear, one line is fine.`;
+Instructions: Lead with the single most important item from above. End with one specific suggested action for today. 2-4 sentences max.`;
 
   const response = await anthropic.messages.create({
     model: MODEL_HAIKU,

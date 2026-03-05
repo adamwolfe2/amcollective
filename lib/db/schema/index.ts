@@ -26,3 +26,4 @@ export * from "./integrations";
 export * from "./sync";
 export * from "./project-snapshots";
 export * from "./sprints";
+export * from "./strategy";
