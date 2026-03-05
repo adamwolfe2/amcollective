@@ -33,14 +33,14 @@ const CEO_TOOL_NAMES = new Set(CEO_TOOL_DEFINITIONS.map((t) => t.name));
 // we always include a ~14-tool core set and add modules by keyword match.
 // Reduces input tokens by ~60% on average.
 
+// Minimal always-on set — everything else is keyword-triggered.
+// Fewer tools = fewer input tokens = cheaper + faster per request.
 const CORE_TOOL_NAMES = new Set([
-  // CEO tools — always critical
-  "get_company_snapshot", "get_current_sprint", "get_portfolio_snapshot",
-  "write_bot_memory", "read_bot_memory", "search_memory",
-  "send_to_slack", "send_sms",
-  "update_task_status", "create_delegation", "search_leads",
-  // Base tools — always critical
-  "get_alerts", "search_knowledge", "get_rocks", "get_status_summary",
+  "write_bot_memory",   // must always be available to persist facts
+  "send_to_slack",      // must always be available for proactive messages
+  "get_alerts",         // critical safety signal — always needed
+  "update_task_status", // most common action command
+  "search_knowledge",   // general knowledge lookup
 ]);
 
 const TOOL_MODULES: Array<{ keywords: string[]; toolNames: string[] }> = [
@@ -99,6 +99,16 @@ const TOOL_MODULES: Array<{ keywords: string[]; toolNames: string[] }> = [
   {
     keywords: ["voice", "brief", "summary", "overview", "status"],
     toolNames: ["get_voice_briefing"],
+  },
+  // Snapshot / status — heavy tools, only load when asked
+  {
+    keywords: ["snapshot", "company", "sprint", "how are we", "where are we", "what's going on", "update me", "give me a", "status update", "quick update", "what do we have"],
+    toolNames: ["get_company_snapshot", "get_current_sprint", "get_status_summary", "get_rocks"],
+  },
+  // Search / delegation
+  {
+    keywords: ["lead", "prospect", "find client", "search", "delegate", "who is", "look up"],
+    toolNames: ["search_leads", "create_delegation", "read_bot_memory", "search_memory"],
   },
   {
     keywords: ["health", "up", "down", "ping", "site", "domain", "product", "live", "working", "broken"],
@@ -348,13 +358,21 @@ export async function runCeoAgent(
   // Run CEO agent loop (up to 10 iterations)
   // Sonnet (!! prefix) gets more tokens for complex analysis
   const maxTokens = useSonnet ? 1024 : 512;
-  let response = await anthropic.messages.create({
-    model: activeModel,
-    max_tokens: maxTokens,
-    system: systemPrompt,
-    tools: selectedTools,
-    messages: anthropicMessages,
-  });
+  let response: Anthropic.Message;
+  try {
+    response = await anthropic.messages.create({
+      model: activeModel,
+      max_tokens: maxTokens,
+      system: systemPrompt,
+      tools: selectedTools,
+      messages: anthropicMessages,
+    });
+  } catch (err) {
+    const e = err as { status?: number; message?: string };
+    if (e.status === 429) throw new Error("Rate limited — try again in a moment.");
+    if (e.status === 529) throw new Error("Anthropic is overloaded — try again in a minute.");
+    throw err;
+  }
 
   let iterations = 0;
   while (response.stop_reason === "tool_use" && iterations < 10) {
@@ -382,13 +400,20 @@ export async function runCeoAgent(
     anthropicMessages.push({ role: "assistant", content: response.content });
     anthropicMessages.push({ role: "user", content: toolResults });
 
-    response = await anthropic.messages.create({
-      model: activeModel,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      tools: selectedTools,
-      messages: anthropicMessages,
-    });
+    try {
+      response = await anthropic.messages.create({
+        model: activeModel,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        tools: selectedTools,
+        messages: anthropicMessages,
+      });
+    } catch (err) {
+      const e = err as { status?: number };
+      if (e.status === 429) throw new Error("Rate limited mid-conversation — try again in a moment.");
+      if (e.status === 529) throw new Error("Anthropic is overloaded — try again in a minute.");
+      throw err;
+    }
   }
 
   // Track usage

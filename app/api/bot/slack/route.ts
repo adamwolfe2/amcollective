@@ -298,17 +298,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (!conversationId) {
-    // Fall back: most recent conversation for this user
-    const [recent] = await db
-      .select({ id: schema.aiConversations.id })
-      .from(schema.aiConversations)
-      .where(eq(schema.aiConversations.userId, user.id))
-      .orderBy(desc(schema.aiConversations.updatedAt))
-      .limit(1);
-
-    conversationId = recent?.id;
-  }
+  // Do NOT fall back to the most recent conversation — that bleeds old context
+  // across unrelated messages and inflates input tokens indefinitely.
+  // Each fresh DM starts a new conversation (clean slate).
+  // Only thread replies (threadTs match) resume prior context.
 
   // Fire-and-forget: embed the incoming user message for future RAG retrieval
   const embedText = `[user-reply] ${new Date().toISOString().split("T")[0]}\n${user.name}: ${messageText}`;
@@ -343,7 +336,11 @@ export async function POST(req: NextRequest) {
     })
     .catch(async (error) => {
       console.error("[bot/slack] Error:", error);
-      await postSlackMessage(channel, "Sorry, I ran into an issue. Please try again.", threadTs);
+      const msg = (error as Error)?.message ?? "";
+      const reply = msg.includes("Rate limited") || msg.includes("overloaded")
+        ? msg
+        : "Sorry, I ran into an issue. Please try again.";
+      await postSlackMessage(channel, reply, threadTs);
     });
 
   // Use after() if available, otherwise fire-and-forget
