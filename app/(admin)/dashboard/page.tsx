@@ -16,6 +16,8 @@ import * as wholesailConnector from "@/lib/connectors/wholesail";
 import * as cursiveConnector from "@/lib/connectors/cursive";
 import * as trackrConnector from "@/lib/connectors/trackr";
 import * as taskspaceConnector from "@/lib/connectors/taskspace";
+import * as tbgcConnector from "@/lib/connectors/tbgc";
+import * as hookConnector from "@/lib/connectors/hook";
 import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { FloatingChatBar } from "@/components/floating-chat-bar";
 import { SprintWidgetClient } from "@/components/sprint-widget-client";
@@ -599,6 +601,113 @@ async function TaskSpaceCard() {
   }
 }
 
+// ─── TBGC Platform Card ────────────────────────────────────────────────────────
+
+async function TBGCCard() {
+  try {
+    const result = await tbgcConnector.getSnapshot();
+    const d = result.success ? result.data : null;
+
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
+        <PlatformCardHeader label="TBGC" tag="TB" internalHref="/products/tbgc" />
+        {d ? (
+          <div className="p-4 space-y-3 flex-1">
+            {/* Stage badge */}
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
+                {d.stage}
+              </span>
+              <span className="font-mono text-[9px] text-[#0A0A0A]/40">Custom B2B wholesale portal</span>
+            </div>
+            {/* Revenue */}
+            <div className="grid grid-cols-2 gap-2">
+              <CardStat
+                label="MRR"
+                value={d.mrrCents > 0 ? formatCurrency(d.mrrCents / 100) : "Pre-revenue"}
+              />
+              <CardStat label="Subscriptions" value={String(d.activeSubscriptions)} sub="active" />
+            </div>
+            {/* Notes */}
+            {d.notes.length > 0 && (
+              <div>
+                <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1">Status</span>
+                {d.notes.map((note, i) => (
+                  <p key={i} className="font-serif text-[11px] text-[#0A0A0A]/60">{note}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <PlatformUnavailable />
+        )}
+      </div>
+    );
+  } catch (err) {
+    console.error("[Dashboard] TBGCCard failed:", err);
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white">
+        <PlatformCardHeader label="TBGC" tag="TB" internalHref="/products/tbgc" />
+        <PlatformUnavailable />
+      </div>
+    );
+  }
+}
+
+// ─── Hook Platform Card ────────────────────────────────────────────────────────
+
+async function HookCard() {
+  try {
+    const result = await hookConnector.getSnapshot();
+    const d = result.success ? result.data : null;
+
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
+        <PlatformCardHeader label="Hook" tag="H" internalHref="/products/hook" />
+        {d ? (
+          <div className="p-4 space-y-3 flex-1">
+            {/* Stage badge */}
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
+                {d.stage}
+              </span>
+              <span className="font-mono text-[9px] text-[#0A0A0A]/40">AI viral content platform</span>
+            </div>
+            {/* Revenue */}
+            <div className="grid grid-cols-3 gap-2">
+              <CardStat
+                label="MRR"
+                value={d.mrrCents > 0 ? formatCurrency(d.mrrCents / 100) : "Pre-revenue"}
+              />
+              <CardStat label="Paying" value={String(d.activeSubscriptions)} sub="users" />
+              <CardStat label="Trialing" value={String(d.trialingSubscriptions)} sub="users" />
+            </div>
+            {/* Notes */}
+            {d.notes.length > 0 && (
+              <div>
+                <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1">Status</span>
+                {d.notes.map((note, i) => (
+                  <p key={i} className="font-serif text-[11px] text-[#0A0A0A]/60">{note}</p>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <PlatformUnavailable />
+        )}
+      </div>
+    );
+  } catch (err) {
+    console.error("[Dashboard] HookCard failed:", err);
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white">
+        <PlatformCardHeader label="Hook" tag="H" internalHref="/products/hook" />
+        <PlatformUnavailable />
+      </div>
+    );
+  }
+}
+
 // ─── Actions Panel ──────────────────────────────────────────────────────────
 
 async function ActionsPanel() {
@@ -896,6 +1005,12 @@ export default async function DashboardPage() {
             </Suspense>
             <Suspense fallback={<PlatformCardSkeleton />}>
               <TaskSpaceCard />
+            </Suspense>
+            <Suspense fallback={<PlatformCardSkeleton />}>
+              <TBGCCard />
+            </Suspense>
+            <Suspense fallback={<PlatformCardSkeleton />}>
+              <HookCard />
             </Suspense>
           </div>
         </div>
