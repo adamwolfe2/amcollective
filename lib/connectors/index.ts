@@ -15,4 +15,6 @@ export * as linear from "./linear";
 export * as trackr from "./trackr";
 export * as taskspace from "./taskspace";
 export * as wholesail from "./wholesail";
+export * as tbgc from "./tbgc";
+export * as hook from "./hook";
 export { type ConnectorResult, invalidateCache } from "./base";
