@@ -1,9 +1,13 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import { AiChat } from "@/components/ai-chat";
 import { Bot } from "lucide-react";
 
 export default function AiPage() {
+  const params = useSearchParams();
+  const initialMessage = params.get("q") ?? undefined;
+
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)] -mx-6 -mt-6">
       {/* ClaudeBot header bar */}
@@ -19,7 +23,7 @@ export default function AiPage() {
         </span>
       </div>
       <div className="flex-1 min-h-0">
-        <AiChat variant="full" className="h-full" />
+        <AiChat variant="full" className="h-full" initialMessage={initialMessage} />
       </div>
     </div>
   );

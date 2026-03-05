@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import ReactMarkdown from "react-markdown";
@@ -197,9 +197,11 @@ interface AiChatProps {
   /** "full" shows conversation sidebar; "embedded" shows dropdown history */
   variant?: "full" | "embedded";
   className?: string;
+  /** Pre-fill and auto-submit this message (e.g. from floating bar ?q= param) */
+  initialMessage?: string;
 }
 
-export function AiChat({ variant = "embedded", className }: AiChatProps) {
+export function AiChat({ variant = "embedded", className, initialMessage }: AiChatProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [mode, setMode] = useState<"chat" | "research">("chat");
@@ -235,6 +237,16 @@ export function AiChat({ variant = "embedded", className }: AiChatProps) {
       });
     }
   }, [messages]);
+
+  // Auto-submit initialMessage once (from floating bar ?q= param)
+  const initialSentRef = useRef(false);
+  useLayoutEffect(() => {
+    if (initialMessage && !initialSentRef.current) {
+      initialSentRef.current = true;
+      handleSubmit(initialMessage);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialMessage]);
 
   const loadConversations = useCallback(async () => {
     try {

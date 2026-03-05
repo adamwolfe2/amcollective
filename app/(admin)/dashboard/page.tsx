@@ -1,6 +1,6 @@
 // Command Center Dashboard
-// Layout: Compact metrics strip → AI Chat (primary) + Actions/Quick Access (side panel)
-// Charts live in their dedicated pages (Finance, Analytics) — 1 click away from sidebar
+// Layout: Compact metrics strip → Portfolio Grid (platforms) + Actions sidebar
+// Floating chat bar replaces the full-page AI panel — click to open /ai
 
 import { Suspense } from "react";
 import Link from "next/link";
@@ -12,8 +12,12 @@ import { eq, and, sql, desc, gte, count, asc, isNull } from "drizzle-orm";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as mercuryConnector from "@/lib/connectors/mercury";
+import * as wholesailConnector from "@/lib/connectors/wholesail";
+import * as cursiveConnector from "@/lib/connectors/cursive";
+import * as trackrConnector from "@/lib/connectors/trackr";
+import * as taskspaceConnector from "@/lib/connectors/taskspace";
 import { getRecentActivity } from "@/lib/db/repositories/activity";
-import { AiChat } from "@/components/ai-chat";
+import { FloatingChatBar } from "@/components/floating-chat-bar";
 import { currentUser } from "@clerk/nextjs/server";
 import {
   Users,
@@ -28,6 +32,7 @@ import {
   FileCheck,
   Zap,
   Check,
+  ExternalLink,
 } from "lucide-react";
 
 function greeting() {
@@ -355,6 +360,364 @@ async function MetricsStrip() {
   }
 }
 
+// ─── Platform Card Shared ────────────────────────────────────────────────────
+
+function PlatformCardHeader({
+  label,
+  tag,
+  href,
+}: {
+  label: string;
+  tag: string;
+  href?: string;
+}) {
+  return (
+    <div className="px-4 py-2.5 border-b border-[#0A0A0A]/5 flex items-center justify-between">
+      <div className="flex items-center gap-2">
+        <span className="inline-flex items-center justify-center w-5 h-5 bg-[#0A0A0A] font-mono text-[9px] font-bold text-white">
+          {tag}
+        </span>
+        <span className="font-serif font-bold text-sm text-[#0A0A0A]">{label}</span>
+      </div>
+      {href && (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 font-mono text-[9px] text-[#0A0A0A]/40 hover:text-[#0A0A0A]/70 transition-colors"
+        >
+          open <ExternalLink size={9} />
+        </a>
+      )}
+    </div>
+  );
+}
+
+function CardStat({
+  label,
+  value,
+  sub,
+  alert,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  alert?: boolean;
+}) {
+  return (
+    <div>
+      <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block">
+        {label}
+      </span>
+      <div className="flex items-baseline gap-1">
+        <span
+          className={`font-mono font-bold text-base leading-tight ${
+            alert ? "text-red-600" : "text-[#0A0A0A]"
+          }`}
+        >
+          {value}
+        </span>
+        {sub && (
+          <span className="font-mono text-[9px] text-[#0A0A0A]/40">{sub}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PlatformUnavailable() {
+  return (
+    <div className="p-4 flex items-center justify-center h-20">
+      <p className="font-mono text-[10px] text-[#0A0A0A]/25">Not connected</p>
+    </div>
+  );
+}
+
+// ─── Wholesail Platform Card ─────────────────────────────────────────────────
+
+async function WholesailCard() {
+  try {
+    const result = await wholesailConnector.getSnapshot();
+    const d = result.success ? result.data : null;
+
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
+        <PlatformCardHeader
+          label="Wholesail"
+          tag="W"
+          href="https://wholesailhub.com/admin"
+        />
+        {d ? (
+          <div className="p-4 space-y-3 flex-1">
+            <div className="grid grid-cols-3 gap-3">
+              <CardStat label="Active" value={String(d.activeBuilds)} />
+              <CardStat label="Live" value={String(d.liveClients)} />
+              <CardStat
+                label="Intake"
+                value={String(d.intake.pending)}
+                sub="pending"
+                alert={d.intake.pending > 0}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <CardStat
+                label="Pipeline"
+                value={formatCurrency(d.pipelineValue)}
+              />
+              <CardStat
+                label="MRR"
+                value={formatCurrency(d.mrrFromRetainers)}
+              />
+            </div>
+            {/* Pipeline bar */}
+            {Object.keys(d.buildsByStatus).length > 0 && (
+              <div className="flex gap-0.5 h-1.5">
+                {Object.entries(d.buildsByStatus).map(([status, cnt]) => (
+                  <div
+                    key={status}
+                    className="h-full bg-[#0A0A0A]/20 flex-1"
+                    title={`${status}: ${cnt}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <PlatformUnavailable />
+        )}
+      </div>
+    );
+  } catch (err) {
+    console.error("[Dashboard] WholesailCard failed:", err);
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white">
+        <PlatformCardHeader label="Wholesail" tag="W" />
+        <PlatformUnavailable />
+      </div>
+    );
+  }
+}
+
+// ─── Cursive Platform Card ────────────────────────────────────────────────────
+
+async function CursiveCard() {
+  try {
+    const result = await cursiveConnector.getSnapshot();
+    const d = result.success ? result.data : null;
+
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
+        <PlatformCardHeader
+          label="Cursive"
+          tag="C"
+          href="https://leads.meetcursive.com/admin"
+        />
+        {d ? (
+          <div className="p-4 space-y-3 flex-1">
+            <div className="grid grid-cols-3 gap-3">
+              <CardStat
+                label="Workspaces"
+                value={String(d.totalWorkspaces)}
+              />
+              <CardStat
+                label="Active"
+                value={String(d.pipeline.active + d.pipeline.trial)}
+                sub="incl. trial"
+              />
+              <CardStat
+                label="New"
+                value={String(d.pipeline.new)}
+                sub="this wk"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <CardStat
+                label="Leads"
+                value={String(d.leads.total)}
+                sub={`+${d.leads.createdThisWeek} wk`}
+              />
+              <CardStat
+                label="Bookings"
+                value={String(d.bookings.thisWeek)}
+                sub="this wk"
+              />
+            </div>
+            {d.pixels.trialsExpiringWeek > 0 && (
+              <div className="flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                <span className="font-mono text-[10px] text-[#0A0A0A]/60">
+                  {d.pixels.trialsExpiringWeek} pixel trial
+                  {d.pixels.trialsExpiringWeek !== 1 ? "s" : ""} expiring
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <PlatformUnavailable />
+        )}
+      </div>
+    );
+  } catch (err) {
+    console.error("[Dashboard] CursiveCard failed:", err);
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white">
+        <PlatformCardHeader label="Cursive" tag="C" />
+        <PlatformUnavailable />
+      </div>
+    );
+  }
+}
+
+// ─── Trackr Platform Card ─────────────────────────────────────────────────────
+
+async function TrackrCard() {
+  try {
+    const result = await trackrConnector.getSnapshot();
+    const d = result.success ? result.data : null;
+
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
+        <PlatformCardHeader
+          label="Trackr"
+          tag="T"
+          href="https://trytrackr.com"
+        />
+        {d ? (
+          <div className="p-4 space-y-3 flex-1">
+            <div className="grid grid-cols-3 gap-3">
+              <CardStat
+                label="Workspaces"
+                value={String(d.totalWorkspaces)}
+                sub={`+${d.newWorkspacesWeek} wk`}
+              />
+              <CardStat
+                label="Paying"
+                value={String(d.activeSubscriptions)}
+              />
+              <CardStat
+                label="Trialing"
+                value={String(d.trialingSubscriptions)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <CardStat
+                label="MRR"
+                value={formatCurrency(d.mrrCents / 100)}
+              />
+              <CardStat
+                label="Tools"
+                value={String(d.totalToolsResearched)}
+                sub="researched"
+              />
+            </div>
+          </div>
+        ) : (
+          <PlatformUnavailable />
+        )}
+      </div>
+    );
+  } catch (err) {
+    console.error("[Dashboard] TrackrCard failed:", err);
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white">
+        <PlatformCardHeader label="Trackr" tag="T" />
+        <PlatformUnavailable />
+      </div>
+    );
+  }
+}
+
+// ─── TaskSpace Platform Card ──────────────────────────────────────────────────
+
+async function TaskSpaceCard() {
+  try {
+    const result = await taskspaceConnector.getSnapshot();
+    const d = result.success ? result.data : null;
+
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
+        <PlatformCardHeader
+          label="TaskSpace"
+          tag="TS"
+          href="https://trytaskspace.com"
+        />
+        {d ? (
+          <div className="p-4 space-y-3 flex-1">
+            <div className="grid grid-cols-3 gap-3">
+              <CardStat label="Orgs" value={String(d.totalOrgs)} />
+              <CardStat label="Members" value={String(d.totalMembers)} />
+              <CardStat
+                label="EOD Rate"
+                value={`${d.eodRate7Day}%`}
+                sub="7d"
+                alert={d.eodRate7Day < 50}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <CardStat
+                label="On-Track"
+                value={String(d.rocksOnTrack)}
+                sub="rocks"
+              />
+              <CardStat
+                label="At-Risk"
+                value={String(d.rocksAtRisk + d.rocksBlocked)}
+                sub="rocks"
+                alert={d.rocksAtRisk + d.rocksBlocked > 0}
+              />
+            </div>
+            {/* Rock progress bar */}
+            {d.rocksOnTrack + d.rocksAtRisk + d.rocksBlocked + d.rocksCompleted > 0 && (
+              <div className="flex gap-0.5 h-1.5">
+                {d.rocksOnTrack > 0 && (
+                  <div
+                    className="h-full bg-emerald-400"
+                    style={{
+                      flex: d.rocksOnTrack,
+                    }}
+                    title={`On-track: ${d.rocksOnTrack}`}
+                  />
+                )}
+                {d.rocksAtRisk > 0 && (
+                  <div
+                    className="h-full bg-amber-400"
+                    style={{ flex: d.rocksAtRisk }}
+                    title={`At-risk: ${d.rocksAtRisk}`}
+                  />
+                )}
+                {d.rocksBlocked > 0 && (
+                  <div
+                    className="h-full bg-red-400"
+                    style={{ flex: d.rocksBlocked }}
+                    title={`Blocked: ${d.rocksBlocked}`}
+                  />
+                )}
+                {d.rocksCompleted > 0 && (
+                  <div
+                    className="h-full bg-[#0A0A0A]/15"
+                    style={{ flex: d.rocksCompleted }}
+                    title={`Completed: ${d.rocksCompleted}`}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <PlatformUnavailable />
+        )}
+      </div>
+    );
+  } catch (err) {
+    console.error("[Dashboard] TaskSpaceCard failed:", err);
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white">
+        <PlatformCardHeader label="TaskSpace" tag="TS" />
+        <PlatformUnavailable />
+      </div>
+    );
+  }
+}
+
 // ─── Actions Panel ──────────────────────────────────────────────────────────
 
 async function ActionsPanel() {
@@ -571,6 +934,28 @@ function MetricsStripSkeleton() {
   );
 }
 
+function PlatformCardSkeleton() {
+  return (
+    <div className="border border-[#0A0A0A]/10 bg-white">
+      <div className="px-4 py-2.5 border-b border-[#0A0A0A]/5">
+        <div className="h-4 w-24 bg-[#0A0A0A]/5 animate-pulse" />
+      </div>
+      <div className="p-4 space-y-3">
+        <div className="grid grid-cols-3 gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-10 bg-[#0A0A0A]/5 animate-pulse" />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="h-10 bg-[#0A0A0A]/5 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ActionsPanelSkeleton() {
   return (
     <div className="space-y-4">
@@ -589,7 +974,8 @@ export default async function DashboardPage() {
   const firstName = user?.firstName ?? "there";
 
   return (
-    <div className="flex flex-col h-[calc(100vh-7rem)]">
+    // pb-24 keeps content above the floating chat bar
+    <div className="flex flex-col h-[calc(100vh-7rem)] pb-20">
       {/* Header + Metrics */}
       <div className="shrink-0 space-y-3 mb-4">
         <div className="flex items-center justify-between">
@@ -601,26 +987,48 @@ export default async function DashboardPage() {
               {format(now, "EEEE, MMMM d, yyyy")}
             </p>
           </div>
+          <Link
+            href="/ai"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 font-mono text-[10px] border border-[#0A0A0A]/15 bg-white hover:border-[#0A0A0A]/30 transition-colors"
+          >
+            Open AM Agent →
+          </Link>
         </div>
         <Suspense fallback={<MetricsStripSkeleton />}>
           <MetricsStrip />
         </Suspense>
       </div>
 
-      {/* Main: AI Chat + Side Panel */}
+      {/* Main: Portfolio Grid + Side Panel */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">
-        {/* AI Chat — primary interface */}
-        <div className="lg:col-span-7 xl:col-span-8 min-h-0 flex flex-col">
-          <AiChat className="flex-1 min-h-0" />
+        {/* Portfolio Grid */}
+        <div className="lg:col-span-8 overflow-y-auto min-h-0">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Suspense fallback={<PlatformCardSkeleton />}>
+              <WholesailCard />
+            </Suspense>
+            <Suspense fallback={<PlatformCardSkeleton />}>
+              <CursiveCard />
+            </Suspense>
+            <Suspense fallback={<PlatformCardSkeleton />}>
+              <TrackrCard />
+            </Suspense>
+            <Suspense fallback={<PlatformCardSkeleton />}>
+              <TaskSpaceCard />
+            </Suspense>
+          </div>
         </div>
 
-        {/* Side Panel — actions, quick access, activity */}
-        <div className="lg:col-span-5 xl:col-span-4 overflow-y-auto min-h-0">
+        {/* Side Panel — sprint, actions, quick access, activity */}
+        <div className="lg:col-span-4 overflow-y-auto min-h-0">
           <Suspense fallback={<ActionsPanelSkeleton />}>
             <ActionsPanel />
           </Suspense>
         </div>
       </div>
+
+      {/* Floating Chat Bar */}
+      <FloatingChatBar />
     </div>
   );
 }

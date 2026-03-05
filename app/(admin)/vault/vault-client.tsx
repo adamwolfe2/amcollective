@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Eye, EyeOff, Copy, Check, Trash2, Plus, X, Pencil } from "lucide-react";
+import { Eye, EyeOff, Copy, Check, Trash2, Plus, X, Pencil, Sparkles } from "lucide-react";
 import { createCredential, updateCredential, deleteCredential } from "@/lib/actions/vault";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -107,9 +107,11 @@ const EMPTY_FORM: FormState = {
 
 export function CredentialForm({
   editing,
+  prefill,
   onClose,
 }: {
   editing?: Credential | null;
+  prefill?: ParsedFields | null;
   onClose: () => void;
 }) {
   const [form, setForm] = useState<FormState>(
@@ -121,6 +123,15 @@ export function CredentialForm({
           password: "",
           url: editing.url ?? "",
           notes: editing.notes ?? "",
+        }
+      : prefill
+      ? {
+          label: prefill.label,
+          service: prefill.service,
+          username: prefill.username,
+          password: prefill.password,
+          url: prefill.url,
+          notes: prefill.notes,
         }
       : EMPTY_FORM
   );
@@ -280,21 +291,137 @@ export function DeleteButton({ id }: { id: string }) {
   );
 }
 
+// ─── AI Parse Modal ───────────────────────────────────────────────────────────
+
+type ParsedFields = {
+  label: string;
+  service: string;
+  username: string;
+  password: string;
+  url: string;
+  notes: string;
+};
+
+function AiParseModal({
+  onClose,
+  onParsed,
+}: {
+  onClose: () => void;
+  onParsed: (fields: ParsedFields) => void;
+}) {
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleParse() {
+    if (!text.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/vault/parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Parse failed");
+        return;
+      }
+      onParsed(data as ParsedFields);
+    } catch {
+      setError("Network error — please try again");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-[#F3F3EF] border-2 border-[#0A0A0A] w-full max-w-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Sparkles size={15} />
+            <h2 className="font-serif font-bold text-lg">AI Parse Credential</h2>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-[#0A0A0A]/10">
+            <X size={16} />
+          </button>
+        </div>
+
+        <p className="font-mono text-[11px] text-[#0A0A0A]/50 mb-3">
+          Paste any raw text (email, doc, notes) and Claude will extract the
+          credential fields automatically.
+        </p>
+
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={8}
+          placeholder="e.g. Mercury login: admin@amcollective.com / Password: abc123!&#10;URL: https://app.mercury.com"
+          className="w-full border border-[#0A0A0A]/30 bg-white px-3 py-2 font-mono text-sm focus:outline-none focus:border-[#0A0A0A] resize-none mb-3"
+        />
+
+        {error && (
+          <p className="font-mono text-[11px] text-red-600 mb-3">{error}</p>
+        )}
+
+        <div className="flex gap-2">
+          <button
+            onClick={handleParse}
+            disabled={loading || !text.trim()}
+            className="flex-1 flex items-center justify-center gap-2 bg-[#0A0A0A] text-white font-mono text-xs uppercase tracking-wider py-2.5 hover:bg-[#0A0A0A]/80 disabled:opacity-40"
+          >
+            <Sparkles size={12} />
+            {loading ? "Parsing..." : "Parse with AI"}
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 border border-[#0A0A0A]/30 font-mono text-xs uppercase tracking-wider hover:bg-[#0A0A0A]/5"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Vault Table (client wrapper with add/edit controls) ──────────────────────
 
 export function VaultTable({ rows }: { rows: Credential[] }) {
   const [showForm, setShowForm] = useState(false);
+  const [showAiParse, setShowAiParse] = useState(false);
   const [editTarget, setEditTarget] = useState<Credential | null>(null);
+  const [prefill, setPrefill] = useState<ParsedFields | null>(null);
+
+  function handleParsed(fields: ParsedFields) {
+    setPrefill(fields);
+    setShowAiParse(false);
+    setShowForm(true);
+  }
+
+  function handleFormClose() {
+    setShowForm(false);
+    setEditTarget(null);
+    setPrefill(null);
+  }
 
   return (
     <>
+      {showAiParse && (
+        <AiParseModal
+          onClose={() => setShowAiParse(false)}
+          onParsed={handleParsed}
+        />
+      )}
+
       {(showForm || editTarget) && (
         <CredentialForm
           editing={editTarget}
-          onClose={() => {
-            setShowForm(false);
-            setEditTarget(null);
-          }}
+          prefill={prefill}
+          onClose={handleFormClose}
         />
       )}
 
@@ -307,13 +434,22 @@ export function VaultTable({ rows }: { rows: Credential[] }) {
             Encrypted shared credentials — passwords revealed on demand
           </p>
         </div>
-        <button
-          onClick={() => setShowForm(true)}
-          className="flex items-center gap-2 bg-[#0A0A0A] text-white font-mono text-xs uppercase tracking-wider px-4 py-2.5 hover:bg-[#0A0A0A]/80"
-        >
-          <Plus size={13} />
-          Add Credential
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAiParse(true)}
+            className="flex items-center gap-2 border border-[#0A0A0A] font-mono text-xs uppercase tracking-wider px-4 py-2.5 hover:bg-[#0A0A0A] hover:text-white transition-colors"
+          >
+            <Sparkles size={13} />
+            AI Parse
+          </button>
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-2 bg-[#0A0A0A] text-white font-mono text-xs uppercase tracking-wider px-4 py-2.5 hover:bg-[#0A0A0A]/80"
+          >
+            <Plus size={13} />
+            Add Credential
+          </button>
+        </div>
       </div>
 
       {rows.length === 0 ? (
