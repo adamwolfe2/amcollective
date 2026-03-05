@@ -16,13 +16,21 @@ export interface TrackrSnapshot {
   totalWorkspaces: number;
   newWorkspacesWeek: number;
   activeSubscriptions: number;
+  trialingSubscriptions: number;
   mrrCents: number;
+  planBreakdown: Record<string, number>;
   totalToolsResearched: number;
   auditSubmissionsTotal: number;
   auditSubmissionsLastWeek: number;
   auditSubmissionsComplete: number;
   auditPipelinePending: number;
   apiCostsMtdCents: number;
+  apiCostsTodayCents: number;
+  // Architect (affiliate) program
+  activeArchitects: number;
+  pendingArchitectApplications: number;
+  pendingCommissionsCents: number;
+  architectReferralsThisWeek: number;
 }
 
 // ─── Stripe price → monthly cents map (hardcoded from Trackr env) ─────────────
@@ -79,6 +87,11 @@ export async function getSnapshot(): Promise<ConnectorResult<TrackrSnapshot>> {
       auditComplete,
       auditPending,
       apiCostsMtd,
+      apiCostsToday,
+      activeArchitects,
+      pendingApplications,
+      pendingCommissions,
+      architectReferralsWeek,
     ] = await Promise.all([
       safeCount("SELECT COUNT(*) as count FROM workspaces"),
       safeCount("SELECT COUNT(*) as count FROM workspaces WHERE created_at > NOW() - INTERVAL '7 days'"),
@@ -87,31 +100,66 @@ export async function getSnapshot(): Promise<ConnectorResult<TrackrSnapshot>> {
       safeCount("SELECT COUNT(*) as count FROM audit_submissions WHERE created_at > NOW() - INTERVAL '7 days'"),
       safeCount("SELECT COUNT(*) as count FROM audit_submissions WHERE status = 'complete'"),
       safeCount("SELECT COUNT(*) as count FROM audit_submissions WHERE status IN ('pending', 'processing')"),
-      safeCount("SELECT COALESCE(SUM(cost_cents), 0) as count FROM api_logs WHERE created_at > DATE_TRUNC('month', NOW())"),
+      safeCount("SELECT COALESCE(SUM(estimated_cost * 100), 0)::int as count FROM api_logs WHERE created_at > DATE_TRUNC('month', NOW())"),
+      safeCount("SELECT COALESCE(SUM(estimated_cost * 100), 0)::int as count FROM api_logs WHERE created_at > CURRENT_DATE"),
+      safeCount("SELECT COUNT(*) as count FROM architects WHERE status = 'active'").catch(() => 0),
+      safeCount("SELECT COUNT(*) as count FROM architect_applications WHERE status = 'pending'").catch(() => 0),
+      safeCount("SELECT COALESCE(SUM(commission_amount), 0)::int as count FROM architect_commissions WHERE status = 'pending'").catch(() => 0),
+      safeCount("SELECT COUNT(*) as count FROM architect_referrals WHERE attributed_at > NOW() - INTERVAL '7 days'").catch(() => 0),
     ]);
 
-    // Real MRR: map each active subscription's plan_id to monthly price
+    // Real MRR: map each active subscription's plan_id to monthly price + tier breakdown
     let activeSubscriptions = 0;
+    let trialingSubscriptions = 0;
     let mrrCents = 0;
+    const planBreakdown: Record<string, number> = { free: 0, team: 0, startup: 0, enterprise: 0 };
+
+    // Plan slug → tier name
+    const PLAN_TIER: Record<string, string> = {
+      team: "team", startup: "startup", enterprise: "enterprise",
+      price_1T2cA8ExwpuzI9OqBKm4EP78: "team",   price_1T2cAWExwpuzI9OqUdhoTkdg: "startup",
+      price_1T2cAtExwpuzI9OqBSFl6VQB: "enterprise",
+      price_1T2cI1ExwpuzI9Oq4UfTvMu7: "team",   price_1T2cGhExwpuzI9OqNKwphxuM: "startup",
+      price_1T2cFKExwpuzI9OqbChqL5tT: "enterprise",
+    };
+
     try {
       const subs = await db(
         "SELECT plan_id, status FROM subscriptions WHERE status IN ('active', 'trialing') AND (current_period_end IS NULL OR current_period_end > NOW())"
       ) as Array<{ plan_id: string; status: string }>;
-      activeSubscriptions = subs.length;
-      mrrCents = subs.reduce((sum, s) => sum + (PLAN_PRICE_MAP[s.plan_id] ?? 5000), 0);
+      for (const s of subs) {
+        if (s.status === "trialing") {
+          trialingSubscriptions++;
+        } else {
+          activeSubscriptions++;
+          mrrCents += PLAN_PRICE_MAP[s.plan_id] ?? 5000;
+        }
+        const tier = PLAN_TIER[s.plan_id] ?? "team";
+        planBreakdown[tier] = (planBreakdown[tier] ?? 0) + 1;
+      }
     } catch { /* subscriptions may be empty */ }
+
+    // Free workspaces = total minus any subscription
+    planBreakdown.free = Math.max(0, totalWorkspaces - activeSubscriptions - trialingSubscriptions);
 
     return {
       totalWorkspaces,
       newWorkspacesWeek,
       activeSubscriptions,
+      trialingSubscriptions,
       mrrCents,
+      planBreakdown,
       totalToolsResearched: totalTools,
       auditSubmissionsTotal: auditTotal,
       auditSubmissionsLastWeek: auditWeek,
       auditSubmissionsComplete: auditComplete,
       auditPipelinePending: auditPending,
       apiCostsMtdCents: apiCostsMtd,
+      apiCostsTodayCents: apiCostsToday,
+      activeArchitects,
+      pendingArchitectApplications: pendingApplications,
+      pendingCommissionsCents: pendingCommissions,
+      architectReferralsThisWeek: architectReferralsWeek,
     };
   });
 }

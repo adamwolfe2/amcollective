@@ -370,6 +370,22 @@ export const CEO_TOOL_DEFINITIONS: Anthropic.Tool[] = [
       required: ["title"],
     },
   },
+  {
+    name: "get_portfolio_snapshot",
+    description:
+      "Get a unified snapshot across all 6 portfolio products: Wholesail, Trackr, Cursive, TaskSpace, TBGC, Hook. Returns MRR, user counts, pipeline, and health per product in one call. Use when asked about 'all products', 'portfolio', 'across platforms', or any multi-product question.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        platform: {
+          type: "string",
+          enum: ["all", "wholesail", "trackr", "cursive", "taskspace"],
+          description: "Which platform to fetch. 'all' returns all 4 connected platforms in parallel.",
+        },
+      },
+      required: [],
+    },
+  },
 ];
 
 // ─── Tool Executor ────────────────────────────────────────────────────────────
@@ -951,6 +967,101 @@ export async function executeCeoTool(
           .returning();
 
         return JSON.stringify({ created: true, sprintId: sprint.id, title: sprint.title, weekOf: sprint.weekOf });
+      }
+
+      case "get_portfolio_snapshot": {
+        const platform = (input.platform as string) || "all";
+        const results: Record<string, unknown> = {};
+
+        const fetchAll = platform === "all";
+
+        await Promise.all([
+          // Wholesail
+          (fetchAll || platform === "wholesail") ? (async () => {
+            const { getSnapshot: wsSnap, isConfigured: wsOk } = await import("@/lib/connectors/wholesail");
+            if (!wsOk()) { results.wholesail = { error: "Not configured" }; return; }
+            const r = await wsSnap();
+            if (!r.success) { results.wholesail = { error: r.error }; return; }
+            const d = r.data!;
+            results.wholesail = {
+              liveClients: d.liveClients,
+              activeBuilds: d.activeBuilds,
+              mrrFromRetainers: d.mrrFromRetainers,
+              pipelineValue: d.pipelineValue,
+              buildsByStatus: d.buildsByStatus,
+              intake: d.intake,
+              stuckProjects: d.stuckProjects,
+              overdueProjects: d.overdueProjects,
+              buildCostsMtdCents: d.buildCostsMtdCents,
+            };
+          })() : Promise.resolve(),
+
+          // Trackr
+          (fetchAll || platform === "trackr") ? (async () => {
+            const { getSnapshot: trSnap, isConfigured: trOk } = await import("@/lib/connectors/trackr");
+            if (!trOk()) { results.trackr = { error: "Not configured" }; return; }
+            const r = await trSnap();
+            if (!r.success) { results.trackr = { error: r.error }; return; }
+            const d = r.data!;
+            results.trackr = {
+              totalWorkspaces: d.totalWorkspaces,
+              newWorkspacesWeek: d.newWorkspacesWeek,
+              activeSubscriptions: d.activeSubscriptions,
+              trialingSubscriptions: d.trialingSubscriptions,
+              mrrCents: d.mrrCents,
+              planBreakdown: d.planBreakdown,
+              auditPipelinePending: d.auditPipelinePending,
+              auditSubmissionsLastWeek: d.auditSubmissionsLastWeek,
+              apiCostsMtdCents: d.apiCostsMtdCents,
+              activeArchitects: d.activeArchitects,
+              pendingArchitectApplications: d.pendingArchitectApplications,
+              pendingCommissionsCents: d.pendingCommissionsCents,
+            };
+          })() : Promise.resolve(),
+
+          // Cursive
+          (fetchAll || platform === "cursive") ? (async () => {
+            const { getSnapshot: cuSnap, isConfigured: cuOk } = await import("@/lib/connectors/cursive");
+            if (!cuOk()) { results.cursive = { error: "Not configured" }; return; }
+            const r = await cuSnap();
+            if (!r.success) { results.cursive = { error: r.error }; return; }
+            const d = r.data!;
+            results.cursive = {
+              totalWorkspaces: d.totalWorkspaces,
+              managedByOps: d.managedByOps,
+              pipeline: d.pipeline,
+              bookings: d.bookings,
+              pixels: d.pixels,
+              leads: d.leads,
+              affiliates: d.affiliates,
+            };
+          })() : Promise.resolve(),
+
+          // TaskSpace
+          (fetchAll || platform === "taskspace") ? (async () => {
+            const { getSnapshot: tsSnap, isConfigured: tsOk } = await import("@/lib/connectors/taskspace");
+            if (!tsOk()) { results.taskspace = { error: "Not configured" }; return; }
+            const r = await tsSnap();
+            if (!r.success) { results.taskspace = { error: r.error }; return; }
+            const d = r.data!;
+            results.taskspace = {
+              totalOrgs: d.totalOrgs,
+              totalMembers: d.totalMembers,
+              eodRate7Day: d.eodRate7Day,
+              eodsToday: d.eodsToday,
+              activeTasks: d.activeTasks,
+              openEscalations: d.openEscalations,
+              rocksOnTrack: d.rocksOnTrack,
+              rocksAtRisk: d.rocksAtRisk,
+              planBreakdown: d.planBreakdown,
+              payingOrgs: d.payingOrgs,
+              mrrCents: d.mrrCents,
+              criticalOrgs: d.orgs.filter((o) => o.riskLevel === "critical").map((o) => o.name),
+            };
+          })() : Promise.resolve(),
+        ]);
+
+        return JSON.stringify({ platform, snapshot: results, fetchedAt: new Date().toISOString() });
       }
 
       default:

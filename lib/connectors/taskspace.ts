@@ -32,6 +32,12 @@ export interface TaskSpaceOrgSnapshot {
   riskLevel: "healthy" | "warning" | "critical";
 }
 
+export interface TaskSpacePlanBreakdown {
+  free: number;
+  team: number;
+  business: number;
+}
+
 export interface TaskSpaceSnapshot {
   totalOrgs: number;
   totalMembers: number;
@@ -45,6 +51,10 @@ export interface TaskSpaceSnapshot {
   rocksBlocked: number;
   rocksCompleted: number;
   avgRockProgress: number;
+  // Monetization
+  planBreakdown: TaskSpacePlanBreakdown;
+  payingOrgs: number;
+  mrrCents: number;
   orgs: TaskSpaceOrgSnapshot[];
 }
 
@@ -114,6 +124,11 @@ export async function getSnapshot(): Promise<ConnectorResult<TaskSpaceSnapshot>>
        FROM rocks
        GROUP BY organization_id, status`
     ) as Array<{ organization_id: string; status: string; count: string; avg_progress: string }>;
+
+    // Plan breakdown — organizations table has plan field: 'free' | 'team' | 'business'
+    const planRows = await sql(
+      "SELECT plan, COUNT(*) as count FROM organizations GROUP BY plan"
+    ).catch(() => []) as Array<{ plan: string; count: string }>;
 
     // Build rock maps
     const rockMap = new Map<string, { onTrack: number; atRisk: number; blocked: number; completed: number; totalProgress: number; totalCount: number }>();
@@ -195,6 +210,16 @@ export async function getSnapshot(): Promise<ConnectorResult<TaskSpaceSnapshot>>
     const totalRockProgress = allRockEntries.reduce((s, e) => s + e.totalProgress, 0);
     const avgRockProgress = totalRockCount > 0 ? Math.round(totalRockProgress / totalRockCount) : 0;
 
+    // Plan breakdown + MRR
+    const planBreakdown: TaskSpacePlanBreakdown = { free: 0, team: 0, business: 0 };
+    for (const r of planRows) {
+      const plan = r.plan as keyof TaskSpacePlanBreakdown;
+      if (plan in planBreakdown) planBreakdown[plan] = parseInt(r.count, 10);
+    }
+    const payingOrgs = planBreakdown.team + planBreakdown.business;
+    // Estimated MRR: Team $49/mo, Business $99/mo (from spec feature flags)
+    const mrrCents = planBreakdown.team * 4900 + planBreakdown.business * 9900;
+
     return {
       totalOrgs,
       totalMembers,
@@ -208,6 +233,9 @@ export async function getSnapshot(): Promise<ConnectorResult<TaskSpaceSnapshot>>
       rocksBlocked,
       rocksCompleted,
       avgRockProgress,
+      planBreakdown,
+      payingOrgs,
+      mrrCents,
       orgs: orgSnapshots,
     };
   });

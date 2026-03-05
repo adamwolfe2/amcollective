@@ -1899,6 +1899,53 @@ export const ceoTools = {
       return { updated: true };
     },
   }),
+
+  search_vault: tool({
+    description:
+      "Search the credentials vault by service name, label, or keyword. Returns metadata only — label, service, username, URL, notes. Never returns passwords. Instruct the user to use the Reveal button in the vault UI to access passwords.",
+    inputSchema: z.object({
+      query: z.string().describe("Service name, label, or keyword to search for (e.g. 'stripe', 'mercury', 'github')"),
+    }),
+    execute: async ({ query }) => {
+      const results = await db
+        .select({
+          id: schema.credentials.id,
+          label: schema.credentials.label,
+          service: schema.credentials.service,
+          username: schema.credentials.username,
+          url: schema.credentials.url,
+          notes: schema.credentials.notes,
+          hasPassword: schema.credentials.passwordEncrypted,
+        })
+        .from(schema.credentials)
+        .where(
+          or(
+            ilike(schema.credentials.label, `%${query}%`),
+            ilike(schema.credentials.service, `%${query}%`),
+            ilike(schema.credentials.notes, `%${query}%`)
+          )
+        )
+        .limit(10);
+
+      if (results.length === 0) {
+        return { found: 0, message: `No credentials found matching "${query}"` };
+      }
+
+      return {
+        found: results.length,
+        credentials: results.map((r) => ({
+          id: r.id,
+          label: r.label,
+          service: r.service,
+          username: r.username ?? null,
+          url: r.url ?? null,
+          notes: r.notes ?? null,
+          hasPassword: !!r.hasPassword,
+        })),
+        note: "Passwords are not returned for security. Use the Reveal button at /vault to access them.",
+      };
+    },
+  }),
 };
 
 // ─── All Tools Combined ───────────────────────────────────────────────────────

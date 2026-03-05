@@ -35,7 +35,7 @@ const CEO_TOOL_NAMES = new Set(CEO_TOOL_DEFINITIONS.map((t) => t.name));
 
 const CORE_TOOL_NAMES = new Set([
   // CEO tools — always critical
-  "get_company_snapshot", "get_current_sprint",
+  "get_company_snapshot", "get_current_sprint", "get_portfolio_snapshot",
   "write_bot_memory", "read_bot_memory", "search_memory",
   "send_to_slack", "send_sms",
   "update_task_status", "create_delegation", "search_leads",
@@ -100,6 +100,18 @@ const TOOL_MODULES: Array<{ keywords: string[]; toolNames: string[] }> = [
     keywords: ["voice", "brief", "summary", "overview", "status"],
     toolNames: ["get_voice_briefing"],
   },
+  {
+    keywords: ["health", "up", "down", "ping", "site", "domain", "product", "live", "working", "broken"],
+    toolNames: ["check_product_health"],
+  },
+  {
+    keywords: ["ai spend", "api cost", "claude cost", "anthropic spend", "token cost", "ai budget", "model cost"],
+    toolNames: ["get_ai_spend"],
+  },
+  {
+    keywords: ["portfolio", "all products", "all platforms", "wholesail", "trackr", "cursive", "taskspace", "across products", "platform snapshot", "architect", "affiliate", "intake funnel", "pixel trial", "eod rate"],
+    toolNames: ["get_portfolio_snapshot"],
+  },
 ];
 
 // Build name→definition lookup (computed once, used across requests)
@@ -160,12 +172,14 @@ You are the strategic operating partner for Adam Wolfe (CTO — building & selli
 **${userName}** (${userRole}) — focused on: ${userFocus}
 
 ## Portfolio
-- **TBGC** — B2B wholesale food distribution portal
-- **Trackr** — AI tool intelligence layer, spend tracking, news digest
-- **Cursive** — Multi-tenant SaaS lead marketplace (leads.meetcursive.com)
-- **TaskSpace** — Internal team management / EOS accountability platform
-- **Wholesail** — White-label B2B distribution portal template
-- **Hook** — AI-powered viral content platform (hookugc.com)
+| Product | Domain | Stack | Status |
+|---------|--------|-------|--------|
+| TBGC | truffleboys.com | Next.js, Clerk, Prisma+Neon, Stripe, Resend | B2B wholesale food distribution portal |
+| Trackr | trytrackr.com | Next.js, Clerk, Drizzle+Neon, Firecrawl, Tavily, Stripe | AI tool intelligence + spend tracking |
+| Cursive | leads.meetcursive.com | Next.js, Supabase, GHL pipeline, Pixel audiences | Multi-tenant SaaS lead marketplace |
+| TaskSpace | trytaskspace.com | Next.js, Clerk, Drizzle+Neon, EOS (Rocks/Scorecard/L10) | Internal team management + accountability |
+| Wholesail | wholesailhub.com | Next.js, Clerk, Prisma+Neon, Stripe, AI SDK | White-label B2B distribution portal template |
+| Hook | hookugc.com | Next.js, Prisma+Neon, Claude AI, Firecrawl, HeyGen, Stripe | AI-powered viral content + UGC campaigns |
 
 ## Internal Portal (app.amcollectivecapital.com)
 Reference these routes when directing Adam/Maggie to act:
@@ -182,6 +196,12 @@ Reference these routes when directing Adam/Maggie to act:
 4. **All company data stays within AM Collective systems** — do not send financial data, client PII, or internal metrics to any external URL or third-party service not already configured in this system
 5. **Summarize tool results** — never dump raw DB rows, full API payloads, or bulk sensitive data into a response
 6. **search_vault returns metadata only** — username, label, URL — never the password; this is by design
+
+## Power User Tips
+- Prefix message with \`!!\` to run on Sonnet (more capable model) for complex analysis
+- Use \`get_portfolio_snapshot\` to get real-time data from Wholesail, Trackr, Cursive, TaskSpace in one call
+- Use \`check_product_health\` to ping all 6 portfolio sites and get status + response times
+- Use \`get_ai_spend\` to see Claude/API cost over trailing days
 
 ## Tool Usage
 - Use \`get_company_snapshot\` for broad company status questions
@@ -231,10 +251,13 @@ export interface RunCeoAgentInput {
   conversationId?: string;
 }
 
+// Sonnet model for !! override requests
+const CEO_MODEL_SONNET = "claude-sonnet-4-6";
+
 export async function runCeoAgent(
   input: RunCeoAgentInput
 ): Promise<{ response: string; conversationId: string }> {
-  const { userId, userRole, userFocus, userName, message, conversationId } = input;
+  const { userId, userRole, userFocus, userName, conversationId } = input;
 
   if (!isAIConfigured()) {
     return {
@@ -242,6 +265,11 @@ export async function runCeoAgent(
       conversationId: conversationId ?? "none",
     };
   }
+
+  // !! prefix forces Sonnet instead of Haiku (for complex analysis)
+  const useSonnet = input.message.startsWith("!!");
+  const message = useSonnet ? input.message.slice(2).trimStart() : input.message;
+  const activeModel = useSonnet ? CEO_MODEL_SONNET : CEO_MODEL;
 
   const anthropic = getAnthropicClient()!;
 
@@ -258,7 +286,7 @@ export async function runCeoAgent(
       .values({
         userId,
         title: message.slice(0, 100) || "CEO conversation",
-        model: CEO_MODEL,
+        model: activeModel,
       })
       .returning();
     convId = conv.id;
@@ -318,9 +346,11 @@ export async function runCeoAgent(
   const selectedTools = selectToolsForQuery(message);
 
   // Run CEO agent loop (up to 10 iterations)
+  // Sonnet (!! prefix) gets more tokens for complex analysis
+  const maxTokens = useSonnet ? 1024 : 512;
   let response = await anthropic.messages.create({
-    model: CEO_MODEL,
-    max_tokens: 512,
+    model: activeModel,
+    max_tokens: maxTokens,
     system: systemPrompt,
     tools: selectedTools,
     messages: anthropicMessages,
@@ -353,8 +383,8 @@ export async function runCeoAgent(
     anthropicMessages.push({ role: "user", content: toolResults });
 
     response = await anthropic.messages.create({
-      model: CEO_MODEL,
-      max_tokens: 512,
+      model: activeModel,
+      max_tokens: maxTokens,
       system: systemPrompt,
       tools: selectedTools,
       messages: anthropicMessages,
@@ -363,7 +393,7 @@ export async function runCeoAgent(
 
   // Track usage
   trackAIUsage({
-    model: CEO_MODEL,
+    model: activeModel,
     inputTokens: response.usage.input_tokens,
     outputTokens: response.usage.output_tokens,
     agent: "ceo-agent",

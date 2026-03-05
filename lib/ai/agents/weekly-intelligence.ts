@@ -7,6 +7,7 @@
 
 import { getAnthropicClient, MODEL_HAIKU } from "../client";
 import * as stripeConnector from "@/lib/connectors/stripe";
+import * as vercelConnector from "@/lib/connectors/vercel";
 import { getUnresolvedCount } from "@/lib/db/repositories/alerts";
 import { getRocks } from "@/lib/db/repositories/rocks";
 import { db } from "@/lib/db";
@@ -43,6 +44,13 @@ export interface WeeklyIntelData {
   // Cash
   recurringTemplates: number;
   estimatedMonthlyRecurring: number;
+  // Infrastructure
+  deploysThisWeek: number;
+  failedDeploysThisWeek: number;
+  // AI costs
+  aiSpendThisWeekDollars: number;
+  // Mercury cash (from DB snapshot)
+  totalCashDollars: number | null;
   // Sprint intelligence (per-project summaries)
   sprintSummaries: string[];
 }
@@ -68,6 +76,9 @@ export async function gatherWeeklyData(): Promise<WeeklyIntelData> {
     totalClients,
     clientsOverdue,
     recurringData,
+    recentDeploys,
+    aiSpend,
+    mercuryAccounts,
   ] = await Promise.all([
     // Revenue
     stripeConnector.getMRR(),
@@ -139,6 +150,19 @@ export async function gatherWeeklyData(): Promise<WeeklyIntelData> {
       })
       .from(schema.recurringInvoices)
       .where(eq(schema.recurringInvoices.status, "active")),
+
+    // Vercel deployments this week
+    vercelConnector.getRecentDeployments(100).catch(() => ({ success: false as const, data: [] })),
+
+    // AI API spend this week (from apiUsage table)
+    db
+      .select({ total: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)` })
+      .from(schema.apiUsage)
+      .where(gte(schema.apiUsage.date, weekAgo))
+      .catch(() => [{ total: 0 }]),
+
+    // Mercury cash (from DB snapshot)
+    db.select({ balance: schema.mercuryAccounts.balance }).from(schema.mercuryAccounts).catch(() => []),
   ]);
 
   // Sprint intelligence — fetch active project IDs then summarize each in parallel
@@ -152,6 +176,18 @@ export async function gatherWeeklyData(): Promise<WeeklyIntelData> {
       activeProjectRows.map((p) => getProjectContextSummary(p.id))
     )
   ).filter((s) => s.trim().length > 0);
+
+  // Parse deploy velocity (VercelDeployment uses `created` epoch ms)
+  const deployList = recentDeploys.success && Array.isArray(recentDeploys.data) ? recentDeploys.data : [];
+  const weekAgoMs = weekAgo.getTime();
+  const deploysThisWeek = deployList.filter((d) => d.created >= weekAgoMs).length;
+  const failedDeploysThisWeek = deployList.filter((d) => d.created >= weekAgoMs && d.state === "ERROR").length;
+
+  // Parse Mercury cash
+  const mercAcctList = Array.isArray(mercuryAccounts) ? mercuryAccounts : [];
+  const totalCashDollars = mercAcctList.length > 0
+    ? mercAcctList.reduce((s: number, a: { balance?: string | number }) => s + Number(a.balance ?? 0), 0) / 100
+    : null;
 
   return {
     mrr: mrrResult.success ? (mrrResult.data?.mrr ?? 0) : null,
@@ -176,6 +212,10 @@ export async function gatherWeeklyData(): Promise<WeeklyIntelData> {
     clientsWithOverdueInvoices: Number(clientsOverdue[0]?.count ?? 0),
     recurringTemplates: recurringData[0]?.count ?? 0,
     estimatedMonthlyRecurring: Number(recurringData[0]?.total ?? 0),
+    deploysThisWeek,
+    failedDeploysThisWeek,
+    aiSpendThisWeekDollars: Number(Array.isArray(aiSpend) ? aiSpend[0]?.total ?? 0 : 0) / 100,
+    totalCashDollars,
     sprintSummaries,
   };
 }
@@ -210,6 +250,7 @@ export async function generateWeeklyIntelligence(
 
 DATA:
 - MRR: ${data.mrr !== null ? fmt(data.mrr) : "N/A"}/mo
+- Cash on hand: ${data.totalCashDollars !== null ? `$${data.totalCashDollars.toLocaleString()}` : "N/A"}
 - Invoices collected this week: ${data.invoicesPaidThisWeek} (${fmt(data.invoicesPaidAmount)})
 - Overdue invoices: ${data.overdueInvoices} (${fmt(data.overdueAmount)})
 - Open proposals: ${data.openProposals} (${fmt(data.openProposalValue)} pipeline)
@@ -224,6 +265,8 @@ DATA:
 - Total clients: ${data.totalClients}
 - Clients with overdue invoices: ${data.clientsWithOverdueInvoices}
 - Active recurring templates: ${data.recurringTemplates} (est. ${fmt(data.estimatedMonthlyRecurring)}/mo)
+- Deploys this week: ${data.deploysThisWeek} (${data.failedDeploysThisWeek} failed)
+- AI API spend this week: $${data.aiSpendThisWeekDollars.toFixed(2)}
 ${sprintSection}
 Respond in this exact JSON format (no markdown, just raw JSON):
 {
@@ -245,6 +288,9 @@ Rules:
 - Flag risks and opportunities
 - Be specific with dollar amounts and percentages
 - If sprint data is provided, include at least 1 insight about project momentum (declining velocity, stalled projects, high completion rate)
+- If failed deploys > 0, flag this as a risk
+- If AI API spend > $5 in a week, flag it as a cost item
+- If cash on hand is available, include it in financial context
 - Do not use emojis`;
 
   try {

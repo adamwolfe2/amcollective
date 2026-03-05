@@ -411,6 +411,27 @@ export const TOOL_DEFINITIONS: Anthropic.Tool[] = [
       required: ["query"],
     },
   },
+  {
+    name: "check_product_health",
+    description: "HTTP health check all 6 portfolio products (TBGC, Trackr, Cursive, TaskSpace, Wholesail, Hook). Returns status code, response time ms, and up/down for each domain.",
+    input_schema: {
+      type: "object" as const,
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: "get_ai_spend",
+    description: "Get AI API usage and cost from the apiUsage table. Shows spend by provider over a trailing period. Use when asked about AI costs, Claude spend, or API budget.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        provider: { type: "string", description: "Filter by provider (e.g. 'anthropic'). Omit for all providers." },
+        days: { type: "number", description: "Trailing days to include (default 30)" },
+      },
+      required: [],
+    },
+  },
   ...VERCEL_TOOL_DEFINITIONS,
   ...POSTHOG_TOOL_DEFINITIONS,
   ...MERCURY_TOOL_DEFINITIONS,
@@ -1044,6 +1065,62 @@ export async function executeTool(
           threadId: input.thread_id as string | undefined,
         });
         return JSON.stringify(sendResult);
+      }
+
+      case "check_product_health": {
+        const PORTFOLIO_DOMAINS = [
+          { name: "TBGC", url: "https://truffleboys.com" },
+          { name: "Trackr", url: "https://trytrackr.com" },
+          { name: "Cursive", url: "https://leads.meetcursive.com" },
+          { name: "TaskSpace", url: "https://trytaskspace.com" },
+          { name: "Wholesail", url: "https://wholesailhub.com" },
+          { name: "Hook", url: "https://hookugc.com" },
+        ];
+        const healthResults = await Promise.all(
+          PORTFOLIO_DOMAINS.map(async ({ name: productName, url }) => {
+            const start = Date.now();
+            try {
+              const res = await fetch(url, {
+                method: "HEAD",
+                signal: AbortSignal.timeout(8000),
+              });
+              return { name: productName, url, status: res.status, ok: res.ok, responseMs: Date.now() - start };
+            } catch (err) {
+              return { name: productName, url, status: 0, ok: false, responseMs: Date.now() - start, error: err instanceof Error ? err.message : "timeout" };
+            }
+          })
+        );
+        const down = healthResults.filter((r) => !r.ok);
+        return JSON.stringify({ results: healthResults, summary: `${healthResults.length - down.length}/${healthResults.length} up`, downProducts: down.map((r) => r.name) });
+      }
+
+      case "get_ai_spend": {
+        const spendDays = (input.days as number) || 30;
+        const spendSince = new Date(Date.now() - spendDays * 24 * 60 * 60 * 1000);
+        const spendConditions = [gte(schema.apiUsage.date, spendSince)];
+        if (input.provider) spendConditions.push(eq(schema.apiUsage.provider, input.provider as string));
+
+        const spendRows = await db
+          .select({
+            provider: schema.apiUsage.provider,
+            totalCost: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
+            totalTokens: sql<number>`COALESCE(SUM(${schema.apiUsage.tokensUsed}), 0)`,
+            requests: count(),
+          })
+          .from(schema.apiUsage)
+          .where(and(...spendConditions))
+          .groupBy(schema.apiUsage.provider);
+
+        return JSON.stringify({
+          period: `last ${spendDays} days`,
+          byProvider: spendRows.map((r) => ({
+            provider: r.provider,
+            costDollars: Number(r.totalCost) / 100,
+            tokens: Number(r.totalTokens),
+            requests: r.requests,
+          })),
+          totalCostDollars: spendRows.reduce((s, r) => s + Number(r.totalCost), 0) / 100,
+        });
       }
 
       default: {

@@ -8,6 +8,7 @@
 import { inngest } from "../client";
 import { captureError } from "@/lib/errors";
 import { sendProactiveMessage } from "@/lib/ai/agents/proactive";
+import { writeMemory, isMemoryConfigured } from "@/lib/ai/memory";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, and, gte, sql } from "drizzle-orm";
@@ -97,6 +98,16 @@ export const eodWrap = inngest.createFunction(
     await step.run("send-dm", async () => {
       await sendProactiveMessage({ trigger: "eod", context });
     });
+
+    // Write daily note to persistent memory (fire-and-forget)
+    if (isMemoryConfigured()) {
+      const dateStr = new Date().toISOString().split("T")[0];
+      const notePath = `notes/${dateStr}.md`;
+      const noteContent = `# ${dateStr}\n\n## Done\n${context}\n\n## Watch\n- Review open tasks and unresolved alerts tomorrow\n`;
+      step.run("write-daily-note", async () => {
+        await writeMemory(notePath, noteContent, `EOD note ${dateStr}`).catch(() => {});
+      }).catch(() => {});
+    }
 
     return { success: true };
   }
