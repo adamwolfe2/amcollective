@@ -45,6 +45,7 @@ import {
   strategyAnalysis,
   dailyDigest,
   syncCashSnapshot,
+  leadFollowupReminder,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -87,5 +88,6 @@ export const { GET, POST, PUT } = serve({
     strategyAnalysis,
     dailyDigest,
     syncCashSnapshot,
+    leadFollowupReminder,
   ],
 });
