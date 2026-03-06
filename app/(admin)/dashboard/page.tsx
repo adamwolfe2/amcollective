@@ -21,6 +21,8 @@ import * as hookConnector from "@/lib/connectors/hook";
 import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { FloatingChatBar } from "@/components/floating-chat-bar";
 import { SprintWidgetClient } from "@/components/sprint-widget-client";
+import { PrioritiesWidget } from "@/components/dashboard/PrioritiesWidget";
+import { CashRunwayChart, type RunwaySnapshot } from "@/components/dashboard/CashRunwayChart";
 import { currentUser } from "@clerk/nextjs/server";
 import {
   Users,
@@ -182,6 +184,40 @@ async function SprintWidget() {
     );
   } catch (err) {
     console.error("[Dashboard] SprintWidget failed:", err);
+    return null;
+  }
+}
+
+// ─── Cash Runway ─────────────────────────────────────────────────────────────
+
+const getCachedRunwaySnapshots = unstable_cache(
+  async (): Promise<RunwaySnapshot[]> => {
+    const rows = await db
+      .select()
+      .from(schema.cashSnapshots)
+      .orderBy(asc(schema.cashSnapshots.recordedAt))
+      .limit(30); // ~1 month of daily snapshots
+
+    return rows.map((r) => ({
+      recordedAt: r.recordedAt.toISOString(),
+      runwayMonths: r.runwayMonths !== null ? Number(r.runwayMonths) : null,
+      balanceCents: r.balanceCents,
+      burnCents: r.burnCents,
+    }));
+  },
+  ["dashboard-runway-snapshots"],
+  { revalidate: 3600 } // 1 hour
+);
+
+async function CashRunwaySection() {
+  try {
+    const snapshots = await getCachedRunwaySnapshots();
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white p-4">
+        <CashRunwayChart snapshots={snapshots} />
+      </div>
+    );
+  } catch {
     return null;
   }
 }
@@ -790,6 +826,9 @@ async function ActionsPanel() {
 
     return (
       <div className="space-y-4">
+        {/* Today's Priorities */}
+        <PrioritiesWidget />
+
         {/* Sprint Widget */}
         <SprintWidget />
 
@@ -1012,6 +1051,12 @@ export default async function DashboardPage() {
             <Suspense fallback={<PlatformCardSkeleton />}>
               <HookCard />
             </Suspense>
+            {/* Cash Runway — spans full width of portfolio grid */}
+            <div className="col-span-full">
+              <Suspense fallback={<div className="h-24 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />}>
+                <CashRunwaySection />
+              </Suspense>
+            </div>
           </div>
         </div>
 

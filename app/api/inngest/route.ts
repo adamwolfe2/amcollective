@@ -43,6 +43,8 @@ import {
   alertTriage,
   backfillEmbeddings,
   strategyAnalysis,
+  dailyDigest,
+  syncCashSnapshot,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -83,5 +85,7 @@ export const { GET, POST, PUT } = serve({
     alertTriage,
     backfillEmbeddings,
     strategyAnalysis,
+    dailyDigest,
+    syncCashSnapshot,
   ],
 });

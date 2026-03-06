@@ -35,3 +35,5 @@ export { sprintPrep } from "./sprint-prep";
 export { alertTriage } from "./alert-triage";
 export { backfillEmbeddings } from "./backfill-embeddings";
 export { strategyAnalysis } from "./strategy-analysis";
+export { dailyDigest } from "./daily-digest";
+export { syncCashSnapshot } from "./sync-cash-snapshot";
