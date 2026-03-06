@@ -57,20 +57,17 @@ export default async function LeadDetailPage({
 }) {
   const { id } = await params;
 
-  const [lead] = await db
-    .select()
-    .from(schema.leads)
-    .where(eq(schema.leads.id, id))
-    .limit(1);
+  const [[lead], activities] = await Promise.all([
+    db.select().from(schema.leads).where(eq(schema.leads.id, id)).limit(1),
+    db
+      .select()
+      .from(schema.leadActivities)
+      .where(eq(schema.leadActivities.leadId, id))
+      .orderBy(desc(schema.leadActivities.createdAt))
+      .limit(50),
+  ]);
 
   if (!lead) notFound();
-
-  const activities = await db
-    .select()
-    .from(schema.leadActivities)
-    .where(eq(schema.leadActivities.leadId, id))
-    .orderBy(desc(schema.leadActivities.createdAt))
-    .limit(50);
 
   return (
     <div className="space-y-6">

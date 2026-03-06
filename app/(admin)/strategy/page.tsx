@@ -23,55 +23,43 @@ export default async function StrategyPage() {
   const { error } = await requireAdmin();
   if (error) redirect("/sign-in");
 
-  // Fetch latest metrics snapshot
-  const [latestMetrics] = await db
-    .select()
-    .from(schema.strategyMetrics)
-    .orderBy(desc(schema.strategyMetrics.createdAt))
-    .limit(1)
-    .catch(() => []);
-
-  // Fetch active + recently resolved recommendations (last 4 weeks)
-  const fourWeeksAgo = new Date();
-  fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
-  const fourWeeksAgoStr = fourWeeksAgo.toISOString().split("T")[0];
-
-  const recommendations = await db
-    .select({
-      id: schema.strategyRecommendations.id,
-      type: schema.strategyRecommendations.type,
-      product: schema.strategyRecommendations.product,
-      priority: schema.strategyRecommendations.priority,
-      title: schema.strategyRecommendations.title,
-      situation: schema.strategyRecommendations.situation,
-      recommendation: schema.strategyRecommendations.recommendation,
-      expectedImpact: schema.strategyRecommendations.expectedImpact,
-      estimatedValueCents: schema.strategyRecommendations.estimatedValueCents,
-      effort: schema.strategyRecommendations.effort,
-      status: schema.strategyRecommendations.status,
-      weekOf: schema.strategyRecommendations.weekOf,
-      createdAt: schema.strategyRecommendations.createdAt,
-    })
-    .from(schema.strategyRecommendations)
-    .where(
-      or(
+  // Fetch latest metrics + recommendations in parallel
+  const [[latestMetrics], recommendations] = await Promise.all([
+    db
+      .select()
+      .from(schema.strategyMetrics)
+      .orderBy(desc(schema.strategyMetrics.createdAt))
+      .limit(1)
+      .catch(() => []),
+    db
+      .select({
+        id: schema.strategyRecommendations.id,
+        type: schema.strategyRecommendations.type,
+        product: schema.strategyRecommendations.product,
+        priority: schema.strategyRecommendations.priority,
+        title: schema.strategyRecommendations.title,
+        situation: schema.strategyRecommendations.situation,
+        recommendation: schema.strategyRecommendations.recommendation,
+        expectedImpact: schema.strategyRecommendations.expectedImpact,
+        estimatedValueCents: schema.strategyRecommendations.estimatedValueCents,
+        effort: schema.strategyRecommendations.effort,
+        status: schema.strategyRecommendations.status,
+        weekOf: schema.strategyRecommendations.weekOf,
+        createdAt: schema.strategyRecommendations.createdAt,
+      })
+      .from(schema.strategyRecommendations)
+      .where(
         or(
           eq(schema.strategyRecommendations.status, "active"),
-          eq(schema.strategyRecommendations.status, "in_progress")
-        ),
-        and(
-          or(
-            eq(schema.strategyRecommendations.status, "done"),
-            eq(schema.strategyRecommendations.status, "dismissed")
-          ),
-          // Only show recently resolved — don't clutter with old history
-          // Drizzle doesn't have direct string comparison for weekOf, use createdAt
+          eq(schema.strategyRecommendations.status, "in_progress"),
+          eq(schema.strategyRecommendations.status, "done"),
+          eq(schema.strategyRecommendations.status, "dismissed")
         )
       )
-    )
-    .orderBy(desc(schema.strategyRecommendations.priority), desc(schema.strategyRecommendations.createdAt))
-    .limit(50)
-    .catch(() => []);
+      .orderBy(desc(schema.strategyRecommendations.priority), desc(schema.strategyRecommendations.createdAt))
+      .limit(50)
+      .catch(() => []),
+  ]);
 
   // Shape metrics for client
   const metricsData: StrategyMetricsData | null = latestMetrics

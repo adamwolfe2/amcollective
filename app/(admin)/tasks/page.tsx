@@ -4,7 +4,7 @@ import { eq, and, desc, sql, count } from "drizzle-orm";
 import { TaskBoard } from "./task-board";
 
 export default async function TasksPage() {
-  const [taskRows, teamMembers, projects] = await Promise.all([
+  const [taskRows, teamMembers, projects, statusCounts, overdue] = await Promise.all([
     db
       .select({
         task: schema.tasks,
@@ -44,28 +44,25 @@ export default async function TasksPage() {
       .from(schema.portfolioProjects)
       .where(eq(schema.portfolioProjects.status, "active"))
       .orderBy(schema.portfolioProjects.name),
+    db
+      .select({
+        status: schema.tasks.status,
+        count: count(),
+      })
+      .from(schema.tasks)
+      .where(eq(schema.tasks.isArchived, false))
+      .groupBy(schema.tasks.status),
+    db
+      .select({ count: count() })
+      .from(schema.tasks)
+      .where(
+        and(
+          eq(schema.tasks.isArchived, false),
+          sql`${schema.tasks.status} NOT IN ('done', 'cancelled')`,
+          sql`${schema.tasks.dueDate} < CURRENT_DATE`
+        )
+      ),
   ]);
-
-  // Stats
-  const statusCounts = await db
-    .select({
-      status: schema.tasks.status,
-      count: count(),
-    })
-    .from(schema.tasks)
-    .where(eq(schema.tasks.isArchived, false))
-    .groupBy(schema.tasks.status);
-
-  const overdue = await db
-    .select({ count: count() })
-    .from(schema.tasks)
-    .where(
-      and(
-        eq(schema.tasks.isArchived, false),
-        sql`${schema.tasks.status} NOT IN ('done', 'cancelled')`,
-        sql`${schema.tasks.dueDate} < CURRENT_DATE`
-      )
-    );
 
   const stats = {
     total: taskRows.length,

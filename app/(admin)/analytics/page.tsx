@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,46 +15,50 @@ import { SyncButton } from "./sync-button";
 import { AnalyticsCharts } from "./analytics-charts";
 
 async function getAnalyticsData() {
-  // Get all projects
-  const allProjects = await db
-    .select()
-    .from(schema.portfolioProjects)
-    .orderBy(desc(schema.portfolioProjects.createdAt));
+  // Fetch projects and all snapshots in parallel (eliminates N+1)
+  const [allProjects, allSnapshots] = await Promise.all([
+    db
+      .select()
+      .from(schema.portfolioProjects)
+      .orderBy(desc(schema.portfolioProjects.createdAt)),
+    db
+      .select()
+      .from(schema.posthogSnapshots)
+      .orderBy(desc(schema.posthogSnapshots.snapshotDate)),
+  ]);
 
   // Get projects with PostHog configured
   const configuredProjects = allProjects.filter(
     (p) => p.posthogProjectId && p.posthogApiKey
   );
 
-  // Get latest snapshot for each configured project
-  const projectData = await Promise.all(
-    configuredProjects.map(async (project) => {
-      const [snapshot] = await db
-        .select()
-        .from(schema.posthogSnapshots)
-        .where(eq(schema.posthogSnapshots.projectId, project.id))
-        .orderBy(desc(schema.posthogSnapshots.snapshotDate))
-        .limit(1);
+  // Build latest-snapshot-per-project map (rows are desc by date, so first hit = latest)
+  const snapshotMap = new Map<string, (typeof allSnapshots)[0]>();
+  for (const snap of allSnapshots) {
+    if (!snapshotMap.has(snap.projectId)) {
+      snapshotMap.set(snap.projectId, snap);
+    }
+  }
 
-      const topPages = snapshot?.topPages as
-        | Array<{ date: string; count: number }>
-        | null;
+  const projectData = configuredProjects.map((project) => {
+    const snapshot = snapshotMap.get(project.id);
+    const topPages = snapshot?.topPages as
+      | Array<{ date: string; count: number }>
+      | null;
 
-      return {
-        id: project.id,
-        name: project.name,
-        domain: project.domain,
-        dau: snapshot?.dau ?? 0,
-        wau: snapshot?.wau ?? 0,
-        mau: snapshot?.mau ?? 0,
-        signupCount: snapshot?.signupCount ?? 0,
-        totalPageviews: snapshot?.totalPageviews ?? 0,
-        topPage:
-          topPages && topPages.length > 0 ? topPages[0].date : null,
-        snapshotDate: snapshot?.snapshotDate ?? null,
-      };
-    })
-  );
+    return {
+      id: project.id,
+      name: project.name,
+      domain: project.domain,
+      dau: snapshot?.dau ?? 0,
+      wau: snapshot?.wau ?? 0,
+      mau: snapshot?.mau ?? 0,
+      signupCount: snapshot?.signupCount ?? 0,
+      totalPageviews: snapshot?.totalPageviews ?? 0,
+      topPage: topPages && topPages.length > 0 ? topPages[0].date : null,
+      snapshotDate: snapshot?.snapshotDate ?? null,
+    };
+  });
 
   // Aggregate totals
   const totals = {
