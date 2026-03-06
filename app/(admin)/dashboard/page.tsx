@@ -322,12 +322,13 @@ async function MetricsStrip() {
         <MetricPill
           label="Cash"
           value={formatCurrency(totalCash)}
-          sub={runway ? `${runway.toFixed(0)}mo runway` : ""}
+          sub={runway ? `${runway.toFixed(0)} mo runway` : "no data"}
           href="/finance"
         />
         <MetricPill
           label="Clients"
           value={String(totalClientsResult[0]?.value ?? 0)}
+          sub="total active"
           href="/clients"
         />
         <MetricPill
@@ -1151,14 +1152,12 @@ function MetricPill({
       <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40">
         {label}
       </span>
-      <div className="flex items-baseline gap-1.5">
-        <span className="font-mono text-lg font-bold">{value}</span>
-        {sub && (
-          <span className="font-mono text-[9px] text-[#0A0A0A]/40">
-            {sub}
-          </span>
-        )}
-      </div>
+      <span className="font-mono text-lg font-bold block leading-tight">{value}</span>
+      {sub && (
+        <span className="font-mono text-[9px] text-[#0A0A0A]/40 block mt-0.5">
+          {sub}
+        </span>
+      )}
     </Link>
   );
 }
