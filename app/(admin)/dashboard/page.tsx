@@ -188,6 +188,56 @@ async function SprintWidget() {
   }
 }
 
+// ─── Cached platform connector snapshots ────────────────────────────────────
+
+const getCachedMercuryAccounts = unstable_cache(
+  () => mercuryConnector.getAccounts(),
+  ["dashboard-mercury-accounts"],
+  { revalidate: 300 }
+);
+
+const getCachedVercelDeployments = unstable_cache(
+  () => vercelConnector.getRecentDeployments(5),
+  ["dashboard-vercel-deployments"],
+  { revalidate: 120 }
+);
+
+const getCachedWholesailSnapshot = unstable_cache(
+  () => wholesailConnector.getSnapshot(),
+  ["dashboard-wholesail-snapshot"],
+  { revalidate: 300 }
+);
+
+const getCachedCursiveSnapshot = unstable_cache(
+  () => cursiveConnector.getSnapshot(),
+  ["dashboard-cursive-snapshot"],
+  { revalidate: 300 }
+);
+
+const getCachedTrackrSnapshot = unstable_cache(
+  () => trackrConnector.getSnapshot(),
+  ["dashboard-trackr-snapshot"],
+  { revalidate: 300 }
+);
+
+const getCachedTaskSpaceSnapshot = unstable_cache(
+  () => taskspaceConnector.getSnapshot(),
+  ["dashboard-taskspace-snapshot"],
+  { revalidate: 300 }
+);
+
+const getCachedTBGCSnapshot = unstable_cache(
+  () => tbgcConnector.getSnapshot(),
+  ["dashboard-tbgc-snapshot"],
+  { revalidate: 300 }
+);
+
+const getCachedHookSnapshot = unstable_cache(
+  () => hookConnector.getSnapshot(),
+  ["dashboard-hook-snapshot"],
+  { revalidate: 300 }
+);
+
 // ─── Cash Runway ─────────────────────────────────────────────────────────────
 
 const getCachedRunwaySnapshots = unstable_cache(
@@ -229,7 +279,7 @@ async function MetricsStrip() {
     const [mrrData, mercuryResult, totalClientsResult, overdueResult, spendResult] =
       await Promise.all([
         getCachedMrr(),
-        mercuryConnector.getAccounts(),
+        getCachedMercuryAccounts(),
         db.select({ value: count() }).from(schema.clients),
         db
           .select({
@@ -377,7 +427,7 @@ function PlatformUnavailable() {
 
 async function WholesailCard() {
   try {
-    const result = await wholesailConnector.getSnapshot();
+    const result = await getCachedWholesailSnapshot();
     const d = result.success ? result.data : null;
 
     return (
@@ -434,7 +484,7 @@ async function WholesailCard() {
 
 async function CursiveCard() {
   try {
-    const result = await cursiveConnector.getSnapshot();
+    const result = await getCachedCursiveSnapshot();
     const d = result.success ? result.data : null;
 
     return (
@@ -501,7 +551,7 @@ async function CursiveCard() {
 
 async function TrackrCard() {
   try {
-    const result = await trackrConnector.getSnapshot();
+    const result = await getCachedTrackrSnapshot();
     const d = result.success ? result.data : null;
 
     return (
@@ -568,7 +618,7 @@ async function TrackrCard() {
 
 async function TaskSpaceCard() {
   try {
-    const result = await taskspaceConnector.getSnapshot();
+    const result = await getCachedTaskSpaceSnapshot();
     const d = result.success ? result.data : null;
 
     return (
@@ -641,7 +691,7 @@ async function TaskSpaceCard() {
 
 async function TBGCCard() {
   try {
-    const result = await tbgcConnector.getSnapshot();
+    const result = await getCachedTBGCSnapshot();
     const d = result.success ? result.data : null;
 
     return (
@@ -694,7 +744,7 @@ async function TBGCCard() {
 
 async function HookCard() {
   try {
-    const result = await hookConnector.getSnapshot();
+    const result = await getCachedHookSnapshot();
     const d = result.success ? result.data : null;
 
     return (
@@ -767,7 +817,7 @@ async function ActionsPanel() {
           .orderBy(schema.invoices.dueDate)
           .limit(5),
         getCachedStaleClients(),
-        vercelConnector.getRecentDeployments(5),
+        getCachedVercelDeployments(),
         getRecentActivity(10),
       ]);
 

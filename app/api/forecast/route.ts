@@ -29,14 +29,58 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 1. Recurring revenue -- monthly value of active recurring invoices
-    const recurringRows = await db
-      .select({
-        amount: schema.recurringInvoices.total,
-        interval: schema.recurringInvoices.interval,
-      })
-      .from(schema.recurringInvoices)
-      .where(eq(schema.recurringInvoices.status, "active"));
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+
+    // Run all 4 independent DB queries in parallel
+    const [recurringRows, leads, contracts, historicalMonths] = await Promise.all([
+      // 1. Recurring revenue
+      db
+        .select({
+          amount: schema.recurringInvoices.total,
+          interval: schema.recurringInvoices.interval,
+        })
+        .from(schema.recurringInvoices)
+        .where(eq(schema.recurringInvoices.status, "active")),
+      // 2. Pipeline leads
+      db
+        .select({
+          stage: schema.leads.stage,
+          estimatedValue: schema.leads.estimatedValue,
+        })
+        .from(schema.leads)
+        .where(
+          and(
+            eq(schema.leads.isArchived, false),
+            sql`${schema.leads.stage} NOT IN ('closed_won', 'closed_lost')`
+          )
+        ),
+      // 3. Active contracts
+      db
+        .select({
+          totalValue: schema.contracts.totalValue,
+          startDate: schema.contracts.startDate,
+          endDate: schema.contracts.endDate,
+        })
+        .from(schema.contracts)
+        .where(eq(schema.contracts.status, "active")),
+      // 4. Historical monthly revenue
+      db
+        .select({
+          month: sql<string>`TO_CHAR(${schema.invoices.paidAt}, 'YYYY-MM')`,
+          total: sql<number>`SUM(${schema.invoices.amount})`,
+          invoiceCount: count(),
+        })
+        .from(schema.invoices)
+        .where(
+          and(
+            eq(schema.invoices.status, "paid"),
+            gte(schema.invoices.paidAt, sixMonthsAgo)
+          )
+        )
+        .groupBy(sql`TO_CHAR(${schema.invoices.paidAt}, 'YYYY-MM')`)
+        .orderBy(sql`TO_CHAR(${schema.invoices.paidAt}, 'YYYY-MM')`),
+    ]);
 
     let monthlyRecurring = 0;
     for (const row of recurringRows) {
@@ -60,20 +104,6 @@ export async function GET() {
       }
     }
 
-    // 2. Pipeline weighted value -- leads with probability
-    const leads = await db
-      .select({
-        stage: schema.leads.stage,
-        estimatedValue: schema.leads.estimatedValue,
-      })
-      .from(schema.leads)
-      .where(
-        and(
-          eq(schema.leads.isArchived, false),
-          sql`${schema.leads.stage} NOT IN ('closed_won', 'closed_lost')`
-        )
-      );
-
     let weightedPipeline = 0;
     let totalPipeline = 0;
     for (const lead of leads) {
@@ -83,40 +113,10 @@ export async function GET() {
       weightedPipeline += value * prob;
     }
 
-    // 3. Active contracts remaining value
-    const contracts = await db
-      .select({
-        totalValue: schema.contracts.totalValue,
-        startDate: schema.contracts.startDate,
-        endDate: schema.contracts.endDate,
-      })
-      .from(schema.contracts)
-      .where(eq(schema.contracts.status, "active"));
-
     let contractedRevenue = 0;
     for (const c of contracts) {
       contractedRevenue += c.totalValue ?? 0;
     }
-
-    // 4. Historical revenue -- last 6 months of paid invoices
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-
-    const historicalMonths = await db
-      .select({
-        month: sql<string>`TO_CHAR(${schema.invoices.paidAt}, 'YYYY-MM')`,
-        total: sql<number>`SUM(${schema.invoices.amount})`,
-        invoiceCount: count(),
-      })
-      .from(schema.invoices)
-      .where(
-        and(
-          eq(schema.invoices.status, "paid"),
-          gte(schema.invoices.paidAt, sixMonthsAgo)
-        )
-      )
-      .groupBy(sql`TO_CHAR(${schema.invoices.paidAt}, 'YYYY-MM')`)
-      .orderBy(sql`TO_CHAR(${schema.invoices.paidAt}, 'YYYY-MM')`);
 
     const monthlyRevenues = historicalMonths.map((m) => Number(m.total) || 0);
     const avgMonthlyRevenue =

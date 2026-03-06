@@ -60,6 +60,7 @@ export async function GET() {
     mercuryResult,
     // Clients
     totalClientsResult,
+    activeClientsResult,
     // Invoices
     overdueInvoices,
     upcomingInvoices,
@@ -69,6 +70,8 @@ export async function GET() {
     recentActivity,
     // PostHog
     posthogData,
+    // Delta snapshots
+    sevenDaySnapshots,
     // Stale clients (no kanban card movement in 7+ days)
     staleClients,
   ] = await Promise.all([
@@ -88,6 +91,11 @@ export async function GET() {
     withTimeout(mercuryConnector.getAccounts(), 5000, "mercury-accounts"),
     // Total clients
     db.select({ value: count() }).from(schema.clients),
+    // Active clients (at least one non-completed kanban card)
+    db
+      .select({ value: sql<number>`COUNT(DISTINCT ${schema.kanbanCards.clientId})` })
+      .from(schema.kanbanCards)
+      .where(sql`${schema.kanbanCards.completedAt} IS NULL`),
     // Overdue invoices
     db
       .select({
@@ -150,6 +158,13 @@ export async function GET() {
       )
       .orderBy(desc(schema.posthogSnapshots.snapshotDate))
       .limit(20),
+    // 7-day metric snapshots for delta calculation
+    db
+      .select()
+      .from(schema.dailyMetricsSnapshots)
+      .where(gte(schema.dailyMetricsSnapshots.date, sevenDaysAgo))
+      .orderBy(asc(schema.dailyMetricsSnapshots.date))
+      .limit(2),
     // Clients with kanban cards — find those with no card movement in 7+ days
     db
       .select({
@@ -235,21 +250,7 @@ export async function GET() {
     currentColumn: c.currentColumn ?? "Unknown",
   }));
 
-  // Active clients = clients with at least one non-completed kanban card
-  const [activeClientsResult] = await db
-    .select({ value: sql<number>`COUNT(DISTINCT ${schema.kanbanCards.clientId})` })
-    .from(schema.kanbanCards)
-    .where(sql`${schema.kanbanCards.completedAt} IS NULL`);
-
   const activeProjects = projects.filter((p) => p.status === "active");
-
-  // Compute deltas from daily snapshots (compare today vs 7 days ago)
-  const sevenDaySnapshots = await db
-    .select()
-    .from(schema.dailyMetricsSnapshots)
-    .where(gte(schema.dailyMetricsSnapshots.date, sevenDaysAgo))
-    .orderBy(asc(schema.dailyMetricsSnapshots.date))
-    .limit(2);
 
   let mrrChange: number | null = null;
   let cashChange: number | null = null;
@@ -274,7 +275,7 @@ export async function GET() {
     cashChange,
     runway: 0,
     totalClients: totalClientsResult[0]?.value ?? 0,
-    activeClients: Number(activeClientsResult?.value ?? 0),
+    activeClients: Number(activeClientsResult[0]?.value ?? 0),
     clientsNeedingAttention,
     overdueInvoices: overdueInvoices.map((inv) => ({
       id: inv.id,

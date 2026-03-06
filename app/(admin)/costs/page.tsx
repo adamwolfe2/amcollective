@@ -13,22 +13,33 @@ import Link from "next/link";
 async function getCommandCenterMetrics() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
 
-  // Total cash from Mercury accounts in DB
-  const accounts = await db
-    .select({ balance: schema.mercuryAccounts.balance })
-    .from(schema.mercuryAccounts);
+  const [accounts, mrrResult, activeSubs, toolCostResult, spendResult] =
+    await Promise.all([
+      db.select({ balance: schema.mercuryAccounts.balance }).from(schema.mercuryAccounts),
+      stripeConnector.getMRR(),
+      db
+        .select({ amount: schema.subscriptionCosts.amount, billingCycle: schema.subscriptionCosts.billingCycle })
+        .from(schema.subscriptionCosts)
+        .where(eq(schema.subscriptionCosts.isActive, true)),
+      db
+        .select({ total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)` })
+        .from(schema.toolCosts)
+        .where(gte(schema.toolCosts.createdAt, monthStart)),
+      db
+        .select({ totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)` })
+        .from(schema.mercuryTransactions)
+        .where(
+          and(
+            eq(schema.mercuryTransactions.direction, "debit"),
+            gte(schema.mercuryTransactions.postedAt, sixtyDaysAgo)
+          )
+        ),
+    ]);
+
   const totalCash = accounts.reduce((s, a) => s + Number(a.balance), 0);
-
-  // Stripe MRR
-  const mrrResult = await stripeConnector.getMRR();
   const mrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) / 100 : 0;
-
-  // Monthly subscription burn
-  const activeSubs = await db
-    .select({ amount: schema.subscriptionCosts.amount, billingCycle: schema.subscriptionCosts.billingCycle })
-    .from(schema.subscriptionCosts)
-    .where(eq(schema.subscriptionCosts.isActive, true));
 
   const subscriptionBurn = activeSubs.reduce((sum, sub) => {
     const monthly = sub.billingCycle === "annual"
@@ -37,29 +48,9 @@ async function getCommandCenterMetrics() {
     return sum + monthly;
   }, 0);
 
-  // Tool costs this month (Vercel, Neon, Stripe fees, etc.)
-  const [toolCostResult] = await db
-    .select({ total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)` })
-    .from(schema.toolCosts)
-    .where(gte(schema.toolCosts.createdAt, monthStart));
-
-  const toolBurn = Number(toolCostResult?.total ?? 0);
+  const toolBurn = Number(toolCostResult[0]?.total ?? 0);
   const totalMonthlyBurn = subscriptionBurn + toolBurn;
-
-  // Runway = cash / monthly spend (from Mercury transactions last 60d)
-  const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
-  const [spendResult] = await db
-    .select({
-      totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)`,
-    })
-    .from(schema.mercuryTransactions)
-    .where(
-      and(
-        eq(schema.mercuryTransactions.direction, "debit"),
-        gte(schema.mercuryTransactions.postedAt, sixtyDaysAgo)
-      )
-    );
-  const monthlySpend = Number(spendResult?.totalSpend ?? 0) / 2;
+  const monthlySpend = Number(spendResult[0]?.totalSpend ?? 0) / 2;
   const runway = monthlySpend > 0 ? totalCash / monthlySpend : null;
 
   return {
@@ -147,37 +138,38 @@ async function getClientMargins() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const clients = await db
-    .select({
-      clientId: schema.clients.id,
-      clientName: schema.clients.name,
-      companyName: schema.clients.companyName,
-      revenue: sql<number>`COALESCE(SUM(CASE WHEN ${schema.invoices.status} = 'paid' THEN ${schema.invoices.amount} ELSE 0 END), 0)`.as("revenue"),
-    })
-    .from(schema.clients)
-    .leftJoin(
-      schema.invoices,
-      and(
-        eq(schema.invoices.clientId, schema.clients.id),
-        gte(schema.invoices.createdAt, monthStart)
+  const [clients, clientCosts] = await Promise.all([
+    db
+      .select({
+        clientId: schema.clients.id,
+        clientName: schema.clients.name,
+        companyName: schema.clients.companyName,
+        revenue: sql<number>`COALESCE(SUM(CASE WHEN ${schema.invoices.status} = 'paid' THEN ${schema.invoices.amount} ELSE 0 END), 0)`.as("revenue"),
+      })
+      .from(schema.clients)
+      .leftJoin(
+        schema.invoices,
+        and(
+          eq(schema.invoices.clientId, schema.clients.id),
+          gte(schema.invoices.createdAt, monthStart)
+        )
       )
-    )
-    .groupBy(schema.clients.id);
-
-  const clientCosts = await db
-    .select({
-      clientId: schema.clientProjects.clientId,
-      totalCost: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`.as("total_cost"),
-    })
-    .from(schema.clientProjects)
-    .leftJoin(
-      schema.toolCosts,
-      and(
-        eq(schema.toolCosts.projectId, schema.clientProjects.projectId),
-        gte(schema.toolCosts.createdAt, monthStart)
+      .groupBy(schema.clients.id),
+    db
+      .select({
+        clientId: schema.clientProjects.clientId,
+        totalCost: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`.as("total_cost"),
+      })
+      .from(schema.clientProjects)
+      .leftJoin(
+        schema.toolCosts,
+        and(
+          eq(schema.toolCosts.projectId, schema.clientProjects.projectId),
+          gte(schema.toolCosts.createdAt, monthStart)
+        )
       )
-    )
-    .groupBy(schema.clientProjects.clientId);
+      .groupBy(schema.clientProjects.clientId),
+  ]);
 
   const costMap = new Map(clientCosts.map((c) => [c.clientId, c.totalCost]));
 
