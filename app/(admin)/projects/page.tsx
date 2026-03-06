@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getProjects, getProjectStats } from "@/lib/db/repositories/projects";
+import { getProjects } from "@/lib/db/repositories/projects";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -19,7 +19,8 @@ import {
 import { AddProjectDialog } from "./add-project-dialog";
 import { formatDistanceToNow } from "date-fns";
 import { db } from "@/lib/db";
-import { projectMetricSnapshots } from "@/lib/db/schema";
+import * as schema from "@/lib/db/schema";
+import { count, eq } from "drizzle-orm";
 
 const statusStyles: Record<string, string> = {
   active: "border-green-600 text-green-700 bg-green-50",
@@ -65,59 +66,67 @@ interface ProjectRow {
 }
 
 export default async function ProjectsPage() {
-  const projects = await getProjects();
+  // Fetch everything in parallel — including batch stats (no N+1)
+  const [projects, vercelResult, snapshots, teamCountRows, clientCountRows] =
+    await Promise.all([
+      getProjects(),
+      vercelConnector.getProjects(),
+      db.select().from(schema.projectMetricSnapshots),
+      db
+        .select({ projectId: schema.teamAssignments.projectId, cnt: count() })
+        .from(schema.teamAssignments)
+        .groupBy(schema.teamAssignments.projectId),
+      db
+        .select({ projectId: schema.clientProjects.projectId, cnt: count() })
+        .from(schema.clientProjects)
+        .groupBy(schema.clientProjects.projectId),
+    ]);
 
-  // Fetch Vercel projects for enrichment
-  const vercelResult = await vercelConnector.getProjects();
   const vercelProjects =
     vercelResult.success && vercelResult.data ? vercelResult.data : [];
   const vercelMap = new Map(vercelProjects.map((v) => [v.id, v]));
-
-  // Fetch metric snapshots for live data
-  const snapshots = await db.select().from(projectMetricSnapshots);
   const snapshotMap = new Map(snapshots.map((s) => [s.projectSlug, s]));
+  const teamMap = new Map(teamCountRows.map((r) => [r.projectId, r.cnt]));
+  const clientMap = new Map(clientCountRows.map((r) => [r.projectId, r.cnt]));
 
-  // Build enriched rows in parallel
-  const rows: ProjectRow[] = await Promise.all(
-    projects.map(async (project) => {
-      const stats = await getProjectStats(project.id);
-      const vProject = project.vercelProjectId
-        ? vercelMap.get(project.vercelProjectId)
-        : null;
-
-      // Get latest deploy for this project
-      let lastDeployState: string | null = null;
-      let lastDeployTime: number | null = null;
-      if (project.vercelProjectId) {
-        const deploys = await vercelConnector.getDeployments(
-          project.vercelProjectId,
-          1
-        );
-        if (deploys.success && deploys.data?.length) {
-          lastDeployState = deploys.data[0].state;
-          lastDeployTime = deploys.data[0].created;
-        }
-      }
-
-      const snapshot = snapshotMap.get(project.slug);
-
-      return {
-        id: project.id,
-        name: project.name,
-        status: project.status,
-        domain: project.domain,
-        framework: vProject?.framework ?? null,
-        lastDeployState,
-        lastDeployTime,
-        teamCount: stats.teamCount,
-        clientCount: stats.clientCount,
-        mrrCents: snapshot?.mrrCents ?? null,
-        activeUsers: snapshot?.activeUsers ?? null,
-        healthScore: snapshot?.healthScore ?? null,
-        syncedAt: snapshot?.syncedAt ?? null,
-      };
-    })
+  // Fetch latest deploy for each project that has a Vercel ID (in parallel)
+  const deployResults = await Promise.all(
+    projects
+      .filter((p) => p.vercelProjectId)
+      .map(async (p) => {
+        const deploys = await vercelConnector.getDeployments(p.vercelProjectId!, 1);
+        return {
+          projectId: p.id,
+          state: deploys.success && deploys.data?.length ? deploys.data[0].state : null,
+          created: deploys.success && deploys.data?.length ? deploys.data[0].created : null,
+        };
+      })
   );
+  const deployMap = new Map(deployResults.map((d) => [d.projectId, d]));
+
+  const rows: ProjectRow[] = projects.map((project) => {
+    const vProject = project.vercelProjectId
+      ? vercelMap.get(project.vercelProjectId)
+      : null;
+    const deploy = deployMap.get(project.id);
+    const snapshot = snapshotMap.get(project.slug);
+
+    return {
+      id: project.id,
+      name: project.name,
+      status: project.status,
+      domain: project.domain,
+      framework: vProject?.framework ?? null,
+      lastDeployState: deploy?.state ?? null,
+      lastDeployTime: deploy?.created ?? null,
+      teamCount: teamMap.get(project.id) ?? 0,
+      clientCount: clientMap.get(project.id) ?? 0,
+      mrrCents: snapshot?.mrrCents ?? null,
+      activeUsers: snapshot?.activeUsers ?? null,
+      healthScore: snapshot?.healthScore ?? null,
+      syncedAt: snapshot?.syncedAt ?? null,
+    };
+  });
 
   return (
     <div>

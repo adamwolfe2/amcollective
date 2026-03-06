@@ -21,48 +21,48 @@ async function getSprint(id: string): Promise<SprintData | null> {
 
   if (!sprint) return null;
 
-  // Step 2: Load sections with FK-resolved names
-  const sections = await db
-    .select({
-      id: schema.sprintSections.id,
-      projectName: sql<string>`COALESCE(${schema.portfolioProjects.name}, ${schema.sprintSections.projectName})`,
-      assigneeName: sql<string | null>`COALESCE(${schema.teamMembers.name}, ${schema.sprintSections.assigneeName})`,
-      goal: schema.sprintSections.goal,
-      sortOrder: schema.sprintSections.sortOrder,
-    })
-    .from(schema.sprintSections)
-    .leftJoin(
-      schema.portfolioProjects,
-      eq(schema.sprintSections.projectId, schema.portfolioProjects.id)
-    )
-    .leftJoin(
-      schema.teamMembers,
-      eq(schema.sprintSections.assigneeId, schema.teamMembers.id)
-    )
-    .where(eq(schema.sprintSections.sprintId, id))
-    .orderBy(asc(schema.sprintSections.sortOrder));
-
-  // Step 3: Load tasks via assignments
-  const allTasks = await db
-    .select({
-      id: schema.tasks.id,
-      content: schema.tasks.title,
-      isCompleted: sql<boolean>`(${schema.tasks.status} = 'done')`,
-      sortOrder: schema.taskSprintAssignments.sortOrder,
-      subtasks: schema.tasks.subtasks,
-      sectionId: schema.taskSprintAssignments.sectionId,
-    })
-    .from(schema.taskSprintAssignments)
-    .innerJoin(
-      schema.tasks,
-      eq(schema.taskSprintAssignments.taskId, schema.tasks.id)
-    )
-    .where(
-      and(
-        eq(schema.taskSprintAssignments.sprintId, id),
-        isNull(schema.taskSprintAssignments.removedAt)
+  // Steps 2 & 3: Load sections and tasks in parallel
+  const [sections, allTasks] = await Promise.all([
+    db
+      .select({
+        id: schema.sprintSections.id,
+        projectName: sql<string>`COALESCE(${schema.portfolioProjects.name}, ${schema.sprintSections.projectName})`,
+        assigneeName: sql<string | null>`COALESCE(${schema.teamMembers.name}, ${schema.sprintSections.assigneeName})`,
+        goal: schema.sprintSections.goal,
+        sortOrder: schema.sprintSections.sortOrder,
+      })
+      .from(schema.sprintSections)
+      .leftJoin(
+        schema.portfolioProjects,
+        eq(schema.sprintSections.projectId, schema.portfolioProjects.id)
       )
-    );
+      .leftJoin(
+        schema.teamMembers,
+        eq(schema.sprintSections.assigneeId, schema.teamMembers.id)
+      )
+      .where(eq(schema.sprintSections.sprintId, id))
+      .orderBy(asc(schema.sprintSections.sortOrder)),
+    db
+      .select({
+        id: schema.tasks.id,
+        content: schema.tasks.title,
+        isCompleted: sql<boolean>`(${schema.tasks.status} = 'done')`,
+        sortOrder: schema.taskSprintAssignments.sortOrder,
+        subtasks: schema.tasks.subtasks,
+        sectionId: schema.taskSprintAssignments.sectionId,
+      })
+      .from(schema.taskSprintAssignments)
+      .innerJoin(
+        schema.tasks,
+        eq(schema.taskSprintAssignments.taskId, schema.tasks.id)
+      )
+      .where(
+        and(
+          eq(schema.taskSprintAssignments.sprintId, id),
+          isNull(schema.taskSprintAssignments.removedAt)
+        )
+      ),
+  ]);
 
   // Step 4: Group tasks by sectionId; collect orphaned (null sectionId) separately
   const tasksBySectionId = new Map<string, SprintTask[]>();

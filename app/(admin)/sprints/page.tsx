@@ -9,30 +9,30 @@ import { SprintCalendar } from "./sprint-calendar";
 import { format, isThisWeek } from "date-fns";
 
 async function getSprints() {
-  const sprints = await db
-    .select({
-      id: schema.weeklySprints.id,
-      title: schema.weeklySprints.title,
-      weekOf: schema.weeklySprints.weekOf,
-      weeklyFocus: schema.weeklySprints.weeklyFocus,
-      createdAt: schema.weeklySprints.createdAt,
-    })
-    .from(schema.weeklySprints)
-    .orderBy(desc(schema.weeklySprints.weekOf));
-
-  // Get task counts per sprint
-  const taskCounts = await db
-    .select({
-      sprintId: schema.sprintSections.sprintId,
-      total: count(schema.sprintTasks.id),
-      completed: sql<number>`COUNT(CASE WHEN ${schema.sprintTasks.isCompleted} THEN 1 END)`,
-    })
-    .from(schema.sprintSections)
-    .leftJoin(
-      schema.sprintTasks,
-      eq(schema.sprintTasks.sectionId, schema.sprintSections.id)
-    )
-    .groupBy(schema.sprintSections.sprintId);
+  const [sprints, taskCounts] = await Promise.all([
+    db
+      .select({
+        id: schema.weeklySprints.id,
+        title: schema.weeklySprints.title,
+        weekOf: schema.weeklySprints.weekOf,
+        weeklyFocus: schema.weeklySprints.weeklyFocus,
+        createdAt: schema.weeklySprints.createdAt,
+      })
+      .from(schema.weeklySprints)
+      .orderBy(desc(schema.weeklySprints.weekOf)),
+    db
+      .select({
+        sprintId: schema.sprintSections.sprintId,
+        total: count(schema.sprintTasks.id),
+        completed: sql<number>`COUNT(CASE WHEN ${schema.sprintTasks.isCompleted} THEN 1 END)`,
+      })
+      .from(schema.sprintSections)
+      .leftJoin(
+        schema.sprintTasks,
+        eq(schema.sprintTasks.sectionId, schema.sprintSections.id)
+      )
+      .groupBy(schema.sprintSections.sprintId),
+  ]);
 
   const countMap = new Map(taskCounts.map((r) => [r.sprintId, r]));
 
