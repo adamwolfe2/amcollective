@@ -11,6 +11,9 @@ import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { createNotification } from "@/lib/db/repositories/notifications";
 import { fireEvent } from "@/lib/webhooks/events";
+import { clerkClient } from "@clerk/nextjs/server";
+import { after } from "next/server";
+import { sendClientWelcomeEmail } from "@/lib/email/notifications";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -49,7 +52,7 @@ export async function POST(_request: NextRequest, ctx: RouteContext) {
         email: lead.email,
         phone: lead.phone,
         website: lead.website,
-        portalAccess: false,
+        portalAccess: true,
       })
       .returning();
 
@@ -79,6 +82,33 @@ export async function POST(_request: NextRequest, ctx: RouteContext) {
       message: `${lead.contactName}${lead.companyName ? ` (${lead.companyName})` : ""} is now a client.`,
       link: `/clients/${client.id}`,
     });
+
+    // Auto-provision portal: Clerk invite + welcome email (non-blocking)
+    if (client.email) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://amcollective.vercel.app";
+      const portalUrl = `${appUrl}/client/${client.id}`;
+      after(async () => {
+        try {
+          const clerk = await clerkClient();
+          await clerk.invitations.createInvitation({
+            emailAddress: client.email!,
+            publicMetadata: { role: "client", clientId: client.id },
+            redirectUrl: portalUrl,
+          });
+        } catch (err) {
+          console.error("[convert] Clerk invite failed:", err);
+        }
+        try {
+          await sendClientWelcomeEmail({
+            clientName: client.name,
+            clientEmail: client.email!,
+            portalUrl,
+          });
+        } catch (err) {
+          console.error("[convert] Welcome email failed:", err);
+        }
+      });
+    }
 
     // Fire webhook
     await fireEvent("lead.converted", {
