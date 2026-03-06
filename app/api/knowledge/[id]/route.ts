@@ -23,20 +23,17 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
 
     const { id } = await ctx.params;
 
-    const [doc] = await db
-      .select()
-      .from(schema.documents)
-      .where(eq(schema.documents.id, id))
-      .limit(1);
+    const [[doc], tags] = await Promise.all([
+      db.select().from(schema.documents).where(eq(schema.documents.id, id)).limit(1),
+      db
+        .select({ tag: schema.documentTags.tag })
+        .from(schema.documentTags)
+        .where(eq(schema.documentTags.documentId, id)),
+    ]);
 
     if (!doc) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-
-    const tags = await db
-      .select({ tag: schema.documentTags.tag })
-      .from(schema.documentTags)
-      .where(eq(schema.documentTags.documentId, id));
 
     return NextResponse.json({
       ...doc,

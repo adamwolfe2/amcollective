@@ -20,40 +20,39 @@ export async function POST() {
   }
 
   try {
-    // Compute current metrics (same logic as Inngest job)
-    const [mrrResult] = await db
-      .select({
-        total: sql<string>`COALESCE(SUM(${schema.subscriptions.amount}), 0)`,
-      })
-      .from(schema.subscriptions)
-      .where(eq(schema.subscriptions.status, "active"));
+    // Compute current metrics in parallel (same logic as Inngest job)
+    const [[mrrResult], [subsCount], mercuryAccounts, [activeClients], projects, overdue] =
+      await Promise.all([
+        db
+          .select({
+            total: sql<string>`COALESCE(SUM(${schema.subscriptions.amount}), 0)`,
+          })
+          .from(schema.subscriptions)
+          .where(eq(schema.subscriptions.status, "active")),
+        db
+          .select({ value: count() })
+          .from(schema.subscriptions)
+          .where(eq(schema.subscriptions.status, "active")),
+        db.select().from(schema.mercuryAccounts),
+        db
+          .select({
+            value: sql<number>`COUNT(DISTINCT ${schema.kanbanCards.clientId})`,
+          })
+          .from(schema.kanbanCards)
+          .where(sql`${schema.kanbanCards.completedAt} IS NULL`),
+        db
+          .select({ status: schema.portfolioProjects.status })
+          .from(schema.portfolioProjects),
+        db
+          .select({ amount: schema.invoices.amount })
+          .from(schema.invoices)
+          .where(eq(schema.invoices.status, "overdue")),
+      ]);
 
-    const [subsCount] = await db
-      .select({ value: count() })
-      .from(schema.subscriptions)
-      .where(eq(schema.subscriptions.status, "active"));
-
-    const mercuryAccounts = await db.select().from(schema.mercuryAccounts);
     const totalCash = mercuryAccounts.reduce(
       (s, a) => s + Number(a.balance),
       0
     );
-
-    const [activeClients] = await db
-      .select({
-        value: sql<number>`COUNT(DISTINCT ${schema.kanbanCards.clientId})`,
-      })
-      .from(schema.kanbanCards)
-      .where(sql`${schema.kanbanCards.completedAt} IS NULL`);
-
-    const projects = await db
-      .select({ status: schema.portfolioProjects.status })
-      .from(schema.portfolioProjects);
-
-    const overdue = await db
-      .select({ amount: schema.invoices.amount })
-      .from(schema.invoices)
-      .where(eq(schema.invoices.status, "overdue"));
 
     const mrr = Number(mrrResult?.total ?? 0);
     const today = new Date();
