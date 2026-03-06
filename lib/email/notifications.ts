@@ -124,6 +124,106 @@ export function notifyClientStatusChange(data: {
   });
 }
 
+// ── Contract: Send signing link to client ───────────────────────────────────
+
+export function sendContractEmail(data: {
+  clientName: string;
+  clientEmail: string;
+  contractTitle: string;
+  contractNumber: string;
+  signingUrl: string;
+  totalValue?: number | null; // cents
+  expiresAt?: Date | null;
+}) {
+  const valueStr =
+    data.totalValue != null
+      ? `$${(data.totalValue / 100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+      : null;
+
+  const expiresStr = data.expiresAt
+    ? new Intl.DateTimeFormat("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }).format(data.expiresAt)
+    : null;
+
+  return send({
+    to: data.clientEmail,
+    subject: `Action required: ${data.contractTitle} is ready for your signature`,
+    html: `
+      <div style="font-family: Georgia, serif; font-size: 14px; color: #0A0A0A; max-width: 540px; margin: 0 auto;">
+        <div style="background: #0A0A0A; padding: 20px 24px; margin-bottom: 0;">
+          <p style="font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.4); margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.1em;">AM Collective Capital</p>
+          <h1 style="font-family: Georgia, serif; color: #fff; font-size: 20px; margin: 0; font-weight: bold;">${data.contractTitle}</h1>
+          <p style="font-family: monospace; font-size: 11px; color: rgba(255,255,255,0.4); margin: 6px 0 0;">${data.contractNumber}</p>
+        </div>
+        <div style="border: 1px solid #0A0A0A; border-top: none; padding: 24px;">
+          <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
+            Hi ${data.clientName},
+          </p>
+          <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
+            Your contract is ready for review and signature. Please click the button below to read and sign the agreement.
+          </p>
+          ${valueStr ? `<p style="font-family: monospace; font-size: 12px; color: #0A0A0A; margin: 0 0 16px;">Contract value: <strong>${valueStr}</strong></p>` : ""}
+          ${expiresStr ? `<p style="font-family: monospace; font-size: 12px; color: #8B92A5; margin: 0 0 16px;">This link expires: ${expiresStr}</p>` : ""}
+          <p style="margin: 24px 0;">
+            <a href="${data.signingUrl}" style="display: inline-block; background: #0A0A0A; color: #fff; font-family: monospace; font-size: 12px; padding: 12px 24px; text-decoration: none; font-weight: bold;">
+              Review &amp; Sign Contract →
+            </a>
+          </p>
+          <p style="font-family: monospace; font-size: 11px; color: #8B92A5; margin: 0; line-height: 1.6;">
+            Or copy this link: ${data.signingUrl}
+          </p>
+        </div>
+        <p style="font-family: monospace; font-size: 10px; color: #8B92A5; margin: 16px 0 0; text-align: center;">
+          — AM Collective Capital · amcollectivecapital.com
+        </p>
+      </div>
+    `,
+  });
+}
+
+// ── Client: Welcome to the portal ───────────────────────────────────────────
+
+export function sendClientWelcomeEmail(data: {
+  clientName: string;
+  clientEmail: string;
+  portalUrl: string;
+}) {
+  return send({
+    to: data.clientEmail,
+    subject: `Welcome to AM Collective — your client portal is ready`,
+    html: `
+      <div style="font-family: Georgia, serif; font-size: 14px; color: #0A0A0A; max-width: 540px; margin: 0 auto;">
+        <div style="background: #0A0A0A; padding: 20px 24px; margin-bottom: 0;">
+          <p style="font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.4); margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.1em;">AM Collective Capital</p>
+          <h1 style="font-family: Georgia, serif; color: #fff; font-size: 20px; margin: 0; font-weight: bold;">Welcome, ${data.clientName}</h1>
+        </div>
+        <div style="border: 1px solid #0A0A0A; border-top: none; padding: 24px;">
+          <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
+            Your AM Collective client portal is ready. You can use it to track project progress, view invoices, and stay in sync with our team.
+          </p>
+          <p style="margin: 24px 0;">
+            <a href="${data.portalUrl}" style="display: inline-block; background: #0A0A0A; color: #fff; font-family: monospace; font-size: 12px; padding: 12px 24px; text-decoration: none; font-weight: bold;">
+              Access Your Portal →
+            </a>
+          </p>
+          <p style="font-family: monospace; font-size: 11px; color: #8B92A5; margin: 0 0 16px; line-height: 1.6;">
+            Portal URL: ${data.portalUrl}
+          </p>
+          <p style="line-height: 1.7; color: #3D4556; margin: 0;">
+            You will receive a separate email from us to set up your account login. If you have any questions, reply directly to this email.
+          </p>
+        </div>
+        <p style="font-family: monospace; font-size: 10px; color: #8B92A5; margin: 16px 0 0; text-align: center;">
+          — AM Collective Capital · amcollectivecapital.com
+        </p>
+      </div>
+    `,
+  });
+}
+
 // ── Client: Portal is live ──────────────────────────────────────────────────
 
 export function notifyClientPortalLive(data: {
