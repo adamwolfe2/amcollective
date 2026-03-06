@@ -184,6 +184,45 @@ export function sendContractEmail(data: {
   });
 }
 
+// ── Contract: Fully executed confirmation ───────────────────────────────────
+
+export function sendContractExecutedEmail(data: {
+  clientName: string;
+  clientEmail: string;
+  contractTitle: string;
+  contractNumber: string;
+  startDate?: string | null;
+}) {
+  return send({
+    to: data.clientEmail,
+    subject: `${data.contractTitle} — fully executed`,
+    html: `
+      <div style="font-family: Georgia, serif; font-size: 14px; color: #0A0A0A; max-width: 540px; margin: 0 auto;">
+        <div style="background: #0A0A0A; padding: 20px 24px; margin-bottom: 0;">
+          <p style="font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.4); margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.1em;">AM Collective Capital</p>
+          <h1 style="font-family: Georgia, serif; color: #fff; font-size: 20px; margin: 0; font-weight: bold;">Contract Executed</h1>
+          <p style="font-family: monospace; font-size: 11px; color: rgba(255,255,255,0.4); margin: 6px 0 0;">${data.contractNumber}</p>
+        </div>
+        <div style="border: 1px solid #0A0A0A; border-top: none; padding: 24px;">
+          <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
+            Hi ${data.clientName},
+          </p>
+          <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
+            Great news — <strong>${data.contractTitle}</strong> has been countersigned and is now fully executed. Both parties are bound by its terms.
+          </p>
+          ${data.startDate ? `<p style="font-family: monospace; font-size: 12px; color: #0A0A0A; margin: 0 0 16px;">Effective date: <strong>${data.startDate}</strong></p>` : ""}
+          <p style="line-height: 1.7; color: #3D4556; margin: 0;">
+            We will retain a copy on file. If you need a copy or have any questions, reply directly to this email.
+          </p>
+        </div>
+        <p style="font-family: monospace; font-size: 10px; color: #8B92A5; margin: 16px 0 0; text-align: center;">
+          — AM Collective Capital · amcollectivecapital.com
+        </p>
+      </div>
+    `,
+  });
+}
+
 // ── Client: Welcome to the portal ───────────────────────────────────────────
 
 export function sendClientWelcomeEmail(data: {

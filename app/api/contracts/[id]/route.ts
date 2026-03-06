@@ -11,7 +11,7 @@ import { eq } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
-import { sendContractEmail } from "@/lib/email/notifications";
+import { sendContractEmail, sendContractExecutedEmail } from "@/lib/email/notifications";
 import { after } from "next/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -87,10 +87,11 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
       updates.status = "terminated";
     }
 
-    // Fetch client email before update (needed for send email)
+    // Fetch client email before update (needed for send/countersign emails)
     const needsEmail = body.action === "send" || body.status === "sent";
+    const needsCountersignEmail = body.action === "countersign";
     let clientRow: { clientName: string | null; clientEmail: string | null } | null = null;
-    if (needsEmail) {
+    if (needsEmail || needsCountersignEmail) {
       const [found] = await db
         .select({
           clientName: schema.clients.name,
@@ -126,6 +127,19 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
           signingUrl,
           totalValue: updated.totalValue,
           expiresAt: updated.expiresAt,
+        })
+      );
+    }
+
+    // Send countersign confirmation email to client
+    if (needsCountersignEmail && clientRow?.clientEmail) {
+      after(() =>
+        sendContractExecutedEmail({
+          clientName: clientRow.clientName ?? "Client",
+          clientEmail: clientRow.clientEmail!,
+          contractTitle: updated.title,
+          contractNumber: updated.contractNumber,
+          startDate: updated.startDate,
         })
       );
     }
