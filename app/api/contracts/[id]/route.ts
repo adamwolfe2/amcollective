@@ -11,6 +11,8 @@ import { eq } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { sendContractEmail } from "@/lib/email/notifications";
+import { after } from "next/server";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -85,6 +87,22 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
       updates.status = "terminated";
     }
 
+    // Fetch client email before update (needed for send email)
+    const needsEmail = body.action === "send" || body.status === "sent";
+    let clientRow: { clientName: string | null; clientEmail: string | null } | null = null;
+    if (needsEmail) {
+      const [found] = await db
+        .select({
+          clientName: schema.clients.name,
+          clientEmail: schema.clients.email,
+        })
+        .from(schema.contracts)
+        .leftJoin(schema.clients, eq(schema.contracts.clientId, schema.clients.id))
+        .where(eq(schema.contracts.id, id))
+        .limit(1);
+      clientRow = found ?? null;
+    }
+
     const [updated] = await db
       .update(schema.contracts)
       .set(updates)
@@ -93,6 +111,23 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
 
     if (!updated) {
       return NextResponse.json({ error: "Contract not found" }, { status: 404 });
+    }
+
+    // Send signing link email when contract is sent to client
+    if (needsEmail && clientRow?.clientEmail) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://amcollective.vercel.app";
+      const signingUrl = `${appUrl}/contracts/sign/${updated.token}`;
+      after(() =>
+        sendContractEmail({
+          clientName: clientRow.clientName ?? "Client",
+          clientEmail: clientRow.clientEmail!,
+          contractTitle: updated.title,
+          contractNumber: updated.contractNumber,
+          signingUrl,
+          totalValue: updated.totalValue,
+          expiresAt: updated.expiresAt,
+        })
+      );
     }
 
     await createAuditLog({
