@@ -57,14 +57,15 @@ export default async function ClientsPage({
         ? conditions[0]
         : undefined;
 
-  const clientsList = await db
-    .select()
-    .from(schema.clients)
-    .where(whereClause)
-    .orderBy(desc(schema.clients.currentMrr))
-    .limit(50);
-
-  const totalCount = await clientsRepo.getClientCount();
+  const [clientsList, totalCount] = await Promise.all([
+    db
+      .select()
+      .from(schema.clients)
+      .where(whereClause)
+      .orderBy(desc(schema.clients.currentMrr))
+      .limit(50),
+    clientsRepo.getClientCount(),
+  ]);
 
   return (
     <div>

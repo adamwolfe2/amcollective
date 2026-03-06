@@ -84,9 +84,11 @@ export default async function ProjectDetailPage({
 
   if (!project) notFound();
 
-  // Fetch Vercel data if project has vercelProjectId
+  // Fetch Vercel data + PostHog snapshot + project costs all in parallel
   const hasVercel = !!project.vercelProjectId;
-  const [deploysResult, detailResult, domainsResult, envCountResult] =
+  const hasPosthog = !!project.posthogProjectId && !!project.posthogApiKey;
+
+  const [deploysResult, detailResult, domainsResult, envCountResult, posthogRows, projectCosts] =
     await Promise.all([
       hasVercel
         ? vercelConnector.getDeployments(project.vercelProjectId!, 5)
@@ -100,6 +102,15 @@ export default async function ProjectDetailPage({
       hasVercel
         ? vercelConnector.getProjectEnvVarCount(project.vercelProjectId!)
         : Promise.resolve(null),
+      hasPosthog
+        ? db
+            .select()
+            .from(schema.posthogSnapshots)
+            .where(eq(schema.posthogSnapshots.projectId, id))
+            .orderBy(desc(schema.posthogSnapshots.snapshotDate))
+            .limit(1)
+        : Promise.resolve([]),
+      getProjectCosts(id),
     ]);
 
   const deploys =
@@ -112,21 +123,7 @@ export default async function ProjectDetailPage({
     envCountResult?.success && envCountResult.data != null
       ? envCountResult.data
       : null;
-
-  // Fetch PostHog snapshot if project has posthogProjectId
-  const hasPosthog = !!project.posthogProjectId && !!project.posthogApiKey;
-  const posthogSnapshot = hasPosthog
-    ? await db
-        .select()
-        .from(schema.posthogSnapshots)
-        .where(eq(schema.posthogSnapshots.projectId, id))
-        .orderBy(desc(schema.posthogSnapshots.snapshotDate))
-        .limit(1)
-        .then((rows) => rows[0] ?? null)
-    : null;
-
-  // Fetch cost data
-  const projectCosts = await getProjectCosts(id);
+  const posthogSnapshot = posthogRows[0] ?? null;
   const totalProjectCost = projectCosts.reduce(
     (sum, c) => sum + Number(c.total),
     0

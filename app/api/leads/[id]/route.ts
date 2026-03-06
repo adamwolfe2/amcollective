@@ -23,22 +23,19 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
 
     const { id } = await ctx.params;
 
-    const [lead] = await db
-      .select()
-      .from(schema.leads)
-      .where(eq(schema.leads.id, id))
-      .limit(1);
+    const [[lead], activities] = await Promise.all([
+      db.select().from(schema.leads).where(eq(schema.leads.id, id)).limit(1),
+      db
+        .select()
+        .from(schema.leadActivities)
+        .where(eq(schema.leadActivities.leadId, id))
+        .orderBy(desc(schema.leadActivities.createdAt))
+        .limit(50),
+    ]);
 
     if (!lead) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
-
-    const activities = await db
-      .select()
-      .from(schema.leadActivities)
-      .where(eq(schema.leadActivities.leadId, id))
-      .orderBy(desc(schema.leadActivities.createdAt))
-      .limit(50);
 
     return NextResponse.json({ ...lead, activities });
   } catch (error) {

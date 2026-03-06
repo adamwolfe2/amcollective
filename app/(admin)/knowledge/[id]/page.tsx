@@ -10,18 +10,15 @@ type PageProps = { params: Promise<{ id: string }> };
 export default async function KnowledgeArticlePage({ params }: PageProps) {
   const { id } = await params;
 
-  const [doc] = await db
-    .select()
-    .from(schema.documents)
-    .where(eq(schema.documents.id, id))
-    .limit(1);
+  const [[doc], tags] = await Promise.all([
+    db.select().from(schema.documents).where(eq(schema.documents.id, id)).limit(1),
+    db
+      .select({ tag: schema.documentTags.tag })
+      .from(schema.documentTags)
+      .where(eq(schema.documentTags.documentId, id)),
+  ]);
 
   if (!doc) notFound();
-
-  const tags = await db
-    .select({ tag: schema.documentTags.tag })
-    .from(schema.documentTags)
-    .where(eq(schema.documentTags.documentId, id));
 
   const TYPE_STYLES: Record<string, string> = {
     sop: "border-blue-700 bg-blue-50 text-blue-700",
