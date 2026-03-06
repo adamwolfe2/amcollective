@@ -8,7 +8,7 @@ import { format, formatDistanceToNow } from "date-fns";
 import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, and, sql, desc, gte, count, asc, isNull } from "drizzle-orm";
+import { eq, and, sql, desc, gte, count, asc, isNull, lte, not, inArray, isNotNull } from "drizzle-orm";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as mercuryConnector from "@/lib/connectors/mercury";
@@ -800,7 +800,7 @@ async function HookCard() {
 async function ActionsPanel() {
   try {
     const now = new Date();
-    const [overdueInvoices, staleClients, deploysResult, recentActivity] =
+    const [overdueInvoices, staleClients, deploysResult, recentActivity, unsignedContracts, missedFollowups] =
       await Promise.all([
         db
           .select({
@@ -820,6 +820,39 @@ async function ActionsPanel() {
         getCachedStaleClients(),
         getCachedVercelDeployments(),
         getRecentActivity(10),
+        // Unsigned contracts that were sent to clients
+        db
+          .select({
+            id: schema.contracts.id,
+            title: schema.contracts.title,
+            contractNumber: schema.contracts.contractNumber,
+            sentAt: schema.contracts.sentAt,
+            clientName: schema.clients.name,
+          })
+          .from(schema.contracts)
+          .leftJoin(schema.clients, eq(schema.contracts.clientId, schema.clients.id))
+          .where(inArray(schema.contracts.status, ["sent", "viewed"]))
+          .orderBy(schema.contracts.sentAt)
+          .limit(5),
+        // Leads with missed follow-ups
+        db
+          .select({
+            id: schema.leads.id,
+            contactName: schema.leads.contactName,
+            companyName: schema.leads.companyName,
+            nextFollowUpAt: schema.leads.nextFollowUpAt,
+          })
+          .from(schema.leads)
+          .where(
+            and(
+              isNotNull(schema.leads.nextFollowUpAt),
+              lte(schema.leads.nextFollowUpAt, now),
+              eq(schema.leads.isArchived, false),
+              not(inArray(schema.leads.stage, ["closed_won", "closed_lost", "nurture"]))
+            )
+          )
+          .orderBy(schema.leads.nextFollowUpAt)
+          .limit(5),
       ]);
 
     const failedDeploys = deploysResult.success
@@ -867,6 +900,31 @@ async function ActionsPanel() {
         label: `No activity ${days}d`,
         detail: c.clientName,
         url: `/clients/${c.clientId}/kanban`,
+      });
+    }
+
+    for (const contract of unsignedContracts) {
+      const daysSent = contract.sentAt
+        ? Math.floor((now.getTime() - new Date(contract.sentAt).getTime()) / (1000 * 60 * 60 * 24))
+        : null;
+      actionItems.push({
+        severity: daysSent != null && daysSent > 7 ? "critical" : "warning",
+        label: `Unsigned contract${daysSent != null ? ` ${daysSent}d` : ""}`,
+        detail: `${contract.clientName ?? "Unknown"} — ${contract.contractNumber}`,
+        url: `/contracts/${contract.id}`,
+      });
+    }
+
+    for (const lead of missedFollowups) {
+      const daysOverdue = lead.nextFollowUpAt
+        ? Math.floor((now.getTime() - new Date(lead.nextFollowUpAt).getTime()) / (1000 * 60 * 60 * 24))
+        : 0;
+      const name = lead.companyName ? `${lead.contactName} (${lead.companyName})` : lead.contactName;
+      actionItems.push({
+        severity: daysOverdue > 3 ? "critical" : "warning",
+        label: `Follow-up overdue ${daysOverdue}d`,
+        detail: name,
+        url: `/leads`,
       });
     }
 
