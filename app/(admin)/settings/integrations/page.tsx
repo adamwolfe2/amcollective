@@ -95,105 +95,71 @@ export default async function IntegrationsPage() {
     (i) => !!process.env[i.envKey]
   ).length;
 
-  // Fetch latest sync runs per service
-  const syncByService: Record<
-    string,
-    {
-      status: string;
-      startedAt: Date;
-      recordsProcessed: number | null;
-    }
-  > = {};
-  try {
-    const latestRuns = await db
-      .selectDistinctOn([schema.syncRuns.service], {
-        service: schema.syncRuns.service,
-        status: schema.syncRuns.status,
-        startedAt: schema.syncRuns.startedAt,
-        recordsProcessed: schema.syncRuns.recordsProcessed,
-      })
-      .from(schema.syncRuns)
-      .orderBy(schema.syncRuns.service, desc(schema.syncRuns.startedAt));
-
-    for (const run of latestRuns) {
-      syncByService[run.service] = {
-        status: run.status,
-        startedAt: run.startedAt,
-        recordsProcessed: run.recordsProcessed,
-      };
-    }
-  } catch {
-    // Table may not exist yet
-  }
-
-  // Fetch recent sync history (last 15 runs)
-  let recentSyncRuns: Array<{
-    id: string;
-    service: string;
-    status: string;
-    recordsProcessed: number | null;
-    errorMessage: string | null;
-    startedAt: Date;
-    completedAt: Date | null;
-  }> = [];
-  try {
-    recentSyncRuns = await db
-      .select({
-        id: schema.syncRuns.id,
-        service: schema.syncRuns.service,
-        status: schema.syncRuns.status,
-        recordsProcessed: schema.syncRuns.recordsProcessed,
-        errorMessage: schema.syncRuns.errorMessage,
-        startedAt: schema.syncRuns.startedAt,
-        completedAt: schema.syncRuns.completedAt,
-      })
-      .from(schema.syncRuns)
-      .orderBy(desc(schema.syncRuns.startedAt))
-      .limit(15);
-  } catch {
-    // Table may not exist yet
-  }
-
-  // Gmail OAuth status
-  let gmailAccount: {
-    email: string | null;
-    lastSyncAt: Date | null;
-  } | null = null;
-  try {
-    const gmailAccounts = await db
-      .select()
-      .from(schema.connectedAccounts)
-      .where(
-        and(
-          eq(schema.connectedAccounts.provider, "gmail"),
-          eq(schema.connectedAccounts.status, "active")
-        )
-      );
-    gmailAccount = gmailAccounts[0] ?? null;
-  } catch {
-    // Table may not exist yet
-  }
   const composioReady = isComposioConfigured();
 
-  // PostHog per-project config
-  const projects = await db
-    .select({
-      id: schema.portfolioProjects.id,
-      name: schema.portfolioProjects.name,
-      posthogProjectId: schema.portfolioProjects.posthogProjectId,
-      posthogApiKey: schema.portfolioProjects.posthogApiKey,
-    })
-    .from(schema.portfolioProjects);
+  // Run all DB queries in parallel — wrap each in catch for graceful degradation
+  const [latestRunsResult, recentRunsResult, gmailResult, projectsResult, mercuryResult] =
+    await Promise.allSettled([
+      db
+        .selectDistinctOn([schema.syncRuns.service], {
+          service: schema.syncRuns.service,
+          status: schema.syncRuns.status,
+          startedAt: schema.syncRuns.startedAt,
+          recordsProcessed: schema.syncRuns.recordsProcessed,
+        })
+        .from(schema.syncRuns)
+        .orderBy(schema.syncRuns.service, desc(schema.syncRuns.startedAt)),
+      db
+        .select({
+          id: schema.syncRuns.id,
+          service: schema.syncRuns.service,
+          status: schema.syncRuns.status,
+          recordsProcessed: schema.syncRuns.recordsProcessed,
+          errorMessage: schema.syncRuns.errorMessage,
+          startedAt: schema.syncRuns.startedAt,
+          completedAt: schema.syncRuns.completedAt,
+        })
+        .from(schema.syncRuns)
+        .orderBy(desc(schema.syncRuns.startedAt))
+        .limit(15),
+      db
+        .select()
+        .from(schema.connectedAccounts)
+        .where(
+          and(
+            eq(schema.connectedAccounts.provider, "gmail"),
+            eq(schema.connectedAccounts.status, "active")
+          )
+        ),
+      db
+        .select({
+          id: schema.portfolioProjects.id,
+          name: schema.portfolioProjects.name,
+          posthogProjectId: schema.portfolioProjects.posthogProjectId,
+          posthogApiKey: schema.portfolioProjects.posthogApiKey,
+        })
+        .from(schema.portfolioProjects),
+      db
+        .select()
+        .from(schema.mercuryAccounts)
+        .orderBy(desc(schema.mercuryAccounts.createdAt)),
+    ]);
+
+  const syncByService: Record<string, { status: string; startedAt: Date; recordsProcessed: number | null }> = {};
+  if (latestRunsResult.status === "fulfilled") {
+    for (const run of latestRunsResult.value) {
+      syncByService[run.service] = { status: run.status, startedAt: run.startedAt, recordsProcessed: run.recordsProcessed };
+    }
+  }
+
+  const recentSyncRuns = recentRunsResult.status === "fulfilled" ? recentRunsResult.value : [];
+  const gmailAccount = gmailResult.status === "fulfilled" ? (gmailResult.value[0] ?? null) : null;
+  const projects = projectsResult.status === "fulfilled" ? projectsResult.value : [];
+  const mercuryAccounts = mercuryResult.status === "fulfilled" ? mercuryResult.value : [];
 
   const posthogConfigured = projects.filter(
     (p) => p.posthogProjectId && p.posthogApiKey
   );
-
-  // Mercury accounts
-  const mercuryAccounts = await db
-    .select()
-    .from(schema.mercuryAccounts)
-    .orderBy(desc(schema.mercuryAccounts.createdAt));
 
   return (
     <div>

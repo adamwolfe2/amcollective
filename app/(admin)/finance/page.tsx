@@ -11,35 +11,28 @@ import { MercurySyncButton } from "./sync-button";
 const PAGE_SIZE = 50;
 
 async function getMetrics() {
-  // Mercury accounts — live from API
-  const accountsResult = await mercuryConnector.getAccounts();
-  const accounts = accountsResult.success ? (accountsResult.data ?? []) : [];
-
-  const totalCash = accounts.reduce((s, a) => s + a.currentBalance, 0);
-
-  // Stripe MRR
-  const mrrResult = await stripeConnector.getMRR();
-  const mrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) / 100 : 0;
-  const arr = mrr * 12;
-
-  // Runway: total cash / average monthly spend (last 60 days)
   const sixtyDaysAgo = new Date();
   sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-  const [spendResult] = await db
-    .select({
-      totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)`,
-    })
-    .from(schema.mercuryTransactions)
-    .where(
-      and(
-        eq(schema.mercuryTransactions.direction, "debit"),
-        gte(schema.mercuryTransactions.postedAt, sixtyDaysAgo)
-      )
-    );
+  const [accountsResult, mrrResult, spendResult] = await Promise.all([
+    mercuryConnector.getAccounts(),
+    stripeConnector.getMRR(),
+    db
+      .select({ totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)` })
+      .from(schema.mercuryTransactions)
+      .where(
+        and(
+          eq(schema.mercuryTransactions.direction, "debit"),
+          gte(schema.mercuryTransactions.postedAt, sixtyDaysAgo)
+        )
+      ),
+  ]);
 
-  const totalSpend60d = Number(spendResult?.totalSpend ?? 0);
-  const monthlySpend = totalSpend60d / 2;
+  const accounts = accountsResult.success ? (accountsResult.data ?? []) : [];
+  const totalCash = accounts.reduce((s, a) => s + a.currentBalance, 0);
+  const mrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) / 100 : 0;
+  const arr = mrr * 12;
+  const monthlySpend = Number(spendResult[0]?.totalSpend ?? 0) / 2;
   const runway = monthlySpend > 0 ? totalCash / monthlySpend : null;
 
   return { totalCash, mrr, arr, runway, monthlySpend, accounts };
@@ -82,31 +75,30 @@ async function getCashFlowData() {
 async function getTransactions(page: number) {
   const offset = (page - 1) * PAGE_SIZE;
 
-  const [totalResult] = await db
-    .select({ total: count() })
-    .from(schema.mercuryTransactions);
-
-  const txns = await db
-    .select({
-      id: schema.mercuryTransactions.id,
-      accountName: schema.mercuryAccounts.name,
-      counterpartyName: schema.mercuryTransactions.counterpartyName,
-      amount: schema.mercuryTransactions.amount,
-      direction: schema.mercuryTransactions.direction,
-      status: schema.mercuryTransactions.status,
-      description: schema.mercuryTransactions.description,
-      companyTag: schema.mercuryTransactions.companyTag,
-      postedAt: schema.mercuryTransactions.postedAt,
-      createdAt: schema.mercuryTransactions.createdAt,
-    })
-    .from(schema.mercuryTransactions)
-    .innerJoin(
-      schema.mercuryAccounts,
-      eq(schema.mercuryTransactions.accountId, schema.mercuryAccounts.id)
-    )
-    .orderBy(desc(schema.mercuryTransactions.postedAt))
-    .limit(PAGE_SIZE)
-    .offset(offset);
+  const [totalRows, txns] = await Promise.all([
+    db.select({ total: count() }).from(schema.mercuryTransactions),
+    db
+      .select({
+        id: schema.mercuryTransactions.id,
+        accountName: schema.mercuryAccounts.name,
+        counterpartyName: schema.mercuryTransactions.counterpartyName,
+        amount: schema.mercuryTransactions.amount,
+        direction: schema.mercuryTransactions.direction,
+        status: schema.mercuryTransactions.status,
+        description: schema.mercuryTransactions.description,
+        companyTag: schema.mercuryTransactions.companyTag,
+        postedAt: schema.mercuryTransactions.postedAt,
+        createdAt: schema.mercuryTransactions.createdAt,
+      })
+      .from(schema.mercuryTransactions)
+      .innerJoin(
+        schema.mercuryAccounts,
+        eq(schema.mercuryTransactions.accountId, schema.mercuryAccounts.id)
+      )
+      .orderBy(desc(schema.mercuryTransactions.postedAt))
+      .limit(PAGE_SIZE)
+      .offset(offset),
+  ]);
 
   return {
     transactions: txns.map((t) => ({
@@ -115,7 +107,7 @@ async function getTransactions(page: number) {
       postedAt: t.postedAt?.toISOString() ?? null,
       createdAt: t.createdAt.toISOString(),
     })),
-    totalCount: totalResult?.total ?? 0,
+    totalCount: totalRows[0]?.total ?? 0,
   };
 }
 
