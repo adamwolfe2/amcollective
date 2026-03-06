@@ -45,16 +45,16 @@ const CORE_TOOL_NAMES = new Set([
 
 const TOOL_MODULES: Array<{ keywords: string[]; toolNames: string[] }> = [
   {
-    keywords: ["invoice", "revenue", "mrr", "stripe", "payment", "billing", "cash", "finance", "money", "overdue", "spend", "cost", "budget", "forecast", "paid"],
-    toolNames: ["get_revenue_data", "get_invoices", "get_recurring_invoices", "get_forecast", "get_costs"],
+    keywords: ["invoice", "revenue", "mrr", "stripe", "payment", "billing", "cash", "finance", "money", "overdue", "spend", "cost", "budget", "forecast", "paid", "pending", "owes", "bill", "charge", "owe", "received"],
+    toolNames: ["get_revenue_data", "get_invoices", "get_recurring_invoices", "get_forecast", "get_costs", "create_invoice", "create_client", "mark_invoice_paid"],
   },
   {
-    keywords: ["lead", "prospect", "client", "customer", "pipeline", "deal", "company", "contact", "proposal", "follow"],
-    toolNames: ["search_clients", "get_client_detail", "get_leads", "create_lead", "update_lead", "get_proposals"],
+    keywords: ["lead", "prospect", "client", "customer", "pipeline", "deal", "company", "contact", "proposal", "follow", "add client", "new client", "set up client"],
+    toolNames: ["search_clients", "get_client_detail", "get_leads", "create_lead", "update_lead", "get_proposals", "create_client"],
   },
   {
-    keywords: ["task", "sprint", "todo", "rock", "goal", "quarter", "assign", "delegate", "retro", "velocity", "close sprint"],
-    toolNames: ["get_tasks", "update_rock_status", "create_rock", "update_sprint_note", "close_sprint", "create_sprint", "add_meeting_note"],
+    keywords: ["task", "sprint", "todo", "rock", "goal", "quarter", "assign", "delegate", "retro", "velocity", "close sprint", "add task", "create task", "section", "backlog", "put in sprint", "add to sprint"],
+    toolNames: ["get_tasks", "update_rock_status", "create_rock", "update_sprint_note", "close_sprint", "create_sprint", "add_meeting_note", "create_task", "add_task_to_sprint", "create_sprint_section"],
   },
   {
     keywords: ["deploy", "vercel", "build", "error", "fail", "server", "domain", "cdn", "deployment", "project"],
@@ -113,6 +113,46 @@ const TOOL_MODULES: Array<{ keywords: string[]; toolNames: string[] }> = [
   {
     keywords: ["health", "up", "down", "ping", "site", "domain", "product", "live", "working", "broken"],
     toolNames: ["check_product_health"],
+  },
+  {
+    keywords: ["alert", "flag", "resolve", "fixed", "mark resolved", "snooze", "close alert", "dismiss alert", "remind me"],
+    toolNames: ["resolve_alert", "create_alert"],
+  },
+  {
+    keywords: ["scorecard", "metric", "kpi", "weekly number", "signups this week", "this week was", "rate was", "update scorecard", "log metric"],
+    toolNames: ["update_scorecard_entry", "get_scorecard"],
+  },
+  {
+    keywords: ["proposal", "quote", "scope", "draft proposal", "send proposal", "they accepted", "lost deal", "rejected proposal", "approved proposal"],
+    toolNames: ["create_proposal", "update_proposal_status", "get_proposals"],
+  },
+  {
+    keywords: ["retainer", "recurring", "monthly billing", "auto-invoice", "monthly charge", "subscription", "set up billing", "repeat invoice"],
+    toolNames: ["create_recurring_invoice", "get_recurring_invoices"],
+  },
+  {
+    keywords: ["reminder", "follow up invoice", "send reminder", "overdue", "payment reminder", "chase invoice"],
+    toolNames: ["send_invoice_reminder", "get_invoices"],
+  },
+  {
+    keywords: ["update client", "client notes", "client email", "client phone", "fix client", "change company name"],
+    toolNames: ["update_client", "search_clients"],
+  },
+  {
+    keywords: ["archive lead", "dead lead", "lost lead", "remove from pipeline", "close lead", "bad lead"],
+    toolNames: ["archive_lead", "search_leads"],
+  },
+  {
+    keywords: ["meeting", "schedule", "calendar", "sync call", "kickoff", "l10", "block time", "set up call"],
+    toolNames: ["create_meeting", "add_meeting_note"],
+  },
+  {
+    keywords: ["outreach", "cold email", "campaign", "emailbison", "email campaign", "pause campaign", "resume campaign", "sender", "reply rate", "open rate", "bounce"],
+    toolNames: ["get_outreach_snapshot", "toggle_campaign"],
+  },
+  {
+    keywords: ["recommendation", "strategy rec", "dismiss", "handled that", "already done", "mark in progress", "that suggestion", "strategy suggestion"],
+    toolNames: ["dismiss_recommendation"],
   },
   {
     keywords: ["ai spend", "api cost", "claude cost", "anthropic spend", "token cost", "ai budget", "model cost"],
@@ -220,7 +260,49 @@ Reference these routes when directing Adam/Maggie to act:
 - Use \`write_memory\` to persist long-form context: decisions, narratives, detailed notes — never credentials
 - Use \`write_bot_memory\` to persist SHORT structured facts that should appear in EVERY future prompt — preferences, baselines, status
 - Use \`read_bot_memory\` to review what persistent facts are currently stored
-- Use \`create_delegation\` to assign tasks to team members
+## Action Tool Guidance — Take Action, Never Ask for Approach
+When Adam gives you a command, execute it immediately using the correct tool. Never present options or ask "which approach?" — just pick the most logical one and do it.
+
+**Tasks & Sprint**
+- \`create_task\` — "add a task: X", "create a ticket for Y", "we need to do Z". Set addToCurrentSprint:true if it's for this week.
+- \`add_task_to_sprint\` — "put [task] in the sprint", "add that to this week"
+- \`create_sprint_section\` — "add a TBGC section to the sprint", "start tracking [project] this week"
+
+**Alerts**
+- \`resolve_alert\` — "that's fixed", "close that alert", "mark [X] resolved"
+- \`create_alert\` — "flag this", "remind me about X", "add an alert for Y"
+
+**Scorecard**
+- \`update_scorecard_entry\` — "TaskSpace had 4 new signups", "[metric] was [N] this week". Just do it — don't ask to confirm.
+
+**Proposals**
+- \`create_proposal\` — "draft a proposal for [client] at $X". Auto-creates client if needed.
+- \`update_proposal_status\` — "they accepted", "lost that deal", "send the [client] proposal"
+
+**Billing**
+- \`create_invoice\` — "[client] has a $X invoice", "[client] owes us $X". Auto-creates client if needed.
+- \`mark_invoice_paid\` — "payment received from [client]", "[client] paid"
+- \`create_recurring_invoice\` — "[client] on a $X/mo retainer", "set up monthly billing for [client]"
+- \`send_invoice_reminder\` — "remind [client] about their invoice", "follow up on [client] payment". Returns a draft message to send.
+
+**Clients / CRM**
+- \`create_client\` — "add [company] as a client", "set up [name] in the system"
+- \`update_client\` — "update [client]'s email", "add a note to [client]"
+- \`archive_lead\` — "that lead is dead", "remove [company] from pipeline", "archive [lead]"
+
+**Meetings**
+- \`create_meeting\` — "schedule a meeting with X on [date]", "block time for L10 on [day]"
+- \`add_meeting_note\` — "add a note to the [meeting] call"
+
+**Outreach**
+- \`get_outreach_snapshot\` — "how is outreach going?", "what's the campaign performance?", "reply rate?"
+- \`toggle_campaign\` — "pause the [campaign] campaign", "resume outreach for [name]"
+
+**Strategy**
+- \`dismiss_recommendation\` — "dismiss that", "we already handled [rec]", "mark that recommendation done"
+
+**Delegation & tasks**
+- \`create_delegation\` to assign tasks to team members
 - Use \`update_task_status\` when Adam says a task is done, blocked, or in progress — search by partial title
 - Use \`update_rock_status\` when Adam says a rock is on track, at risk, or off track — search by partial title
 - Use \`update_lead\` to move a lead to a new stage, schedule a follow-up, or append a note
