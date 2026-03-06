@@ -27,38 +27,38 @@ const STATUS_STYLES: Record<string, string> = {
 export default async function TaskDetailPage({ params }: PageProps) {
   const { id } = await params;
 
-  const [row] = await db
-    .select({
-      task: schema.tasks,
-      assigneeName: schema.teamMembers.name,
-      projectName: schema.portfolioProjects.name,
-    })
-    .from(schema.tasks)
-    .leftJoin(
-      schema.teamMembers,
-      eq(schema.tasks.assigneeId, schema.teamMembers.id)
-    )
-    .leftJoin(
-      schema.portfolioProjects,
-      eq(schema.tasks.projectId, schema.portfolioProjects.id)
-    )
-    .where(eq(schema.tasks.id, id))
-    .limit(1);
+  const [[row], comments, teamMembers] = await Promise.all([
+    db
+      .select({
+        task: schema.tasks,
+        assigneeName: schema.teamMembers.name,
+        projectName: schema.portfolioProjects.name,
+      })
+      .from(schema.tasks)
+      .leftJoin(
+        schema.teamMembers,
+        eq(schema.tasks.assigneeId, schema.teamMembers.id)
+      )
+      .leftJoin(
+        schema.portfolioProjects,
+        eq(schema.tasks.projectId, schema.portfolioProjects.id)
+      )
+      .where(eq(schema.tasks.id, id))
+      .limit(1),
+    db
+      .select()
+      .from(schema.taskComments)
+      .where(eq(schema.taskComments.taskId, id))
+      .orderBy(asc(schema.taskComments.createdAt))
+      .limit(100),
+    db
+      .select({ id: schema.teamMembers.id, name: schema.teamMembers.name })
+      .from(schema.teamMembers)
+      .where(eq(schema.teamMembers.isActive, true))
+      .orderBy(schema.teamMembers.name),
+  ]);
 
   if (!row) notFound();
-
-  const comments = await db
-    .select()
-    .from(schema.taskComments)
-    .where(eq(schema.taskComments.taskId, id))
-    .orderBy(asc(schema.taskComments.createdAt))
-    .limit(100);
-
-  const teamMembers = await db
-    .select({ id: schema.teamMembers.id, name: schema.teamMembers.name })
-    .from(schema.teamMembers)
-    .where(eq(schema.teamMembers.isActive, true))
-    .orderBy(schema.teamMembers.name);
 
   const { task } = row;
 

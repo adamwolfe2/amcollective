@@ -8,53 +8,49 @@ export default async function ApiUsagePage() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
 
-  // Monthly totals from the real api_usage table
-  const [monthSummary] = await db
-    .select({
-      totalTokens: sql<number>`COALESCE(SUM(${schema.apiUsage.tokensUsed}), 0)`,
-      totalCost: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
-      callCount: sql<number>`COUNT(*)`,
-    })
-    .from(schema.apiUsage)
-    .where(gte(schema.apiUsage.createdAt, monthStart));
-
-  // By agent this month
-  const byAgent = await db
-    .select({
-      agent: sql<string>`COALESCE(${schema.apiUsage.metadata}->>'agent', 'unknown')`,
-      totalCost: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
-      totalTokens: sql<number>`COALESCE(SUM(${schema.apiUsage.tokensUsed}), 0)`,
-      callCount: sql<number>`COUNT(*)`,
-    })
-    .from(schema.apiUsage)
-    .where(gte(schema.apiUsage.createdAt, monthStart))
-    .groupBy(sql`COALESCE(${schema.apiUsage.metadata}->>'agent', 'unknown')`)
-    .orderBy(desc(sql`COALESCE(SUM(${schema.apiUsage.cost}), 0)`));
-
-  // By model this month
-  const byModel = await db
-    .select({
-      model: sql<string>`COALESCE(${schema.apiUsage.metadata}->>'model', 'unknown')`,
-      totalCost: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
-      totalTokens: sql<number>`COALESCE(SUM(${schema.apiUsage.tokensUsed}), 0)`,
-      callCount: sql<number>`COUNT(*)`,
-    })
-    .from(schema.apiUsage)
-    .where(gte(schema.apiUsage.createdAt, monthStart))
-    .groupBy(sql`COALESCE(${schema.apiUsage.metadata}->>'model', 'unknown')`)
-    .orderBy(desc(sql`COALESCE(SUM(${schema.apiUsage.cost}), 0)`));
-
-  // Daily spend — last 30 days
-  const daily = await db
-    .select({
-      date: sql<string>`TO_CHAR(${schema.apiUsage.date}, 'YYYY-MM-DD')`,
-      totalCost: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
-      totalTokens: sql<number>`COALESCE(SUM(${schema.apiUsage.tokensUsed}), 0)`,
-    })
-    .from(schema.apiUsage)
-    .where(gte(schema.apiUsage.createdAt, thirtyDaysAgo))
-    .groupBy(sql`TO_CHAR(${schema.apiUsage.date}, 'YYYY-MM-DD')`)
-    .orderBy(sql`TO_CHAR(${schema.apiUsage.date}, 'YYYY-MM-DD')`);
+  // All 4 queries are independent — run in parallel
+  const [[monthSummary], byAgent, byModel, daily] = await Promise.all([
+    db
+      .select({
+        totalTokens: sql<number>`COALESCE(SUM(${schema.apiUsage.tokensUsed}), 0)`,
+        totalCost: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
+        callCount: sql<number>`COUNT(*)`,
+      })
+      .from(schema.apiUsage)
+      .where(gte(schema.apiUsage.createdAt, monthStart)),
+    db
+      .select({
+        agent: sql<string>`COALESCE(${schema.apiUsage.metadata}->>'agent', 'unknown')`,
+        totalCost: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
+        totalTokens: sql<number>`COALESCE(SUM(${schema.apiUsage.tokensUsed}), 0)`,
+        callCount: sql<number>`COUNT(*)`,
+      })
+      .from(schema.apiUsage)
+      .where(gte(schema.apiUsage.createdAt, monthStart))
+      .groupBy(sql`COALESCE(${schema.apiUsage.metadata}->>'agent', 'unknown')`)
+      .orderBy(desc(sql`COALESCE(SUM(${schema.apiUsage.cost}), 0)`)),
+    db
+      .select({
+        model: sql<string>`COALESCE(${schema.apiUsage.metadata}->>'model', 'unknown')`,
+        totalCost: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
+        totalTokens: sql<number>`COALESCE(SUM(${schema.apiUsage.tokensUsed}), 0)`,
+        callCount: sql<number>`COUNT(*)`,
+      })
+      .from(schema.apiUsage)
+      .where(gte(schema.apiUsage.createdAt, monthStart))
+      .groupBy(sql`COALESCE(${schema.apiUsage.metadata}->>'model', 'unknown')`)
+      .orderBy(desc(sql`COALESCE(SUM(${schema.apiUsage.cost}), 0)`)),
+    db
+      .select({
+        date: sql<string>`TO_CHAR(${schema.apiUsage.date}, 'YYYY-MM-DD')`,
+        totalCost: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
+        totalTokens: sql<number>`COALESCE(SUM(${schema.apiUsage.tokensUsed}), 0)`,
+      })
+      .from(schema.apiUsage)
+      .where(gte(schema.apiUsage.createdAt, thirtyDaysAgo))
+      .groupBy(sql`TO_CHAR(${schema.apiUsage.date}, 'YYYY-MM-DD')`)
+      .orderBy(sql`TO_CHAR(${schema.apiUsage.date}, 'YYYY-MM-DD')`),
+  ]);
 
   const totalCost = Number(monthSummary?.totalCost ?? 0);
   const totalTokens = Number(monthSummary?.totalTokens ?? 0);
