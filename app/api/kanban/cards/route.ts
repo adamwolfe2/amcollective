@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
     console.error("[kanban/cards] Error:", err);
     captureError(err, { tags: { route: "POST /api/kanban/cards" } });
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

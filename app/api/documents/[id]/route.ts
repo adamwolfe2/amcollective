@@ -95,7 +95,7 @@ export async function PATCH(
     console.error("[documents] Error:", err);
     captureError(err, { tags: { route: "PATCH /api/documents/[id]" } });
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -156,7 +156,7 @@ export async function DELETE(
     console.error("[documents] Error:", err);
     captureError(err, { tags: { route: "DELETE /api/documents/[id]" } });
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

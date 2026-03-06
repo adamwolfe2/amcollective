@@ -47,7 +47,7 @@ export async function PATCH(
     console.error("[kanban/columns] Error:", err);
     captureError(err, { tags: { route: "PATCH /api/kanban/columns/[columnId]" } });
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }
@@ -88,7 +88,7 @@ export async function DELETE(
     console.error("[kanban/columns] Error:", err);
     captureError(err, { tags: { route: "DELETE /api/kanban/columns/[columnId]" } });
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

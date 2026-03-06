@@ -128,39 +128,46 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
       .where(eq(schema.contracts.id, contract.id))
       .returning();
 
-    // Auto-create invoice if configured
+    // Auto-create invoice if configured — non-blocking, contract is already signed
     if (contract.autoInvoiceOnSign && contract.proposalId) {
-      const [proposal] = await db
-        .select()
-        .from(schema.proposals)
-        .where(eq(schema.proposals.id, contract.proposalId))
-        .limit(1);
+      try {
+        const [proposal] = await db
+          .select()
+          .from(schema.proposals)
+          .where(eq(schema.proposals.id, contract.proposalId))
+          .limit(1);
 
-      if (proposal) {
-        const invoiceNumber = await generateInvoiceNumber();
-        const dueDate = new Date();
-        dueDate.setDate(dueDate.getDate() + 30);
+        if (proposal) {
+          const invoiceNumber = await generateInvoiceNumber();
+          const dueDate = new Date();
+          dueDate.setDate(dueDate.getDate() + 30);
 
-        const [invoice] = await db
-          .insert(schema.invoices)
-          .values({
-            clientId: contract.clientId,
-            number: invoiceNumber,
-            status: "draft",
-            lineItems: proposal.lineItems,
-            subtotal: proposal.subtotal ?? 0,
-            taxRate: proposal.taxRate ?? 0,
-            taxAmount: proposal.taxAmount ?? 0,
-            amount: proposal.total ?? 0,
-            dueDate,
-            notes: `Pursuant to contract ${contract.contractNumber}`,
-          })
-          .returning();
+          const [invoice] = await db
+            .insert(schema.invoices)
+            .values({
+              clientId: contract.clientId,
+              number: invoiceNumber,
+              status: "draft",
+              lineItems: proposal.lineItems,
+              subtotal: proposal.subtotal ?? 0,
+              taxRate: proposal.taxRate ?? 0,
+              taxAmount: proposal.taxAmount ?? 0,
+              amount: proposal.total ?? 0,
+              dueDate,
+              notes: `Pursuant to contract ${contract.contractNumber}`,
+            })
+            .returning();
 
-        await db
-          .update(schema.contracts)
-          .set({ invoiceId: invoice.id })
-          .where(eq(schema.contracts.id, contract.id));
+          await db
+            .update(schema.contracts)
+            .set({ invoiceId: invoice.id })
+            .where(eq(schema.contracts.id, contract.id));
+        }
+      } catch (invoiceErr) {
+        // Log but don't fail the signing response — contract is already committed
+        captureError(invoiceErr, {
+          tags: { route: "contract-sign-auto-invoice", contractId: contract.id },
+        });
       }
     }
 

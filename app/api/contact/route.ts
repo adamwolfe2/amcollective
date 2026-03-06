@@ -5,13 +5,21 @@
  * Stores as a lead in the CRM.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { captureError } from "@/lib/errors";
+import { aj } from "@/lib/middleware/arcjet";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  if (aj) {
+    const decision = await aj.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+  }
+
   try {
     const body = await request.json();
     const { name, email, message } = body;

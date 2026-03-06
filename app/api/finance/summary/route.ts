@@ -174,7 +174,6 @@ export async function GET() {
     return NextResponse.json(
       {
         error: "Failed to build finance summary",
-        message: err instanceof Error ? err.message : "Unknown error",
       },
       { status: 500 }
     );

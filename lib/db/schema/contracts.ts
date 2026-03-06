@@ -50,7 +50,7 @@ export const contracts = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     clientId: uuid("client_id")
       .notNull()
-      .references(() => clients.id),
+      .references(() => clients.id, { onDelete: "cascade" }),
     proposalId: uuid("proposal_id").references(() => proposals.id),
     companyTag: companyTagEnum("company_tag")
       .notNull()

@@ -112,7 +112,7 @@ async function recalculateClientMrr(clientId: string) {
  * invoices, minus any refunds recorded on payments.
  */
 async function recalculateClientLtv(clientId: string) {
-  const [result] = await db
+  const [invoiceResult] = await db
     .select({
       total: sql<number>`COALESCE(SUM(${schema.invoices.amount}), 0)`,
     })
@@ -124,7 +124,22 @@ async function recalculateClientLtv(clientId: string) {
       )
     );
 
-  const ltv = Number(result?.total ?? 0);
+  const [refundResult] = await db
+    .select({
+      total: sql<number>`COALESCE(SUM(${schema.payments.refundAmount}), 0)`,
+    })
+    .from(schema.payments)
+    .where(
+      and(
+        eq(schema.payments.clientId, clientId),
+        sql`${schema.payments.refundAmount} > 0`
+      )
+    );
+
+  const ltv = Math.max(
+    0,
+    Number(invoiceResult?.total ?? 0) - Number(refundResult?.total ?? 0)
+  );
 
   await db
     .update(schema.clients)
@@ -981,6 +996,115 @@ async function handleChargeRefunded(event: Stripe.Event) {
   });
 }
 
+// ─── Payment Intent Handlers ──────────────────────────────────────────────────
+
+async function handlePaymentIntentFailed(event: Stripe.Event) {
+  const pi = event.data.object as Stripe.PaymentIntent;
+  const customerId = resolveCustomerId(pi.customer);
+  const client = customerId
+    ? await findClientByStripeCustomerId(customerId)
+    : null;
+
+  if (client) {
+    await db
+      .update(schema.clients)
+      .set({ paymentStatus: "at_risk" })
+      .where(eq(schema.clients.id, client.id));
+  }
+
+  await createAlert({
+    type: "cost_anomaly",
+    severity: "warning",
+    title: `Payment intent failed: ${pi.id.slice(0, 16)}`,
+    message: `A payment of $${((pi.amount ?? 0) / 100).toFixed(2)} ${(pi.currency ?? "usd").toUpperCase()} failed. Reason: ${pi.last_payment_error?.message ?? "unknown"}.${client ? ` Client: ${client.name}.` : ""}`,
+    metadata: {
+      paymentIntentId: pi.id,
+      amount: pi.amount,
+      currency: pi.currency,
+      errorCode: pi.last_payment_error?.code,
+      errorMessage: pi.last_payment_error?.message,
+      clientId: client?.id ?? null,
+    },
+  });
+
+  await createAuditLog({
+    actorId: "stripe",
+    actorType: "system",
+    action: "payment_intent.payment_failed",
+    entityType: "payment",
+    entityId: pi.id,
+    metadata: {
+      amount: pi.amount,
+      currency: pi.currency,
+      errorCode: pi.last_payment_error?.code,
+      clientId: client?.id ?? null,
+    },
+  });
+}
+
+async function handleSubscriptionTrialWillEnd(event: Stripe.Event) {
+  const subscription = event.data.object as Stripe.Subscription;
+  const customerId = resolveCustomerId(subscription.customer);
+  const client = customerId
+    ? await findClientByStripeCustomerId(customerId)
+    : null;
+
+  const trialEnd = subscription.trial_end
+    ? new Date(subscription.trial_end * 1000)
+    : null;
+  const daysLeft = trialEnd
+    ? Math.ceil((trialEnd.getTime() - Date.now()) / 86400000)
+    : "unknown";
+
+  await createAlert({
+    type: "cost_anomaly",
+    severity: "info",
+    title: `Trial ending in ${daysLeft} days: ${client?.name ?? customerId ?? subscription.id}`,
+    message: `Subscription trial ends ${trialEnd ? trialEnd.toLocaleDateString() : "soon"}. Ensure payment method is on file to avoid interruption.`,
+    metadata: {
+      stripeSubscriptionId: subscription.id,
+      customerId,
+      trialEnd: subscription.trial_end,
+      daysLeft,
+      clientId: client?.id ?? null,
+    },
+  });
+
+  await createAuditLog({
+    actorId: "stripe",
+    actorType: "system",
+    action: "customer.subscription.trial_will_end",
+    entityType: "subscription",
+    entityId: subscription.id,
+    metadata: { customerId, trialEnd: subscription.trial_end, clientId: client?.id ?? null },
+  });
+
+  await notifySlack(
+    `Trial ending in ${daysLeft} days — ${client?.name ?? customerId ?? "unknown"}`
+  );
+}
+
+async function handleCheckoutSessionExpired(event: Stripe.Event) {
+  const session = event.data.object as Stripe.Checkout.Session;
+  const localInvoiceId = session.metadata?.invoiceId ?? null;
+  const customerEmail =
+    session.customer_email ?? session.customer_details?.email ?? "unknown";
+
+  await createAuditLog({
+    actorId: "stripe",
+    actorType: "system",
+    action: "checkout.session.expired",
+    entityType: "invoice",
+    entityId: localInvoiceId ?? session.id,
+    metadata: {
+      sessionId: session.id,
+      customerEmail,
+      amountTotal: session.amount_total,
+      localInvoiceId,
+    },
+  });
+}
+
 // ─── Customer Handlers ────────────────────────────────────────────────────────
 
 async function handleCustomerCreated(event: Stripe.Event) {
@@ -1189,8 +1313,15 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   "customer.created": handleCustomerCreated,
   "customer.updated": handleCustomerUpdated,
 
+  // Payment intent failures
+  "payment_intent.payment_failed": handlePaymentIntentFailed,
+
+  // Subscription trial
+  "customer.subscription.trial_will_end": handleSubscriptionTrialWillEnd,
+
   // Payment links / checkout sessions
   "checkout.session.completed": handleCheckoutSessionCompleted,
+  "checkout.session.expired": handleCheckoutSessionExpired,
 };
 
 // ─── Route Handler ────────────────────────────────────────────────────────────

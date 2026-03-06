@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     console.error("[kanban/reorder] Error:", err);
     captureError(err, { tags: { route: "POST /api/kanban/reorder" } });
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

@@ -77,7 +77,6 @@ export async function PATCH(
     return NextResponse.json(
       {
         error: "Failed to update tag",
-        message: err instanceof Error ? err.message : "Unknown error",
       },
       { status: 500 }
     );

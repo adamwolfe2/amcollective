@@ -79,7 +79,7 @@ export async function POST(
     console.error("[kanban/comments] Error:", err);
     captureError(err, { tags: { route: "POST /api/kanban/cards/[cardId]/comments" } });
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

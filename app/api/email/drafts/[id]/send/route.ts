@@ -61,7 +61,7 @@ export async function POST(_request: NextRequest, context: RouteContext) {
         .update(schema.emailDrafts)
         .set({ status: "failed" })
         .where(eq(schema.emailDrafts.id, id));
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
     }
 
     // Mark draft as sent
