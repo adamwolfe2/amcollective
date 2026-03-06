@@ -14,9 +14,133 @@ import {
   convertToModelMessages,
   stepCountIs,
   type UIMessage,
+  type ToolSet,
 } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
-import { allTools, allCeoTools } from "@/lib/ai/tools-sdk";
+import { allTools, allCeoTools, coreTools, vercelTools, posthogTools, mercuryTools, linearTools, ceoTools } from "@/lib/ai/tools-sdk";
+
+// ─── Tool selection (reduce 59 tools → ~10-15 per request) ──────────────────
+
+const ALWAYS_INCLUDED_KEYS: (keyof typeof coreTools)[] = [
+  "search_clients",
+  "get_alerts",
+  "get_status_summary",
+  "search_knowledge",
+  "get_portfolio_overview",
+];
+
+const CEO_ALWAYS_INCLUDED_KEYS: (keyof typeof ceoTools)[] = [
+  "write_memory", "read_memory", "list_memories", "search_memory",
+  "get_company_snapshot", "get_current_sprint",
+];
+
+const TOOL_MODULES: Array<{ keywords: string[]; keys: string[] }> = [
+  {
+    keywords: ["invoice", "payment", "revenue", "mrr", "billing", "arr", "paid", "overdue"],
+    keys: ["get_revenue_data", "get_invoices", "get_recurring_invoices", "get_forecast", "get_proposals", "get_costs"],
+  },
+  {
+    keywords: ["cash", "bank", "transaction", "mercury", "spending", "balance", "money", "spend"],
+    keys: ["get_mercury_balance", "get_mercury_transactions", "get_cash_position", "search_mercury_transactions"],
+  },
+  {
+    keywords: ["deploy", "vercel", "build", "project", "domain", "deployment"],
+    keys: ["list_vercel_projects", "get_vercel_project_costs", "get_deploy_status", "get_vercel_build_logs", "check_vercel_domain_status", "redeploy_vercel_project"],
+  },
+  {
+    keywords: ["analytics", "dau", "users", "posthog", "funnel", "traffic", "views", "visits"],
+    keys: ["get_posthog_analytics", "get_posthog_funnel", "get_posthog_top_pages", "get_posthog_user_count", "get_analytics"],
+  },
+  {
+    keywords: ["linear", "issue", "ticket", "bug", "cycle", "sprint", "milestone"],
+    keys: ["get_linear_issues", "get_linear_my_issues", "get_linear_cycle", "get_linear_projects", "get_linear_teams", "create_linear_issue", "update_linear_issue", "add_linear_comment"],
+  },
+  {
+    keywords: ["rock", "scorecard", "meeting", "quarter", "eos", "goal", "objective"],
+    keys: ["get_rocks", "get_scorecard"],
+  },
+  {
+    keywords: ["task", "todo", "checklist", "action item"],
+    keys: ["get_tasks"],
+  },
+  {
+    keywords: ["lead", "pipeline", "deal", "sales", "prospect", "crm"],
+    keys: ["get_leads", "create_lead", "get_contracts", "get_proposals"],
+  },
+  {
+    keywords: ["email", "message", "send", "draft", "outreach"],
+    keys: ["draft_email", "search_sent_emails"],
+  },
+  {
+    keywords: ["time", "hours", "billable", "timesheet"],
+    keys: ["log_time", "get_unbilled_time"],
+  },
+  {
+    keywords: ["audit", "log", "activity", "history"],
+    keys: ["get_audit_logs"],
+  },
+  {
+    keywords: ["knowledge", "sop", "article", "document", "wiki"],
+    keys: ["search_knowledge", "get_knowledge_articles"],
+  },
+  {
+    keywords: ["briefing", "brief", "morning", "summary", "daily"],
+    keys: ["get_voice_briefing", "get_status_summary"],
+  },
+  {
+    keywords: ["forecast", "runway", "projection", "burn"],
+    keys: ["get_forecast", "get_cash_position", "get_mercury_balance"],
+  },
+  {
+    keywords: ["slack", "sms", "notify", "message", "notification"],
+    keys: ["send_to_slack", "send_sms"],
+  },
+  {
+    keywords: ["delegate", "assign", "delegation"],
+    keys: ["create_delegation"],
+  },
+  {
+    keywords: ["vault", "password", "credential", "secret"],
+    keys: ["search_vault"],
+  },
+  {
+    keywords: ["sprint", "weekly", "focus", "week"],
+    keys: ["get_current_sprint", "update_sprint_note"],
+  },
+];
+
+function selectSDKTools(
+  message: string,
+  isCeoUser: boolean
+): ToolSet {
+  const lower = message.toLowerCase();
+  const base: ToolSet = isCeoUser ? (allCeoTools as ToolSet) : (allTools as ToolSet);
+  const selectedKeys = new Set<string>(ALWAYS_INCLUDED_KEYS as string[]);
+
+  if (isCeoUser) {
+    for (const k of CEO_ALWAYS_INCLUDED_KEYS) selectedKeys.add(k as string);
+  }
+
+  for (const mod of TOOL_MODULES) {
+    if (mod.keywords.some((kw) => lower.includes(kw))) {
+      for (const k of mod.keys) selectedKeys.add(k);
+    }
+  }
+
+  const filtered: ToolSet = {};
+  for (const key of Object.keys(base)) {
+    if (selectedKeys.has(key)) {
+      filtered[key] = base[key];
+    }
+  }
+
+  // Fallback: if nothing matched, return just core tools (never empty)
+  if (Object.keys(filtered).length <= ALWAYS_INCLUDED_KEYS.length) {
+    return coreTools as ToolSet;
+  }
+
+  return filtered;
+}
 import { searchSimilar } from "@/lib/ai/embeddings";
 import { searchMemory } from "@/lib/ai/memory";
 import { runResearch } from "@/lib/ai/agents/research";
@@ -250,7 +374,7 @@ Link to these pages when relevant:
     content: latestText,
   });
 
-  const activeTools = ceoUser ? allCeoTools : allTools;
+  const activeTools = selectSDKTools(latestText, !!ceoUser);
   const activeModel = ceoUser ? "claude-sonnet-4-6" : "claude-sonnet-4-5-20250929";
 
   // Stream response using Vercel AI SDK
@@ -272,19 +396,19 @@ Link to these pages when relevant:
                 id: tc.toolCallId,
               }));
 
-            await db.insert(schema.aiMessages).values({
-              conversationId: convId!,
-              role: "assistant",
-              content: text,
-              toolCalls: toolCalls.length > 0 ? toolCalls : null,
-              tokenCount: (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0),
-            });
-
-            // Update conversation timestamp
-            await db
-              .update(schema.aiConversations)
-              .set({ updatedAt: new Date() })
-              .where(eq(schema.aiConversations.id, convId!));
+            await Promise.all([
+              db.insert(schema.aiMessages).values({
+                conversationId: convId!,
+                role: "assistant",
+                content: text,
+                toolCalls: toolCalls.length > 0 ? toolCalls : null,
+                tokenCount: (usage?.inputTokens ?? 0) + (usage?.outputTokens ?? 0),
+              }),
+              db
+                .update(schema.aiConversations)
+                .set({ updatedAt: new Date() })
+                .where(eq(schema.aiConversations.id, convId!)),
+            ]);
           } catch (err) {
             captureError(err, {
               tags: { route: "POST /api/ai/chat", action: "persist" },
