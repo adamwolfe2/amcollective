@@ -231,6 +231,22 @@ export const mercuryTransactions = pgTable(
   ]
 );
 
+// ─── Cash Snapshots (Daily runway tracking) ──────────────────────────────────
+
+export const cashSnapshots = pgTable(
+  "cash_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    balanceCents: integer("balance_cents").notNull(),    // total Mercury balance
+    burnCents: integer("burn_cents").notNull(),          // monthly infrastructure burn
+    runwayMonths: numeric("runway_months", { precision: 6, scale: 2 }), // balance / burn
+    recordedAt: timestamp("recorded_at", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("cash_snapshots_recorded_at_idx").on(table.recordedAt),
+  ]
+);
+
 // ─── Relations ──────────────────────────────────────────────────────────────
 
 export const toolAccountsRelations = relations(toolAccounts, ({ many }) => ({
