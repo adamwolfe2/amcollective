@@ -38,7 +38,7 @@ export default async function WebhooksPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
         <div className="border border-[#0A0A0A]/10 bg-white p-4">
           <p className="font-mono text-2xl font-bold text-[#0A0A0A]">
             {registrations.length}

@@ -55,7 +55,7 @@ export function AddServiceDialog() {
           Add Service
         </Button>
       </DialogTrigger>
-      <DialogContent className="border-[#0A0A0A] rounded-none bg-[#F3F3EF]">
+      <DialogContent className="border-[#0A0A0A] rounded-none bg-[#F3F3EF] w-full max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-serif text-lg">Add Service</DialogTitle>
         </DialogHeader>
@@ -94,7 +94,7 @@ export function AddServiceDialog() {
               className="border-[#0A0A0A] rounded-none bg-white font-serif"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="basePrice" className="font-mono text-xs uppercase tracking-wider">
                 Price ($)
@@ -121,7 +121,7 @@ export function AddServiceDialog() {
               />
             </div>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"

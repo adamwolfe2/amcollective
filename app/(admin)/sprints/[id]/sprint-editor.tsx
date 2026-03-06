@@ -1159,7 +1159,7 @@ function AddSectionForm({
       <p className="font-serif font-bold text-[#0A0A0A] mb-4">
         Add Project Section
       </p>
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
         <div>
           <MentionInput
             label="Project / Client *"

@@ -268,7 +268,7 @@ export default async function ClientDetailPage({
         {/* Billing Tab */}
         <TabsContent value="billing" className="mt-6">
           {/* Financial Summary Cards */}
-          <div className="grid grid-cols-4 gap-4 mb-6">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
             <div className="border border-[#0A0A0A]/10 p-4">
               <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-1">
                 Monthly Revenue (MRR)

@@ -92,7 +92,7 @@ export function CreateTaskDialog({ teamMembers, projects }: Props) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 block mb-1">
                 Priority
@@ -121,7 +121,7 @@ export function CreateTaskDialog({ teamMembers, projects }: Props) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 block mb-1">
                 Assignee
@@ -159,7 +159,7 @@ export function CreateTaskDialog({ teamMembers, projects }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 mt-6">
+        <div className="flex flex-wrap items-center justify-end gap-2 mt-6">
           <button
             onClick={() => setOpen(false)}
             className="px-4 py-2 border border-[#0A0A0A]/20 font-mono text-sm hover:bg-[#0A0A0A]/5 transition-colors"

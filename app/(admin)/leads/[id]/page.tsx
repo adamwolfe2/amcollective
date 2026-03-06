@@ -201,7 +201,7 @@ export default async function LeadDetailPage({
             <h3 className="font-mono text-[10px] uppercase text-[#0A0A0A]/50">
               Opportunity
             </h3>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <p className="font-mono text-[10px] text-[#0A0A0A]/40">
                   Value

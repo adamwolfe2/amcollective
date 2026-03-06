@@ -343,7 +343,7 @@ async function MetricsStrip() {
   } catch (err) {
     console.error("[Dashboard] MetricsStrip failed:", err);
     return (
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         {Array.from({ length: 4 }).map((_, i) => (
           <div
             key={i}
@@ -437,14 +437,14 @@ async function WholesailCard() {
         {d ? (
           <div className="p-4 space-y-3 flex-1">
             {/* Build pipeline */}
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               <CardStat label="Builds" value={String(d.activeBuilds)} sub="active" />
               <CardStat label="Live" value={String(d.liveClients)} sub="clients" />
               <CardStat label="Total" value={String(Object.values(d.buildsByStatus).reduce((s, n) => s + n, 0))} sub="all time" />
               <CardStat label="Stuck" value={String(d.stuckProjects)} sub=">14d" alert={d.stuckProjects > 0} />
             </div>
             {/* Revenue */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <CardStat label="Pipeline" value={formatCurrency(d.pipelineValue)} />
               <CardStat label="MRR" value={formatCurrency(d.mrrFromRetainers)} sub="retainers" />
               <CardStat label="Overdue" value={String(d.overdueProjects)} sub="builds" alert={d.overdueProjects > 0} />
@@ -452,7 +452,7 @@ async function WholesailCard() {
             {/* Intake funnel */}
             <div>
               <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Intake funnel</span>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <CardStat label="Pending" value={String(d.intake.pending)} alert={d.intake.pending > 0} />
                 <CardStat label="Reviewed" value={String(d.intake.reviewed)} />
                 <CardStat label="Converted" value={String(d.intake.converted)} />
@@ -460,7 +460,7 @@ async function WholesailCard() {
               </div>
             </div>
             {/* Costs */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <CardStat label="Build Costs MTD" value={formatCurrency(d.buildCostsMtdCents / 100)} />
               <CardStat label="Build Costs All-Time" value={formatCurrency(d.buildCostsAllTimeCents / 100)} />
             </div>
@@ -496,7 +496,7 @@ async function CursiveCard() {
             {/* Workspace pipeline */}
             <div>
               <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Workspace pipeline</span>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <CardStat label="Total" value={String(d.totalWorkspaces)} />
                 <CardStat label="Active" value={String(d.pipeline.active)} />
                 <CardStat label="Trial" value={String(d.pipeline.trial)} />
@@ -504,13 +504,13 @@ async function CursiveCard() {
               </div>
             </div>
             {/* Leads */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <CardStat label="Total Leads" value={String(d.leads.total)} />
               <CardStat label="New Leads" value={String(d.leads.createdThisWeek)} sub="this wk" />
               <CardStat label="At-Risk" value={String(d.pipeline.at_risk)} sub="workspaces" alert={d.pipeline.at_risk > 0} />
             </div>
             {/* Bookings */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <CardStat label="Bookings Today" value={String(d.bookings.today)} />
               <CardStat label="This Week" value={String(d.bookings.thisWeek)} />
               <CardStat label="This Month" value={String(d.bookings.thisMonth)} />
@@ -518,7 +518,7 @@ async function CursiveCard() {
             {/* Pixels */}
             <div>
               <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Pixels</span>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <CardStat label="Installed" value={String(d.pixels.totalInstalls)} />
                 <CardStat label="Active Trial" value={String(d.pixels.activeTrials)} />
                 <CardStat label="Expiring" value={String(d.pixels.trialsExpiringWeek)} sub="7d" alert={d.pixels.trialsExpiringWeek > 0} />
@@ -526,7 +526,7 @@ async function CursiveCard() {
               </div>
             </div>
             {/* Affiliates */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <CardStat label="Affiliates" value={String(d.affiliates.activeAffiliates)} sub="active" />
               <CardStat label="Applications" value={String(d.affiliates.pendingApplications)} sub="pending" alert={d.affiliates.pendingApplications > 0} />
               <CardStat label="Commissions" value={formatCurrency(d.affiliates.pendingCommissionsCents / 100)} sub="pending" />
@@ -563,7 +563,7 @@ async function TrackrCard() {
             {/* Users */}
             <div>
               <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Users</span>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <CardStat label="Workspaces" value={String(d.totalWorkspaces)} />
                 <CardStat label="New" value={String(d.newWorkspacesWeek)} sub="this wk" />
                 <CardStat label="Paying" value={String(d.activeSubscriptions)} />
@@ -571,28 +571,28 @@ async function TrackrCard() {
               </div>
             </div>
             {/* Revenue — plan breakdown */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <CardStat label="MRR" value={formatCurrency(d.mrrCents / 100)} />
               <CardStat label="Free" value={String(d.planBreakdown.free ?? 0)} sub="workspaces" />
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <CardStat label="Team" value={String(d.planBreakdown.team ?? 0)} sub="plan" />
               <CardStat label="Startup" value={String(d.planBreakdown.startup ?? 0)} sub="plan" />
               <CardStat label="Enterprise" value={String(d.planBreakdown.enterprise ?? 0)} sub="plan" />
             </div>
             {/* Product */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <CardStat label="Tools Researched" value={String(d.totalToolsResearched)} />
               <CardStat label="Audits Pending" value={String(d.auditPipelinePending)} alert={d.auditPipelinePending > 0} />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <CardStat label="API Cost MTD" value={formatCurrency(d.apiCostsMtdCents / 100)} />
               <CardStat label="API Cost Today" value={formatCurrency(d.apiCostsTodayCents / 100)} />
             </div>
             {/* Architect program */}
             <div>
               <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Architect program</span>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <CardStat label="Active" value={String(d.activeArchitects)} />
                 <CardStat label="Applications" value={String(d.pendingArchitectApplications)} sub="pending" alert={d.pendingArchitectApplications > 0} />
                 <CardStat label="Commissions" value={formatCurrency(d.pendingCommissionsCents / 100)} sub="pending" />
@@ -628,13 +628,13 @@ async function TaskSpaceCard() {
         {d ? (
           <div className="p-4 space-y-3 flex-1">
             {/* Orgs & users */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <CardStat label="Orgs" value={String(d.totalOrgs)} />
               <CardStat label="Members" value={String(d.totalMembers)} />
               <CardStat label="Paying Orgs" value={String(d.payingOrgs)} />
             </div>
             {/* Revenue */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <CardStat label="MRR" value={formatCurrency(d.mrrCents / 100)} />
               <CardStat label="Team Plan" value={String(d.planBreakdown.team)} />
               <CardStat label="Business Plan" value={String(d.planBreakdown.business)} />
@@ -642,21 +642,21 @@ async function TaskSpaceCard() {
             {/* EOD activity */}
             <div>
               <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">EOD Reports</span>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <CardStat label="Today" value={String(d.eodsToday)} />
                 <CardStat label="7-Day Rate" value={`${d.eodRate7Day}%`} alert={d.eodRate7Day < 50} />
                 <CardStat label="Escalations" value={String(d.openEscalations)} sub="open" alert={d.openEscalations > 0} />
               </div>
             </div>
             {/* Tasks */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <CardStat label="Active Tasks" value={String(d.activeTasks)} />
               <CardStat label="Completed" value={String(d.completedTasksThisWeek)} sub="this wk" />
             </div>
             {/* Rocks */}
             <div>
               <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Rocks (quarterly goals)</span>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <CardStat label="On-Track" value={String(d.rocksOnTrack)} />
                 <CardStat label="At-Risk" value={String(d.rocksAtRisk)} alert={d.rocksAtRisk > 0} />
                 <CardStat label="Blocked" value={String(d.rocksBlocked)} alert={d.rocksBlocked > 0} />
@@ -708,7 +708,7 @@ async function TBGCCard() {
               <span className="font-mono text-[9px] text-[#0A0A0A]/40">Custom B2B wholesale portal</span>
             </div>
             {/* Revenue */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <CardStat
                 label="MRR"
                 value={d.mrrCents > 0 ? formatCurrency(d.mrrCents / 100) : "Pre-revenue"}
@@ -761,7 +761,7 @@ async function HookCard() {
               <span className="font-mono text-[9px] text-[#0A0A0A]/40">AI viral content platform</span>
             </div>
             {/* Revenue */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <CardStat
                 label="MRR"
                 value={d.mrrCents > 0 ? formatCurrency(d.mrrCents / 100) : "Pre-revenue"}
@@ -1079,12 +1079,12 @@ function PlatformCardSkeleton() {
         <div className="h-4 w-24 bg-[#0A0A0A]/5 animate-pulse" />
       </div>
       <div className="p-4 space-y-3">
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <div key={i} className="h-10 bg-[#0A0A0A]/5 animate-pulse" />
           ))}
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {Array.from({ length: 2 }).map((_, i) => (
             <div key={i} className="h-10 bg-[#0A0A0A]/5 animate-pulse" />
           ))}

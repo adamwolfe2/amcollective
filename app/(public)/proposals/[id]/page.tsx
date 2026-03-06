@@ -47,7 +47,7 @@ export default async function PublicProposalPage({
   // Status-specific rendering
   if (proposal.status === "approved") {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-16 text-center">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-16 text-center">
         <p className="font-mono text-xs text-[#0A0A0A]/50 mb-8">
           AM COLLECTIVE CAPITAL
         </p>
@@ -70,7 +70,7 @@ export default async function PublicProposalPage({
 
   if (proposal.status === "rejected") {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-16 text-center">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-16 text-center">
         <p className="font-mono text-xs text-[#0A0A0A]/50 mb-8">
           AM COLLECTIVE CAPITAL
         </p>
@@ -86,7 +86,7 @@ export default async function PublicProposalPage({
 
   if (proposal.status === "expired") {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-16 text-center">
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-16 text-center">
         <p className="font-mono text-xs text-[#0A0A0A]/50 mb-8">
           AM COLLECTIVE CAPITAL
         </p>
@@ -105,7 +105,7 @@ export default async function PublicProposalPage({
   }
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-12">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
       {/* Header */}
       <p className="font-mono text-xs text-[#0A0A0A]/50 mb-8">
         AM COLLECTIVE CAPITAL
@@ -197,7 +197,7 @@ export default async function PublicProposalPage({
           <h2 className="font-mono text-xs uppercase tracking-widest text-[#0A0A0A]/50 mb-3">
             Pricing
           </h2>
-          <div className="border-2 border-[#0A0A0A]">
+          <div className="border-2 border-[#0A0A0A] overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b-2 border-[#0A0A0A]">

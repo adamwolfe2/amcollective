@@ -405,7 +405,7 @@ export default async function CostsPage() {
           <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
             Tool Costs (3 Months)
           </h2>
-          <div className="border border-[#0A0A0A]/10 bg-white">
+          <div className="border border-[#0A0A0A]/10 bg-white overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-[#0A0A0A]/10">
@@ -458,7 +458,7 @@ export default async function CostsPage() {
             AI Usage →
           </Link>
         </div>
-        <div className="border border-[#0A0A0A]/10 bg-white">
+        <div className="border border-[#0A0A0A]/10 bg-white overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#0A0A0A]/10">
@@ -515,7 +515,7 @@ export default async function CostsPage() {
             Full breakdown →
           </Link>
         </div>
-        <div className="border border-[#0A0A0A]/10 bg-white">
+        <div className="border border-[#0A0A0A]/10 bg-white overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-[#0A0A0A]/10">

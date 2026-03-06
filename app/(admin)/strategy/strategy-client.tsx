@@ -429,6 +429,7 @@ export function StrategyClient({
             {Object.keys(productMargins).length === 0 ? (
               <div className="p-4 text-center text-xs text-gray-400">Run analysis to populate</div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-100">
@@ -475,6 +476,7 @@ export function StrategyClient({
                   </tfoot>
                 )}
               </table>
+              </div>
             )}
           </div>
 

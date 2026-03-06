@@ -134,7 +134,7 @@ export default async function PublicSprintPage({
   const signInUrl = `/sign-in?redirect_url=${encodeURIComponent(`/s/${token}`)}`;
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-12">
+    <div className="max-w-2xl mx-auto px-4 sm:px-6 py-12">
       {/* Auth banner */}
       {!canEdit && (
         <div className="flex items-center justify-between px-4 py-3 mb-8 border border-[#0A0A0A]/10 bg-white">
@@ -170,7 +170,7 @@ export default async function PublicSprintPage({
         <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/30 mb-3">
           AM Collective · Weekly Sprint
         </p>
-        <h1 className="text-4xl font-bold font-serif text-[#0A0A0A] tracking-tight">
+        <h1 className="text-2xl sm:text-4xl font-bold font-serif text-[#0A0A0A] tracking-tight">
           {sprint.title}
         </h1>
         {sprint.weeklyFocus && (

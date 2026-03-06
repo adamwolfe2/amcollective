@@ -295,7 +295,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
             Sprint Velocity
           </h2>
           <div className="border border-[#0A0A0A]/10 bg-white p-4">
-            <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
               <div>
                 <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block">Velocity</span>
                 <div className="flex items-center gap-1.5 mt-1">

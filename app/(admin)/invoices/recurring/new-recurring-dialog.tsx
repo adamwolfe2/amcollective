@@ -159,7 +159,7 @@ export function NewRecurringDialog({
           </div>
 
           {/* Dates */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="font-mono text-xs uppercase tracking-widest text-[#0A0A0A]/50 block mb-1">
                 Start Date

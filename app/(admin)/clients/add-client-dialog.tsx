@@ -52,7 +52,7 @@ export function AddClientDialog() {
           Add Client
         </Button>
       </DialogTrigger>
-      <DialogContent className="rounded-none border-[#0A0A0A] sm:max-w-md">
+      <DialogContent className="rounded-none border-[#0A0A0A] sm:max-w-md w-full max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-serif text-lg tracking-tight">
             Add Client
@@ -91,7 +91,7 @@ export function AddClientDialog() {
               className="font-mono text-sm rounded-none border-[#0A0A0A]/20"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/60">
                 Phone
@@ -118,7 +118,7 @@ export function AddClientDialog() {
             <p className="text-sm font-mono text-red-600">{error}</p>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"

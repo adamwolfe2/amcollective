@@ -459,7 +459,7 @@ export function VaultTable({ rows }: { rows: Credential[] }) {
           </p>
         </div>
       ) : (
-        <div className="border border-[#0A0A0A]/10 overflow-hidden">
+        <div className="border border-[#0A0A0A]/10 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#0A0A0A]/10 bg-[#0A0A0A]/[0.03]">

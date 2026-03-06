@@ -147,7 +147,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-60 bg-[#0A0A0A] p-5 flex flex-col overflow-y-auto transition-transform duration-200 md:hidden ${
+        className={`fixed inset-y-0 left-0 z-50 w-60 bg-[#0A0A0A] p-5 flex flex-col overflow-y-auto pb-[var(--sab,1rem)] transition-transform duration-200 md:hidden ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -165,7 +165,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <X className="h-5 w-5" />
           </button>
         </div>
-        <SidebarNav onNavigate={() => setMobileOpen(false)} />
+        <div className="overflow-y-auto flex-1">
+          <SidebarNav onNavigate={() => setMobileOpen(false)} />
+        </div>
       </aside>
 
       {/* Main content */}

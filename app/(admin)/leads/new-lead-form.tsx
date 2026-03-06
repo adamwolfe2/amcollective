@@ -91,7 +91,7 @@ export function NewLeadForm() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-mono text-[10px] uppercase text-[#0A0A0A]/50 mb-1">
                 Email
@@ -115,7 +115,7 @@ export function NewLeadForm() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block font-mono text-[10px] uppercase text-[#0A0A0A]/50 mb-1">
                 Stage

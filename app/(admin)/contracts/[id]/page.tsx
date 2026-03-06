@@ -134,7 +134,7 @@ export default async function ContractDetailPage({ params }: PageProps) {
               <h2 className="font-mono text-xs uppercase tracking-widest text-[#0A0A0A]/50 mb-3">
                 Client Signature
               </h2>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="font-mono text-[10px] text-[#0A0A0A]/40 mb-0.5">
                     Signed By

@@ -38,6 +38,23 @@
 
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* ── Safe area insets (notched iPhones / Dynamic Island) ─────────── */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+/* ── Minimum touch target (44×44px per Apple HIG) ────────────────── */
+@media (pointer: coarse) {
+  button, [role="button"], a, input, select, textarea, label[for] {
+    min-height: 44px;
+  }
 }
 
 /* ── Selection ──────────────────────────────────────────────────────────── */

@@ -94,7 +94,7 @@ export function UploadDocumentDialog({ clients }: { clients: Client[] }) {
           Upload
         </Button>
       </DialogTrigger>
-      <DialogContent className="rounded-none border-[#0A0A0A] sm:max-w-lg">
+      <DialogContent className="rounded-none border-[#0A0A0A] sm:max-w-lg w-full max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-serif text-lg tracking-tight">
             Upload Document
@@ -142,7 +142,7 @@ export function UploadDocumentDialog({ clients }: { clients: Client[] }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/60">
                 Type
@@ -217,7 +217,7 @@ export function UploadDocumentDialog({ clients }: { clients: Client[] }) {
             <p className="text-sm font-mono text-red-600">{error}</p>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"

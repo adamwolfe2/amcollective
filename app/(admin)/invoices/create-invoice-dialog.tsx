@@ -120,7 +120,7 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
           Create Invoice
         </Button>
       </DialogTrigger>
-      <DialogContent className="border-[#0A0A0A] rounded-none bg-[#F3F3EF] max-w-lg">
+      <DialogContent className="border-[#0A0A0A] rounded-none bg-[#F3F3EF] max-w-lg w-full max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-serif text-lg">
             Create Invoice
@@ -156,7 +156,7 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
             </Select>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="number" className="font-mono text-xs uppercase tracking-wider">
                 Invoice Number
@@ -289,7 +289,7 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex flex-wrap justify-end gap-2 pt-2">
             <Button
               type="button"
               variant="outline"

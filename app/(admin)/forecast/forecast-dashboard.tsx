@@ -199,6 +199,7 @@ export function ForecastDashboard() {
             6-Month Forecast Breakdown
           </h2>
         </div>
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-[#0A0A0A]/10">
@@ -248,6 +249,7 @@ export function ForecastDashboard() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <p className="font-mono text-[10px] text-[#0A0A0A]/30 text-right">

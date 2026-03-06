@@ -190,7 +190,7 @@ export default async function ClientDashboardPage({
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
         <div className="border border-[#0A0A0A]/10 bg-white p-5">
           <p className="font-mono text-3xl font-bold text-[#0A0A0A] tracking-tight">
             {activeProjectCount}

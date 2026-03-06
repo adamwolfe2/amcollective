@@ -102,7 +102,7 @@ export default async function ApiUsagePage() {
           {/* By Agent + By Model side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* By Agent */}
-            <div className="border border-[#0A0A0A]/10 bg-white">
+            <div className="border border-[#0A0A0A]/10 bg-white overflow-x-auto">
               <div className="px-5 py-3 border-b border-[#0A0A0A]/10">
                 <h2 className="font-serif font-bold text-[#0A0A0A]">
                   By Agent
@@ -147,7 +147,7 @@ export default async function ApiUsagePage() {
             </div>
 
             {/* By Model */}
-            <div className="border border-[#0A0A0A]/10 bg-white">
+            <div className="border border-[#0A0A0A]/10 bg-white overflow-x-auto">
               <div className="px-5 py-3 border-b border-[#0A0A0A]/10">
                 <h2 className="font-serif font-bold text-[#0A0A0A]">
                   By Model
