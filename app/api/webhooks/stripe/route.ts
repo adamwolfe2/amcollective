@@ -1069,6 +1069,99 @@ async function handleCustomerUpdated(event: Stripe.Event) {
   });
 }
 
+// ─── Payment Link / Checkout Session Handler ──────────────────────────────────
+
+/**
+ * checkout.session.completed — fired when a client pays via Stripe payment link.
+ *
+ * Our payment link creation flow (sendInvoiceAction) attaches `invoiceId` to
+ * the payment link's metadata, which Stripe propagates to every checkout
+ * session created from that link. We use it to find and mark the local
+ * invoice as paid.
+ */
+async function handleCheckoutSessionCompleted(event: Stripe.Event) {
+  const session = event.data.object as Stripe.Checkout.Session;
+
+  // Only process paid sessions
+  if (session.payment_status !== "paid") return;
+
+  const localInvoiceId = session.metadata?.invoiceId ?? null;
+
+  const now = new Date();
+  let localInvoice: { id: string; clientId: string; amount: number } | null = null;
+
+  // Match by metadata.invoiceId (our payment link flow)
+  if (localInvoiceId) {
+    const rows = await db
+      .select({
+        id: schema.invoices.id,
+        clientId: schema.invoices.clientId,
+        amount: schema.invoices.amount,
+      })
+      .from(schema.invoices)
+      .where(eq(schema.invoices.id, localInvoiceId as string))
+      .limit(1);
+    localInvoice = rows[0] ?? null;
+  }
+
+  // Fallback: match by payment link URL (in case metadata is missing)
+  if (!localInvoice && session.payment_link) {
+    const paymentLinkId =
+      typeof session.payment_link === "string"
+        ? session.payment_link
+        : session.payment_link.id;
+    // We store the URL not the ID, so we can't match by ID directly.
+    // The metadata path above is the primary path.
+    void paymentLinkId; // documented fallback — not implemented
+  }
+
+  if (localInvoice) {
+    await db
+      .update(schema.invoices)
+      .set({ status: "paid", paidAt: now })
+      .where(
+        and(
+          eq(schema.invoices.id, localInvoice.id),
+          // Don't re-mark if already paid (idempotency)
+          sql`${schema.invoices.status} != 'paid'`
+        )
+      );
+
+    // Update client billing
+    await db
+      .update(schema.clients)
+      .set({ lastPaymentDate: now, paymentStatus: "healthy" })
+      .where(eq(schema.clients.id, localInvoice.clientId));
+
+    // Recalculate LTV
+    await recalculateClientLtv(localInvoice.clientId);
+  }
+
+  const amountPaid = session.amount_total ?? 0;
+  const customerEmail = session.customer_email ?? session.customer_details?.email ?? "unknown";
+
+  await createAuditLog({
+    actorId: "stripe",
+    actorType: "system",
+    action: "checkout.session.completed",
+    entityType: "invoice",
+    entityId: localInvoice?.id ?? session.id,
+    metadata: {
+      sessionId: session.id,
+      paymentLink: session.payment_link ?? null,
+      amountTotal: amountPaid,
+      currency: session.currency,
+      customerEmail,
+      localInvoiceId: localInvoice?.id ?? null,
+      metadataInvoiceId: localInvoiceId,
+    },
+  });
+
+  await notifySlack(
+    `Payment received via link — $${(amountPaid / 100).toFixed(2)} from ${customerEmail}${localInvoice ? ` (Invoice #${localInvoice.id.slice(0, 8)})` : ""}`
+  );
+}
+
 // ─── Event Dispatcher ─────────────────────────────────────────────────────────
 
 type EventHandler = (event: Stripe.Event) => Promise<void>;
@@ -1095,6 +1188,9 @@ const EVENT_HANDLERS: Record<string, EventHandler> = {
   // Customers
   "customer.created": handleCustomerCreated,
   "customer.updated": handleCustomerUpdated,
+
+  // Payment links / checkout sessions
+  "checkout.session.completed": handleCheckoutSessionCompleted,
 };
 
 // ─── Route Handler ────────────────────────────────────────────────────────────
