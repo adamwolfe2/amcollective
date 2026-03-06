@@ -10,10 +10,63 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { getAnthropicClient, MODEL_SONNET, isAIConfigured, trackAIUsage } from "../client";
 import { TOOL_DEFINITIONS, executeTool } from "../tools";
+import { selectToolsForQuery, type ToolModule } from "./shared/select-tools";
 import { searchSimilar } from "../embeddings";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+
+// ─── Tool Modules for keyword-based filtering ─────────────────────────────────
+// Loads only relevant tools per query instead of all 40+.
+
+const CHAT_CORE_TOOLS = new Set(["search_clients", "get_alerts", "search_knowledge"]);
+
+const CHAT_TOOL_MODULES: ToolModule[] = [
+  {
+    keywords: ["invoice", "payment", "revenue", "mrr", "billing", "cash", "overdue", "paid"],
+    toolNames: ["get_revenue_data", "get_invoices", "get_costs"],
+  },
+  {
+    keywords: ["client", "customer", "company", "lead", "prospect"],
+    toolNames: ["search_clients", "get_client_detail", "get_leads"],
+  },
+  {
+    keywords: ["task", "sprint", "todo", "rock", "goal"],
+    toolNames: ["get_tasks", "get_current_sprint", "get_rocks"],
+  },
+  {
+    keywords: ["deploy", "vercel", "build", "error", "project", "domain"],
+    toolNames: ["get_deploy_status", "get_portfolio_overview"],
+  },
+  {
+    keywords: ["analytics", "posthog", "metric", "user", "traffic"],
+    toolNames: ["get_analytics", "get_scorecard"],
+  },
+  {
+    keywords: ["mercury", "bank", "balance", "transaction"],
+    toolNames: ["get_cash_position"],
+  },
+  {
+    keywords: ["cost", "spend", "budget", "subscription", "tool"],
+    toolNames: ["get_costs"],
+  },
+  {
+    keywords: ["knowledge", "sop", "note", "doc", "know"],
+    toolNames: ["search_knowledge", "get_knowledge_articles"],
+  },
+  {
+    keywords: ["alert", "flag", "warning", "error", "issue"],
+    toolNames: ["get_alerts"],
+  },
+  {
+    keywords: ["team", "member", "staff"],
+    toolNames: ["get_team"],
+  },
+  {
+    keywords: ["audit", "activity", "history", "log"],
+    toolNames: ["get_audit_logs"],
+  },
+];
 
 const SYSTEM_PROMPT = `You are AM Agent, the internal AI assistant for AM Collective Capital — a holding company that manages multiple software products (TBGC, Trackr, Cursive, TaskSpace, Wholesail, Hook).
 
@@ -84,12 +137,20 @@ export async function chat(
         : m.content,
     }));
 
+  // Select only relevant tools for this query (reduces input tokens ~50%)
+  const selectedTools = selectToolsForQuery(
+    latestUserMessage,
+    TOOL_DEFINITIONS,
+    CHAT_TOOL_MODULES,
+    CHAT_CORE_TOOLS
+  );
+
   // Call Claude with tools — handle tool use loop
   let response = await anthropic.messages.create({
     model: MODEL_SONNET,
     max_tokens: 2000,
     system: SYSTEM_PROMPT,
-    tools: TOOL_DEFINITIONS,
+    tools: selectedTools,
     messages: anthropicMessages,
   });
 
@@ -125,7 +186,7 @@ export async function chat(
       model: MODEL_SONNET,
       max_tokens: 2000,
       system: SYSTEM_PROMPT,
-      tools: TOOL_DEFINITIONS,
+      tools: selectedTools,
       messages: anthropicMessages,
     });
   }

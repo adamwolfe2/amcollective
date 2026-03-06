@@ -574,6 +574,24 @@ function buildRevenueForecast(
   return forecast;
 }
 
+// ─── Strategy System Prompt (module-level constant — built once) ───────────────
+
+const STRATEGY_SYSTEM_PROMPT = `You are the Chief Strategy Officer for AM Collective Capital (6-product software portfolio). Generate specific, data-driven, prioritized recommendations to increase revenue, reduce costs, improve margins, or mitigate risks.
+
+RULES (no exceptions):
+1. Never recommend sunsetting products launched within 180 days. Focus on making them successful.
+2. building stage: focus on launch readiness only.
+3. beta stage: focus on retention, engagement, PMF signals.
+4. launched <90d: focus on first 10 paying customers.
+5. launched 90-180d: focus on repeatable acquisition.
+6. scaling/mature: focus on CAC, LTV, channel efficiency, margin expansion.
+7. Sprint velocity is a leading indicator — factor it into health.
+8. Every recommendation needs a SPECIFIC action (not "consider X" but "raise pricing from $Y to $Z").
+9. Quantify dollar impact wherever possible.
+10. Lead with the most urgent item (unpaid invoices, cash risk, churn).
+11. Direct and specific — written for the founder, not a board.
+12. No emojis, no markdown headers, no bullets inside text fields.`;
+
 // ─── Strategy Generation (Claude) ─────────────────────────────────────────────
 
 export async function generateStrategyRecommendations(
@@ -623,59 +641,40 @@ export async function generateStrategyRecommendations(
     return `  ${p.name}${stageInfo}${ageInfo}${goalInfo}: ${mrrInfo} | Cost ${fmt(p.monthlyCostCents)}/mo${marginInfo}${notesStr}`;
   }).join("\n");
 
+  // Compact revenue trend: "2025-10: $12k, 2025-11: $14k" on one line
   const revenueTrendSection = data.revenueTrend.length > 1
-    ? data.revenueTrend.map((t) => `  ${t.month}: ${fmt(t.revenue)}`).join("\n")
-    : "  Insufficient historical data";
+    ? data.revenueTrend.map((t) => `${t.month}: ${fmt(t.revenue)}`).join(", ")
+    : "Insufficient historical data";
 
+  // Sprint sections: truncate to 300 chars each to limit token bloat
   const sprintSection = data.sprintContexts.length > 0
-    ? data.sprintContexts.map((s) => `\n${s.sprintSummary}`).join("\n---\n")
-    : "  No sprint data available";
+    ? data.sprintContexts
+        .map((s) => {
+          const summary = s.sprintSummary.slice(0, 300);
+          return `${s.projectName}: ${summary}${s.sprintSummary.length > 300 ? "..." : ""}`;
+        })
+        .join(" | ")
+    : "No sprint data";
 
-  const systemPrompt = `You are the Chief Strategy Officer for AM Collective Capital. You have access to real-time financial and operational data across 6 portfolio software products. Your job is to generate specific, data-driven, prioritized recommendations that will directly increase revenue, reduce costs, improve margins, or mitigate risks.
+  // Use module-level constant (not rebuilt per call)
+  const systemPrompt = STRATEGY_SYSTEM_PROMPT;
 
-CRITICAL RULES — you must follow these without exception:
-1. NEVER recommend sunsetting, shutting down, or discontinuing ANY product that was launched within the last 180 days. For recently launched products, focus on what would make them successful given their current stage.
-2. For "building" stage products: focus ONLY on launch readiness, build quality, and time-to-launch — not revenue.
-3. For "beta" stage products: focus on retention, engagement, and product-market fit signals — not aggressive growth tactics.
-4. For "launched" stage products under 90 days live: focus on first 10 paying customers and initial traction signals.
-5. For "launched" stage products 90-180 days live: focus on repeatable acquisition and improving conversion.
-6. For "scaling" or "mature" stage products: focus on CAC, LTV, channel efficiency, and margin expansion.
-7. Sprint velocity is a leading indicator of product momentum — factor it into health assessment.
-8. Every recommendation must have a SPECIFIC action (not "consider improving X" but "raise TaskSpace pricing from $175 to $249 for new signups").
-9. Quantify dollar impact wherever possible.
-10. Lead with the most urgent item (unpaid invoices, cash risk, churn risk).
-11. Be direct and specific — this is for the founder, not a board presentation.
-12. No emojis, no markdown headers, no bullet points inside text fields.`;
+  const userPrompt = `Analyze this week's data and generate strategic recommendations for AM Collective.
 
-  const userPrompt = `Analyze this week's business data and generate strategic recommendations for AM Collective.
+MRR ${fmt(data.totalMrrCents)}/mo | Growth ${data.mrrGrowthPct !== null ? `${data.mrrGrowthPct > 0 ? "+" : ""}${data.mrrGrowthPct}%` : "n/a"} | Cash ${data.totalCashCents > 0 ? fmt(data.totalCashCents) : "n/a"} | Burn ${fmt(data.monthlyBurnCents)}/mo | Runway ${data.runwayMonths ?? "?"} mo | Concentration ${data.concentrationPct}% | Health ${healthScore}/100
 
-PLATFORM OVERVIEW:
-- Total MRR: ${fmt(data.totalMrrCents)}/mo (connector-derived, includes all 6 products)
-- MRR Growth (30d): ${data.mrrGrowthPct !== null ? `${data.mrrGrowthPct > 0 ? "+" : ""}${data.mrrGrowthPct}%` : "insufficient data"}
-- Cash on Hand: ${data.totalCashCents > 0 ? fmt(data.totalCashCents) : "Mercury not synced"}
-- Monthly Infrastructure Costs: ${fmt(data.monthlyBurnCents)}
-- Cash Runway: ${data.runwayMonths !== null ? `${data.runwayMonths} months` : "unknown"}
-- Revenue Concentration: Top product = ${data.concentrationPct}% of MRR
-- Platform Health Score: ${healthScore}/100
-
-PRODUCT PORTFOLIO (6 products):
+PRODUCTS:
 ${productSection}
 
-REVENUE TREND (last 6 months from platform snapshots):
-${revenueTrendSection}
+REVENUE TREND (6mo): ${revenueTrendSection}
 
-OVERDUE INVOICES: ${data.overdueInvoices} invoices, ${fmt(data.overdueAmountCents)} total
-  Aging: <30d=${data.invoiceAging.under30}, 30-60d=${data.invoiceAging.days30to60}, >60d=${data.invoiceAging.over60}
+INVOICES: ${data.overdueInvoices} overdue ${fmt(data.overdueAmountCents)} | Aging <30d=${data.invoiceAging.under30} 30-60d=${data.invoiceAging.days30to60} >60d=${data.invoiceAging.over60}
+PROPOSALS: ${data.openProposalCount} open worth ${fmt(data.openProposalValueCents)}
+OPS: ${data.unresolvedAlerts} alerts | ${data.atRiskRocks} rocks at risk
 
-OPEN PROPOSALS: ${data.openProposalCount} proposals worth ${fmt(data.openProposalValueCents)}
+COSTS: ${Object.entries(data.costsByTag).map(([t, c]) => `${t}: ${fmt(c)}/mo`).join(" | ") || "none"}
 
-OPERATIONS: ${data.unresolvedAlerts} unresolved alerts, ${data.atRiskRocks} quarterly goals at risk
-
-COST BREAKDOWN BY PRODUCT:
-${Object.entries(data.costsByTag).map(([tag, cost]) => `  ${tag}: ${fmt(cost)}/mo`).join("\n") || "  No cost data"}
-
-SPRINT VELOCITY & EXECUTION (current week open tasks per product):
-${sprintSection}
+SPRINT: ${sprintSection}
 
 Return ONLY raw JSON (no markdown wrapping), in this exact structure:
 {
