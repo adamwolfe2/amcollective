@@ -22,7 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Webhook } from "svix";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { ajWebhook } from "@/lib/middleware/arcjet";
 
@@ -118,6 +118,23 @@ export async function POST(request: NextRequest) {
               email_address: string;
             }>
           )?.[0]?.email_address ?? "unknown";
+
+        // Link Clerk user to existing client record (matched by email).
+        // This is the critical step that makes the client portal work after
+        // a Clerk invitation is accepted — without it, getClientByClerkId()
+        // returns null and the portal shows nothing.
+        if (email && email !== "unknown") {
+          await db
+            .update(schema.clients)
+            .set({ clerkUserId: userId, portalAccess: true })
+            .where(
+              and(
+                eq(schema.clients.email, email),
+                // Only link if not already linked to a different Clerk user
+                sql`${schema.clients.clerkUserId} IS NULL`
+              )
+            );
+        }
 
         await createAuditLog({
           actorId: "clerk-webhook",
