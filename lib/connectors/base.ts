@@ -3,7 +3,12 @@
  *
  * Standard interface + caching for all external service connectors.
  * Connectors are READ-ONLY wrappers around external APIs.
+ *
+ * Cache backend: Upstash Redis (survives serverless cold starts).
+ * Graceful fallback: if Redis is unavailable, every request hits the source.
  */
+
+import { Redis } from "@upstash/redis";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -14,48 +19,100 @@ export interface ConnectorResult<T> {
   fetchedAt: Date;
 }
 
-// ─── In-Memory Cache with TTL ────────────────────────────────────────────────
+// ─── Redis Client (module-level singleton) ────────────────────────────────────
 
-interface CacheEntry<T> {
-  data: T;
-  expiresAt: number;
+interface RedisCacheEntry<T> {
+  d: T;       // data
+  t: number;  // fetchedAt unix ms
 }
 
-const cache = new Map<string, CacheEntry<unknown>>();
+let _redis: Redis | null | undefined = undefined; // undefined = not yet initialized
 
-const DEFAULT_TTL_MS = 5 * 60 * 1000; // 5 minutes
+function getRedis(): Redis | null {
+  if (_redis !== undefined) return _redis;
+  if (
+    !process.env.UPSTASH_REDIS_REST_URL ||
+    !process.env.UPSTASH_REDIS_REST_TOKEN
+  ) {
+    _redis = null;
+    return null;
+  }
+  try {
+    _redis = Redis.fromEnv();
+  } catch {
+    _redis = null;
+  }
+  return _redis;
+}
+
+const CACHE_PREFIX = "amc:conn:";
+const DEFAULT_TTL_SECONDS = 5 * 60; // 5 minutes
+
+// ─── Cache API ────────────────────────────────────────────────────────────────
 
 /**
- * Get a cached value, or run the fetcher and cache the result.
- * Simple in-memory Map — no Redis dependency for read-only connector calls.
+ * Get a cached value from Redis, or run the fetcher and cache the result.
+ * Graceful fallback: if Redis is unavailable, always runs the fetcher.
  */
 export async function cached<T>(
   key: string,
   fetcher: () => Promise<T>,
-  ttlMs: number = DEFAULT_TTL_MS
+  ttlSeconds: number = DEFAULT_TTL_SECONDS
 ): Promise<T> {
-  const now = Date.now();
-  const existing = cache.get(key) as CacheEntry<T> | undefined;
+  const redis = getRedis();
+  const redisKey = `${CACHE_PREFIX}${key}`;
 
-  if (existing && existing.expiresAt > now) {
-    return existing.data;
+  if (redis) {
+    try {
+      const hit = await redis.get<RedisCacheEntry<T>>(redisKey);
+      if (hit !== null && hit !== undefined) {
+        return hit.d;
+      }
+    } catch {
+      // Redis unavailable — fall through to fetcher
+    }
   }
 
   const data = await fetcher();
-  cache.set(key, { data, expiresAt: now + ttlMs });
+
+  if (redis) {
+    // Fire-and-forget — don't block the response on Redis writes
+    redis
+      .set(redisKey, { d: data, t: Date.now() } as RedisCacheEntry<T>, {
+        ex: ttlSeconds,
+      })
+      .catch(() => {});
+  }
+
   return data;
 }
 
-/** Manually invalidate a cache key or all keys matching a prefix. */
-export function invalidateCache(prefixOrKey: string): void {
-  if (cache.has(prefixOrKey)) {
-    cache.delete(prefixOrKey);
-    return;
+/**
+ * Return the UTC timestamp when a key was last fetched, or null.
+ * Used for data freshness indicators in the dashboard.
+ */
+export async function getCachedAt(key: string): Promise<Date | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+  try {
+    const entry = await redis.get<RedisCacheEntry<unknown>>(
+      `${CACHE_PREFIX}${key}`
+    );
+    if (entry && entry.t) return new Date(entry.t);
+  } catch {
+    // ignore
   }
-  for (const key of cache.keys()) {
-    if (key.startsWith(prefixOrKey)) {
-      cache.delete(key);
-    }
+  return null;
+}
+
+/** Manually invalidate a cache key. Best-effort — ignores Redis errors. */
+export async function invalidateCache(key: string): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    await redis.del(`${CACHE_PREFIX}${key}`);
+  } catch {
+    // Ignore Redis errors — invalidation is best-effort
   }
 }
 

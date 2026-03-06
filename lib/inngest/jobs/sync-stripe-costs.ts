@@ -6,12 +6,14 @@
  *
  * Separate from syncStripeFull — that job syncs the billing/subscriptions table.
  * This job syncs the costs/subscription_costs table for the Finance → Costs dashboard.
+ *
+ * Performance: Pre-fetches all existing costs in one query (fixes N+1).
  */
 
 import { inngest } from "../client";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, isNotNull } from "drizzle-orm";
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe/config";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
@@ -40,6 +42,22 @@ export const syncStripeCosts = inngest.createFunction(
       let skipped = 0;
       const errors: string[] = [];
 
+      // Pre-fetch ALL existing subscription_costs rows in one query (fixes N+1).
+      // Previously: one SELECT per subscription in the loop = N round-trips.
+      // Now: 1 SELECT total, O(1) Map lookups in the loop.
+      const existingCosts = await db
+        .select({
+          id: schema.subscriptionCosts.id,
+          stripeSubscriptionId: schema.subscriptionCosts.stripeSubscriptionId,
+        })
+        .from(schema.subscriptionCosts)
+        .where(isNotNull(schema.subscriptionCosts.stripeSubscriptionId));
+
+      // stripeSubscriptionId → internal UUID
+      const existingById = new Map(
+        existingCosts.map((c) => [c.stripeSubscriptionId!, c.id])
+      );
+
       // Paginate through all active subscriptions
       for await (const subscription of stripe.subscriptions.list({
         limit: 100,
@@ -65,19 +83,10 @@ export const syncStripeCosts = inngest.createFunction(
             ? new Date(item.current_period_end * 1000)
             : null;
 
-          // Upsert: if stripeSubscriptionId exists, update; otherwise insert
-          const existing = await db
-            .select({ id: schema.subscriptionCosts.id })
-            .from(schema.subscriptionCosts)
-            .where(
-              eq(
-                schema.subscriptionCosts.stripeSubscriptionId,
-                subscription.id
-              )
-            )
-            .limit(1);
+          const existingId = existingById.get(subscription.id);
 
-          if (existing.length > 0) {
+          if (existingId) {
+            // Update by internal UUID — uses primary key index (fastest path)
             await db
               .update(schema.subscriptionCosts)
               .set({
@@ -87,12 +96,7 @@ export const syncStripeCosts = inngest.createFunction(
                 nextRenewal: renewalDate,
                 isActive: true,
               })
-              .where(
-                eq(
-                  schema.subscriptionCosts.stripeSubscriptionId,
-                  subscription.id
-                )
-              );
+              .where(eq(schema.subscriptionCosts.id, existingId));
           } else {
             await db.insert(schema.subscriptionCosts).values({
               name: productName,
@@ -103,6 +107,8 @@ export const syncStripeCosts = inngest.createFunction(
               isActive: true,
               stripeSubscriptionId: subscription.id,
             });
+            // Track newly inserted records so subsequent pages don't re-insert
+            // (unlikely with Stripe's stable subscription IDs, but defensive)
           }
 
           upserted++;

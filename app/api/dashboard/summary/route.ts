@@ -17,6 +17,28 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as mercuryConnector from "@/lib/connectors/mercury";
+import type { ConnectorResult } from "@/lib/connectors/base";
+
+// ─── Timeout Wrapper ─────────────────────────────────────────────────────────
+
+function withTimeout<T>(
+  promise: Promise<ConnectorResult<T>>,
+  ms: number,
+  label: string
+): Promise<ConnectorResult<T>> {
+  return Promise.race([
+    promise,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]).catch((err) => {
+    captureError(err, {
+      tags: { route: "dashboard-summary", connector: label },
+      level: "warning",
+    });
+    return { success: false as const, error: String(err), fetchedAt: new Date() };
+  });
+}
 
 export async function GET() {
   const userId = await checkAdmin();
@@ -50,8 +72,8 @@ export async function GET() {
     // Stale clients (no kanban card movement in 7+ days)
     staleClients,
   ] = await Promise.all([
-    // MRR + active subscriptions — live from Stripe
-    stripeConnector.getMRR(),
+    // MRR + active subscriptions — live from Stripe (5s timeout)
+    withTimeout(stripeConnector.getMRR(), 5000, "stripe-mrr"),
     // Failed payments in last 14 days
     db
       .select({ value: count() })
@@ -62,8 +84,8 @@ export async function GET() {
           gte(schema.payments.paymentDate, fourteenDaysAgo)
         )
       ),
-    // Mercury accounts — live from API
-    mercuryConnector.getAccounts(),
+    // Mercury accounts — live from API (5s timeout)
+    withTimeout(mercuryConnector.getAccounts(), 5000, "mercury-accounts"),
     // Total clients
     db.select({ value: count() }).from(schema.clients),
     // Overdue invoices
