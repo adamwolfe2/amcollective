@@ -28,6 +28,7 @@ import { notifySlack } from "@/lib/webhooks/slack";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { notifyAdmins } from "@/lib/db/repositories/notifications";
 import { after } from "next/server";
+import { ajWebhook } from "@/lib/middleware/arcjet";
 
 function verifyHmac(body: string, signature: string, secret: string): boolean {
   try {
@@ -44,6 +45,13 @@ function verifyHmac(body: string, signature: string, secret: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  if (ajWebhook) {
+    const decision = await ajWebhook.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   try {
     const rawBody = await request.text();
     const secret = process.env.INTAKE_WEBHOOK_SECRET;

@@ -79,6 +79,7 @@ export const clients = pgTable(
       .$onUpdate(() => new Date()),
   },
   (table) => [
+    index("clients_name_idx").on(table.name),
     index("clients_email_idx").on(table.email),
     index("clients_clerk_user_id_idx").on(table.clerkUserId),
     index("clients_created_at_idx").on(table.createdAt),

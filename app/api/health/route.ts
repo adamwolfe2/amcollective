@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   // DB check
   try {
     const start = performance.now();
-    const sql = neon(process.env.DATABASE_URL!);
+    const sql = neon(process.env.DATABASE_URL ?? "");
     await sql`SELECT 1`;
     const latencyMs = Math.round(performance.now() - start);
     checks.database = { status: "ok", latencyMs };

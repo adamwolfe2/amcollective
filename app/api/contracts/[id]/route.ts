@@ -118,30 +118,38 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
     if (needsEmail && clientRow?.clientEmail) {
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://amcollective.vercel.app";
       const signingUrl = `${appUrl}/contracts/sign/${updated.token}`;
-      after(() =>
-        sendContractEmail({
-          clientName: clientRow.clientName ?? "Client",
-          clientEmail: clientRow.clientEmail!,
-          contractTitle: updated.title,
-          contractNumber: updated.contractNumber,
-          signingUrl,
-          totalValue: updated.totalValue,
-          expiresAt: updated.expiresAt,
-        })
-      );
+      after(async () => {
+        try {
+          await sendContractEmail({
+            clientName: clientRow.clientName ?? "Client",
+            clientEmail: clientRow.clientEmail!,
+            contractTitle: updated.title,
+            contractNumber: updated.contractNumber,
+            signingUrl,
+            totalValue: updated.totalValue,
+            expiresAt: updated.expiresAt,
+          });
+        } catch (emailErr) {
+          captureError(emailErr, { tags: { route: "contract-send-email", contractId: id } });
+        }
+      });
     }
 
     // Send countersign confirmation email to client
     if (needsCountersignEmail && clientRow?.clientEmail) {
-      after(() =>
-        sendContractExecutedEmail({
-          clientName: clientRow.clientName ?? "Client",
-          clientEmail: clientRow.clientEmail!,
-          contractTitle: updated.title,
-          contractNumber: updated.contractNumber,
-          startDate: updated.startDate,
-        })
-      );
+      after(async () => {
+        try {
+          await sendContractExecutedEmail({
+            clientName: clientRow.clientName ?? "Client",
+            clientEmail: clientRow.clientEmail!,
+            contractTitle: updated.title,
+            contractNumber: updated.contractNumber,
+            startDate: updated.startDate,
+          });
+        } catch (emailErr) {
+          captureError(emailErr, { tags: { route: "contract-countersign-email", contractId: id } });
+        }
+      });
     }
 
     await createAuditLog({
