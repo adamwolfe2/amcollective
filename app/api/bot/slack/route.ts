@@ -24,6 +24,8 @@ import { snoozeAlert, resolveAlert, getAlerts } from "@/lib/db/repositories/aler
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { sanitizeUserInput } from "@/lib/ai/sanitize";
+import { ajWebhook } from "@/lib/middleware/arcjet";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -94,6 +96,8 @@ function parseSnoozeMs(text: string): number {
  * Download a private Slack file and transcribe via OpenAI Whisper.
  * Returns the transcript text, or null if transcription is not possible.
  */
+const MAX_TRANSCRIPT_LENGTH = 5000;
+
 async function transcribeSlackAudio(
   urlPrivate: string,
   filename: string
@@ -101,6 +105,9 @@ async function transcribeSlackAudio(
   const slackToken = process.env.SLACK_BOT_TOKEN;
   const openaiKey = process.env.OPENAI_API_KEY;
   if (!slackToken || !openaiKey) return null;
+
+  // SSRF defense: only allow Slack file URLs
+  if (!urlPrivate.startsWith("https://files.slack.com/")) return null;
 
   try {
     // Download file from Slack (requires auth)
@@ -126,7 +133,7 @@ async function transcribeSlackAudio(
     if (!whisperRes.ok) return null;
 
     const transcript = await whisperRes.text();
-    return transcript.trim() || null;
+    return (transcript.trim() || null)?.slice(0, MAX_TRANSCRIPT_LENGTH) ?? null;
   } catch {
     return null;
   }
@@ -188,6 +195,13 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  if (ajWebhook) {
+    const decision = await ajWebhook.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   const event = payload.event;
   if (!event) return NextResponse.json({ ok: true });
 
@@ -220,14 +234,18 @@ export async function POST(req: NextRequest) {
       audioFile.name || "audio.mp4"
     );
     if (transcript) {
+      const sanitizedTranscript = sanitizeUserInput(transcript, MAX_TRANSCRIPT_LENGTH);
       // Prepend transcript to any text (bot mention may have been the only text)
       messageText = messageText
-        ? `[Voice note] ${transcript}\n${messageText}`
-        : `[Voice note] ${transcript}`;
+        ? `[Voice note] ${sanitizedTranscript}\n${messageText}`
+        : `[Voice note] ${sanitizedTranscript}`;
     }
   }
 
   if (!messageText) return NextResponse.json({ ok: true });
+
+  // Sanitize and enforce max length on the final message
+  messageText = sanitizeUserInput(messageText, 10000);
 
   // Resolve user
   const user = resolveUser(slackUserId);

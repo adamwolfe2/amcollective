@@ -14,9 +14,13 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { runCeoAgent, resolveUser } from "@/lib/ai/agents/ceo-agent";
+import { sanitizeUserInput } from "@/lib/ai/sanitize";
+import { ajWebhook } from "@/lib/middleware/arcjet";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
+
+const MAX_SMS_LENGTH = 10000;
 
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
@@ -27,6 +31,13 @@ export async function POST(req: NextRequest) {
     const signature = req.headers.get("x-bloo-signature") ?? "";
     if (!verifyWebhookSignature(rawBody, signature, secret)) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
+    }
+  }
+
+  if (ajWebhook) {
+    const decision = await ajWebhook.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
     }
   }
 
@@ -46,11 +57,17 @@ export async function POST(req: NextRequest) {
 
   // Extract sender phone and message body
   const senderPhone = payload.from || payload.sender || payload.phone || "";
-  const messageText = payload.text || payload.message || "";
+  const rawMessageText = payload.text || payload.message || "";
 
-  if (!senderPhone || !messageText) {
+  if (!senderPhone || !rawMessageText) {
     return NextResponse.json({ ok: true }); // Ignore pings/delivery receipts
   }
+
+  if (rawMessageText.length > MAX_SMS_LENGTH) {
+    return NextResponse.json({ ok: true }); // Silently drop oversized messages
+  }
+
+  const messageText = sanitizeUserInput(rawMessageText);
 
   // Resolve user
   const user = resolveUser(senderPhone);

@@ -18,6 +18,10 @@ export const maxDuration = 60;
 
 const MAX_SIZE = 25 * 1024 * 1024; // 25MB
 
+function sanitizeFileName(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 255);
+}
+
 const ALLOWED_TYPES = new Set([
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -82,7 +86,7 @@ export async function POST(req: NextRequest) {
       // Upload to Vercel Blob
       const folder = clientId || "internal";
       const timestamp = Date.now();
-      const pathname = `documents/${companyTag}/${folder}/${timestamp}-${file.name}`;
+      const pathname = `documents/${companyTag}/${folder}/${timestamp}-${sanitizeFileName(file.name)}`;
 
       const blob = await put(pathname, file, {
         access: "public",

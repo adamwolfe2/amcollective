@@ -6,11 +6,18 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { captureError } from "@/lib/errors";
 import { aj } from "@/lib/middleware/arcjet";
+
+const contactSchema = z.object({
+  name: z.string().min(1).max(200).trim(),
+  email: z.string().email().max(255),
+  message: z.string().min(1).max(5000).trim(),
+});
 
 export async function POST(request: NextRequest) {
   if (aj) {
@@ -22,14 +29,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, email, message } = body;
-
-    if (!name || !email || !message) {
+    const parsed = contactSchema.safeParse(body);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Name, email, and message are required" },
+        { error: "Invalid input", details: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
+    const { name, email, message } = parsed.data;
 
     // Create a lead from the contact form
     const [lead] = await db

@@ -23,8 +23,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { runCeoAgent } from "@/lib/ai/agents/ceo-agent";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { sanitizeUserInput } from "@/lib/ai/sanitize";
+import { ajWebhook } from "@/lib/middleware/arcjet";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // CEO agent tool chains can take up to 60s
@@ -50,14 +53,24 @@ type UserId = keyof typeof CEO_USERS;
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
+const MAX_MESSAGE_LENGTH = 10000;
+
 function verifyAuth(request: NextRequest): boolean {
   const secret = process.env.OPENCLAW_SHARED_SECRET;
   if (!secret) {
     console.warn("[OpenClaw] OPENCLAW_SHARED_SECRET is not set — all requests rejected");
     return false;
   }
-  const authHeader = request.headers.get("Authorization");
-  return authHeader === `Bearer ${secret}`;
+  const authHeader = request.headers.get("Authorization") ?? "";
+  const expected = `Bearer ${secret}`;
+  try {
+    const a = Buffer.from(authHeader);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 // ─── GET — Health check ───────────────────────────────────────────────────────
@@ -76,6 +89,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  if (ajWebhook) {
+    const decision = await ajWebhook.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   let body: {
     message?: unknown;
     userId?: unknown;
@@ -90,10 +110,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const message = typeof body.message === "string" ? body.message.trim() : "";
-  if (!message) {
+  const rawMessage = typeof body.message === "string" ? body.message.trim() : "";
+  if (!rawMessage) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
   }
+
+  if (rawMessage.length > MAX_MESSAGE_LENGTH) {
+    return NextResponse.json(
+      { error: `Message too long. Max ${MAX_MESSAGE_LENGTH} characters.` },
+      { status: 400 }
+    );
+  }
+
+  const message = sanitizeUserInput(rawMessage);
 
   const rawUserId = typeof body.userId === "string" ? body.userId.toLowerCase() : "adam";
   const userId: UserId = rawUserId in CEO_USERS ? (rawUserId as UserId) : "adam";

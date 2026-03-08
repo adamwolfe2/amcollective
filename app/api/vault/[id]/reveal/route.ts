@@ -6,11 +6,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { decryptPassword } from "@/lib/vault/crypto";
+import { createAuditLog } from "@/lib/db/repositories/audit";
 
 export async function GET(
   _req: NextRequest,
@@ -40,6 +42,17 @@ export async function GET(
 
   try {
     const password = decryptPassword(row.passwordEncrypted);
+
+    after(async () => {
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: "credential.revealed",
+        entityType: "credential",
+        entityId: id,
+      });
+    });
+
     return NextResponse.json({ password });
   } catch {
     return NextResponse.json(

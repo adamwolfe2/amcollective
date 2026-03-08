@@ -10,9 +10,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { runCeoAgent, resolveUser } from "@/lib/ai/agents/ceo-agent";
+import { sanitizeUserInput } from "@/lib/ai/sanitize";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
+
+const MAX_MESSAGE_LENGTH = 10000;
 
 export async function POST(req: NextRequest) {
   // Internal-only: require a shared secret to prevent abuse
@@ -44,6 +47,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return NextResponse.json(
+      { error: `Message too long. Max ${MAX_MESSAGE_LENGTH} characters.` },
+      { status: 400 }
+    );
+  }
+
   // Resolve user from senderId
   const user = resolveUser(senderId);
   if (!user) {
@@ -53,12 +63,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  const sanitizedMessage = sanitizeUserInput(message);
+
   const result = await runCeoAgent({
     userId: user.id,
     userRole: user.role,
     userFocus: user.focus,
     userName: user.name,
-    message,
+    message: sanitizedMessage,
     conversationId,
   });
 

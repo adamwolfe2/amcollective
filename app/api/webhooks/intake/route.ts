@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
     }
 
     const contactName =
-      typeof payload.contactName === "string" ? payload.contactName.trim() : "";
+      typeof payload.contactName === "string" ? payload.contactName.trim().slice(0, 200) : "";
     if (!contactName) {
       return NextResponse.json({ error: "contactName is required" }, { status: 400 });
     }
@@ -91,13 +91,13 @@ export async function POST(request: NextRequest) {
       .insert(schema.leads)
       .values({
         contactName,
-        companyName: typeof payload.companyName === "string" ? payload.companyName : null,
-        email: typeof payload.email === "string" ? payload.email : null,
-        phone: typeof payload.phone === "string" ? payload.phone : null,
+        companyName: typeof payload.companyName === "string" ? payload.companyName.slice(0, 300) : null,
+        email: typeof payload.email === "string" ? payload.email.slice(0, 255) : null,
+        phone: typeof payload.phone === "string" ? payload.phone.slice(0, 50) : null,
         website: typeof payload.website === "string" ? payload.website : null,
         industry: typeof payload.industry === "string" ? payload.industry : null,
         estimatedValue: typeof payload.estimatedValue === "number" ? payload.estimatedValue : null,
-        notes: typeof payload.notes === "string" ? payload.notes : null,
+        notes: typeof payload.notes === "string" ? payload.notes.slice(0, 5000) : null,
         source,
         stage: "interest",
         companyTag: "am_collective",
