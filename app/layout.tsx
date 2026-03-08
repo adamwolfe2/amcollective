@@ -23,6 +23,14 @@ export const metadata: Metadata = {
     title: "AM Collective",
     description:
       "AM Collective Capital — Internal operations dashboard",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "AM Collective Capital",
+      },
+    ],
   },
   icons: {
     icon: "/icon.svg",

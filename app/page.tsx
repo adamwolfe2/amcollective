@@ -20,12 +20,21 @@ export const metadata: Metadata = {
     siteName: "AM Collective Capital",
     type: "website",
     locale: "en_US",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "AM Collective Capital — Building AI Infrastructure",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: "AM Collective — Building AI Infrastructure",
     description:
       "Technical AI execution with strategic business development to launch companies from 0 to 1.",
+    images: ["/opengraph-image"],
   },
 };
 
