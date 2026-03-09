@@ -17,7 +17,11 @@ import crypto from "crypto";
 
 function verifySignature(rawBody: string, signature: string | null): boolean {
   const secret = process.env.COMPOSIO_WEBHOOK_SECRET;
-  if (!secret || !signature) return !secret; // allow if no secret configured
+  if (!secret) {
+    console.warn("[composio] COMPOSIO_WEBHOOK_SECRET not set — accepting all webhook requests");
+    return true;
+  }
+  if (!signature) return false;
   const expected = crypto
     .createHmac("sha256", secret)
     .update(rawBody)

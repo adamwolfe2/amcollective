@@ -3,10 +3,12 @@
  */
 
 import { NextResponse } from "next/server";
+import { after } from "next/server";
 import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { createAuditLog } from "@/lib/db/repositories/audit";
 
 export async function POST(
   _req: Request,
@@ -42,6 +44,17 @@ export async function POST(
       .update(schema.proposals)
       .set(updates)
       .where(eq(schema.proposals.id, id));
+
+    after(async () => {
+      await createAuditLog({
+        actorId: "client",
+        actorType: "system",
+        action: "view",
+        entityType: "proposal",
+        entityId: id,
+        metadata: { proposalNumber: proposal.proposalNumber },
+      });
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

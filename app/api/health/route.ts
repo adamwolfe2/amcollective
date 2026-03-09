@@ -3,6 +3,7 @@ import { neon } from "@neondatabase/serverless";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { count } from "drizzle-orm";
+import { checkAdmin } from "@/lib/auth";
 
 export const runtime = "nodejs";
 
@@ -55,9 +56,16 @@ export async function GET(request: NextRequest) {
     checks.redis = { status: "not_configured" };
   }
 
-  // Detailed mode: include table counts
+  // Detailed mode: include table counts (requires admin auth)
   const detailed = request.nextUrl.searchParams.get("detailed") === "true";
   let counts = undefined;
+
+  if (detailed) {
+    const userId = await checkAdmin();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+  }
 
   if (detailed && checks.database.status === "ok") {
     try {

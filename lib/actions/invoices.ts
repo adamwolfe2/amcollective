@@ -204,8 +204,9 @@ export async function sendInvoiceAction(id: string): Promise<ActionResult> {
   const subtotal = lineItems.reduce((s, li) => s + li.quantity * li.unitPrice, 0);
 
   // Generate Stripe payment link if Stripe is configured and total > 0
-  let paymentLinkUrl: string | null = null;
-  if (process.env.STRIPE_SECRET_KEY && invoice.amount > 0) {
+  // Reuse existing link if already created (idempotency)
+  let paymentLinkUrl: string | null = invoice.stripePaymentLinkUrl ?? null;
+  if (!paymentLinkUrl && process.env.STRIPE_SECRET_KEY && invoice.amount > 0) {
     try {
       const stripe = getStripeClient();
       const paymentLink = await stripe.paymentLinks.create({

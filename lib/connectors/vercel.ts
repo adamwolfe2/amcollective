@@ -139,7 +139,7 @@ export async function getUsage(): Promise<ConnectorResult<VercelUsage>> {
         );
         return res;
       },
-      10 * 60 * 1000 // 10 min cache for usage
+      10 * 60 // 10 min cache for usage
     )
   );
 }
@@ -339,7 +339,7 @@ export async function getPortfolioActivity(): Promise<ConnectorResult<VercelPort
           projects: activities,
         };
       },
-      10 * 60 * 1000 // 10 min cache
+      10 * 60 // 10 min cache
     )
   );
 }

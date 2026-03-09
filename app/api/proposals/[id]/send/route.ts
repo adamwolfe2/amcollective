@@ -44,6 +44,13 @@ export async function POST(
 
     const { proposal, clientEmail, clientName } = result;
 
+    if (!clientEmail) {
+      return NextResponse.json(
+        { error: "Client has no email address — proposal cannot be sent" },
+        { status: 400 }
+      );
+    }
+
     // Update status
     await db
       .update(schema.proposals)

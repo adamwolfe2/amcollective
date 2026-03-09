@@ -85,8 +85,19 @@ export async function GET() {
         // Handle client disconnect
         controller.enqueue(encoder.encode(": connected\n\n"));
 
+        // Auto-close after 5 minutes to prevent resource leaks
+        const maxDuration = setTimeout(() => {
+          cancelled = true;
+          clearInterval(interval);
+          try { controller.close(); } catch {}
+        }, 5 * 60 * 1000);
+
         // Store cleanup for cancel
-        (controller as unknown as { _cleanup: () => void })._cleanup = cleanup;
+        const originalCleanup = cleanup;
+        (controller as unknown as { _cleanup: () => void })._cleanup = () => {
+          originalCleanup();
+          clearTimeout(maxDuration);
+        };
       },
       cancel() {
         cancelled = true;

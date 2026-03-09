@@ -1,5 +1,14 @@
 import { Resend } from "resend";
 
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;");
+}
+
 const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
@@ -33,9 +42,9 @@ export function notifyAdminNewIntake(data: {
       <div style="font-family: monospace; font-size: 14px; color: #0F1523;">
         <h2 style="margin: 0 0 16px;">New Intake Submission</h2>
         <table style="border-collapse: collapse;">
-          <tr><td style="padding: 4px 16px 4px 0; color: #8B92A5;">Company</td><td><strong>${data.companyName}</strong></td></tr>
-          <tr><td style="padding: 4px 16px 4px 0; color: #8B92A5;">Contact</td><td>${data.contactName} (${data.contactEmail})</td></tr>
-          <tr><td style="padding: 4px 16px 4px 0; color: #8B92A5;">Industry</td><td>${data.industry}</td></tr>
+          <tr><td style="padding: 4px 16px 4px 0; color: #8B92A5;">Company</td><td><strong>${escapeHtml(data.companyName)}</strong></td></tr>
+          <tr><td style="padding: 4px 16px 4px 0; color: #8B92A5;">Contact</td><td>${escapeHtml(data.contactName)} (${escapeHtml(data.contactEmail)})</td></tr>
+          <tr><td style="padding: 4px 16px 4px 0; color: #8B92A5;">Industry</td><td>${escapeHtml(data.industry)}</td></tr>
           <tr><td style="padding: 4px 16px 4px 0; color: #8B92A5;">Features</td><td>${data.featureCount} selected</td></tr>
         </table>
         <p style="margin-top: 20px;">
@@ -60,9 +69,9 @@ export function sendIntakeConfirmation(data: {
     subject: `We received your info, ${data.contactName}`,
     html: `
       <div style="font-family: monospace; font-size: 14px; color: #0F1523; max-width: 500px;">
-        <h2 style="margin: 0 0 8px;">Thanks, ${data.contactName}.</h2>
+        <h2 style="margin: 0 0 8px;">Thanks, ${escapeHtml(data.contactName)}.</h2>
         <p style="color: #3D4556; line-height: 1.6;">
-          We've received your portal inquiry for <strong>${data.companyName}</strong>.
+          We've received your portal inquiry for <strong>${escapeHtml(data.companyName)}</strong>.
           Our team will review your submission and reach out within 24 hours to schedule your consultation call.
         </p>
         <p style="color: #3D4556; line-height: 1.6;">
@@ -107,10 +116,10 @@ export function notifyClientStatusChange(data: {
       <div style="font-family: monospace; font-size: 14px; color: #0F1523; max-width: 500px;">
         <h2 style="margin: 0 0 8px;">Build Update</h2>
         <p style="color: #3D4556; line-height: 1.6;">
-          Hi ${data.contactName}, your portal build for <strong>${data.companyName}</strong>
-          has moved to <strong>${label}</strong> (Phase ${data.currentPhase}/15).
+          Hi ${escapeHtml(data.contactName)}, your portal build for <strong>${escapeHtml(data.companyName)}</strong>
+          has moved to <strong>${escapeHtml(label)}</strong> (Phase ${data.currentPhase}/15).
         </p>
-        ${data.message ? `<p style="color: #3D4556; line-height: 1.6;">${data.message}</p>` : ""}
+        ${data.message ? `<p style="color: #3D4556; line-height: 1.6;">${escapeHtml(data.message)}</p>` : ""}
         <p>
           <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://amcollective.vercel.app"}/status" style="color: #2A52BE;">
             Check your full build progress →
@@ -155,12 +164,12 @@ export function sendContractEmail(data: {
       <div style="font-family: Georgia, serif; font-size: 14px; color: #0A0A0A; max-width: 540px; margin: 0 auto;">
         <div style="background: #0A0A0A; padding: 20px 24px; margin-bottom: 0;">
           <p style="font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.4); margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.1em;">AM Collective Capital</p>
-          <h1 style="font-family: Georgia, serif; color: #fff; font-size: 20px; margin: 0; font-weight: bold;">${data.contractTitle}</h1>
-          <p style="font-family: monospace; font-size: 11px; color: rgba(255,255,255,0.4); margin: 6px 0 0;">${data.contractNumber}</p>
+          <h1 style="font-family: Georgia, serif; color: #fff; font-size: 20px; margin: 0; font-weight: bold;">${escapeHtml(data.contractTitle)}</h1>
+          <p style="font-family: monospace; font-size: 11px; color: rgba(255,255,255,0.4); margin: 6px 0 0;">${escapeHtml(data.contractNumber)}</p>
         </div>
         <div style="border: 1px solid #0A0A0A; border-top: none; padding: 24px;">
           <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
-            Hi ${data.clientName},
+            Hi ${escapeHtml(data.clientName)},
           </p>
           <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
             Your contract is ready for review and signature. Please click the button below to read and sign the agreement.
@@ -201,14 +210,14 @@ export function sendContractExecutedEmail(data: {
         <div style="background: #0A0A0A; padding: 20px 24px; margin-bottom: 0;">
           <p style="font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.4); margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.1em;">AM Collective Capital</p>
           <h1 style="font-family: Georgia, serif; color: #fff; font-size: 20px; margin: 0; font-weight: bold;">Contract Executed</h1>
-          <p style="font-family: monospace; font-size: 11px; color: rgba(255,255,255,0.4); margin: 6px 0 0;">${data.contractNumber}</p>
+          <p style="font-family: monospace; font-size: 11px; color: rgba(255,255,255,0.4); margin: 6px 0 0;">${escapeHtml(data.contractNumber)}</p>
         </div>
         <div style="border: 1px solid #0A0A0A; border-top: none; padding: 24px;">
           <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
-            Hi ${data.clientName},
+            Hi ${escapeHtml(data.clientName)},
           </p>
           <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
-            Great news — <strong>${data.contractTitle}</strong> has been countersigned and is now fully executed. Both parties are bound by its terms.
+            Great news — <strong>${escapeHtml(data.contractTitle)}</strong> has been countersigned and is now fully executed. Both parties are bound by its terms.
           </p>
           ${data.startDate ? `<p style="font-family: monospace; font-size: 12px; color: #0A0A0A; margin: 0 0 16px;">Effective date: <strong>${data.startDate}</strong></p>` : ""}
           <p style="line-height: 1.7; color: #3D4556; margin: 0;">
@@ -237,7 +246,7 @@ export function sendClientWelcomeEmail(data: {
       <div style="font-family: Georgia, serif; font-size: 14px; color: #0A0A0A; max-width: 540px; margin: 0 auto;">
         <div style="background: #0A0A0A; padding: 20px 24px; margin-bottom: 0;">
           <p style="font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.4); margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.1em;">AM Collective Capital</p>
-          <h1 style="font-family: Georgia, serif; color: #fff; font-size: 20px; margin: 0; font-weight: bold;">Welcome, ${data.clientName}</h1>
+          <h1 style="font-family: Georgia, serif; color: #fff; font-size: 20px; margin: 0; font-weight: bold;">Welcome, ${escapeHtml(data.clientName)}</h1>
         </div>
         <div style="border: 1px solid #0A0A0A; border-top: none; padding: 24px;">
           <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
@@ -278,8 +287,8 @@ export function notifyClientPortalLive(data: {
       <div style="font-family: monospace; font-size: 14px; color: #0F1523; max-width: 500px;">
         <h2 style="margin: 0 0 8px;">Your Portal is Live</h2>
         <p style="color: #3D4556; line-height: 1.6;">
-          ${data.contactName}, your custom wholesale ordering portal for
-          <strong>${data.companyName}</strong> is now live at:
+          ${escapeHtml(data.contactName)}, your custom wholesale ordering portal for
+          <strong>${escapeHtml(data.companyName)}</strong> is now live at:
         </p>
         <p style="margin: 16px 0;">
           <a href="https://${data.portalUrl}" style="color: #2A52BE; font-size: 16px; font-weight: bold;">

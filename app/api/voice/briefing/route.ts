@@ -99,7 +99,7 @@ export async function GET() {
 
     // Build voice-friendly summary
     const summary = {
-      greeting: `Good ${now.getHours() < 12 ? "morning" : now.getHours() < 17 ? "afternoon" : "evening"}, Adam.`,
+      greeting: `Good ${now.getHours() < 12 ? "morning" : now.getHours() < 17 ? "afternoon" : "evening"}.`,
       revenue: {
         mrr,
         arr: mrr * 12,
@@ -142,7 +142,7 @@ export async function GET() {
     };
 
     // Build natural language briefing
-    const lines = [summary.greeting];
+    const lines: string[] = [summary.greeting];
     lines.push(`MRR is $${mrr.toLocaleString()}, cash position is $${totalCash.toLocaleString()}.`);
 
     if (overdueInvoices[0]?.count) {

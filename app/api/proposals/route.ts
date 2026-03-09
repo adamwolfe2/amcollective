@@ -53,6 +53,14 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
+
+    if (!body.title || typeof body.title !== "string") {
+      return NextResponse.json({ error: "title is required" }, { status: 400 });
+    }
+    if (body.title.length > 500) {
+      return NextResponse.json({ error: "title must be 500 characters or fewer" }, { status: 400 });
+    }
+
     const proposalNumber = await generateProposalNumber();
 
     const [proposal] = await db
@@ -60,9 +68,9 @@ export async function POST(req: Request) {
       .values({
         clientId: body.clientId,
         companyTag: body.companyTag ?? "am_collective",
-        title: body.title,
+        title: body.title.slice(0, 500),
         proposalNumber,
-        summary: body.summary ?? null,
+        summary: body.summary ? String(body.summary).slice(0, 10000) : null,
         scope: body.scope ?? null,
         deliverables: body.deliverables ?? null,
         timeline: body.timeline ?? null,

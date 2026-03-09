@@ -48,12 +48,16 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     const { id } = await ctx.params;
     const body = await request.json();
 
+    if (!body.content || typeof body.content !== "string" || !body.content.trim()) {
+      return NextResponse.json({ error: "content is required" }, { status: 400 });
+    }
+
     const [activity] = await db
       .insert(schema.leadActivities)
       .values({
         leadId: id,
         type: body.type ?? "note",
-        content: body.content,
+        content: body.content.slice(0, 5000),
         createdById: userId,
       })
       .returning();

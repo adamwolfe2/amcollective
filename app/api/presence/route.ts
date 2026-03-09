@@ -24,7 +24,8 @@ export async function GET() {
     const onlineUsers = await db
       .select()
       .from(schema.userPresence)
-      .where(gte(schema.userPresence.lastHeartbeat, threshold));
+      .where(gte(schema.userPresence.lastHeartbeat, threshold))
+      .limit(50);
 
     return NextResponse.json(
       onlineUsers.map((u) => ({

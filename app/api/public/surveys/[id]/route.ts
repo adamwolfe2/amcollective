@@ -3,6 +3,7 @@ import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { ajWebhook } from "@/lib/middleware/arcjet";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -44,6 +45,13 @@ export async function GET(_request: NextRequest, context: RouteContext) {
  * POST /api/public/surveys/:id — Submit survey response (no auth, public)
  */
 export async function POST(request: NextRequest, context: RouteContext) {
+  if (ajWebhook) {
+    const decision = await ajWebhook.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   try {
     const { id } = await context.params;
     const body = await request.json();
@@ -67,11 +75,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Score is required" }, { status: 400 });
     }
 
+    const numericScore = Number(score);
+    if (isNaN(numericScore) || numericScore < 0 || numericScore > 10) {
+      return NextResponse.json({ error: "Score must be a number between 0 and 10" }, { status: 400 });
+    }
+
+    const safeFeedback = feedback
+      ? String(feedback).slice(0, 5000)
+      : null;
+
     await db
       .update(schema.surveys)
       .set({
-        score: Number(score),
-        feedback: feedback || null,
+        score: numericScore,
+        feedback: safeFeedback,
         status: "completed",
         respondedAt: new Date(),
       })

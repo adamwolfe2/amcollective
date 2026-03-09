@@ -29,7 +29,8 @@ export async function GET() {
         schema.clients,
         eq(schema.recurringInvoices.clientId, schema.clients.id)
       )
-      .orderBy(desc(schema.recurringInvoices.createdAt));
+      .orderBy(desc(schema.recurringInvoices.createdAt))
+      .limit(500);
 
     return NextResponse.json(templates);
   } catch (error) {
