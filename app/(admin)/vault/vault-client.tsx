@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Eye, EyeOff, Copy, Check, Trash2, Plus, X, Pencil, Sparkles } from "lucide-react";
 import { createCredential, updateCredential, deleteCredential } from "@/lib/actions/vault";
 import { toast } from "sonner";
@@ -395,10 +396,31 @@ function AiParseModal({
 // ─── Vault Table (client wrapper with add/edit controls) ──────────────────────
 
 export function VaultTable({ rows }: { rows: Credential[] }) {
+  const router = useRouter();
   const [showForm, setShowForm] = useState(false);
   const [showAiParse, setShowAiParse] = useState(false);
   const [editTarget, setEditTarget] = useState<Credential | null>(null);
   const [prefill, setPrefill] = useState<ParsedFields | null>(null);
+  const [seeding, setSeeding] = useState(false);
+
+  async function handleSeedFromEnv() {
+    if (!confirm("Seed vault from environment variables? Existing entries will not be overwritten.")) return;
+    setSeeding(true);
+    try {
+      const res = await fetch("/api/admin/vault-seed", { method: "POST" });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`${data.seeded} credentials seeded into vault.`);
+        router.refresh();
+      } else {
+        toast.error(data.error || "Seed failed.");
+      }
+    } catch {
+      toast.error("Seed failed. Check your connection.");
+    } finally {
+      setSeeding(false);
+    }
+  }
 
   function handleParsed(fields: ParsedFields) {
     setPrefill(fields);
@@ -439,6 +461,13 @@ export function VaultTable({ rows }: { rows: Credential[] }) {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleSeedFromEnv}
+            disabled={seeding}
+            className="flex items-center gap-2 border border-[#0A0A0A] font-mono text-xs uppercase tracking-wider px-4 py-2.5 hover:bg-[#0A0A0A] hover:text-white transition-colors disabled:opacity-40"
+          >
+            {seeding ? "Seeding..." : "Seed from Env"}
+          </button>
           <button
             onClick={() => setShowAiParse(true)}
             className="flex items-center gap-2 border border-[#0A0A0A] font-mono text-xs uppercase tracking-wider px-4 py-2.5 hover:bg-[#0A0A0A] hover:text-white transition-colors"
