@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { updateClient } from "@/lib/actions/clients";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -54,9 +55,11 @@ export function ClientOverviewForm({ client }: { client: ClientData }) {
 
     if (!result.success) {
       setError(result.error || "Failed to update client.");
+      toast.error(result.error || "Failed to update client.");
       return;
     }
 
+    toast.success("Client saved.");
     setSuccess(true);
     router.refresh();
     setTimeout(() => setSuccess(false), 2000);

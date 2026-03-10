@@ -4,6 +4,7 @@ import { AdminShell } from "./admin-shell";
 import { CommandPalette } from "@/components/command-palette";
 import { CompanyProvider } from "@/components/company-context";
 import { PresenceHeartbeat } from "@/components/presence-heartbeat";
+import { Toaster } from "@/components/ui/sonner";
 
 // Admin pages are always auth-gated and serve live data — never statically prerender
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function AdminLayout({
         {children}
         <CommandPalette />
         <PresenceHeartbeat />
+        <Toaster position="bottom-right" richColors />
       </AdminShell>
     </CompanyProvider>
   );

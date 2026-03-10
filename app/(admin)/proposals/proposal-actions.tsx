@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Send, FileText, ArrowRight } from "lucide-react";
+import { toast } from "sonner";
 
 export function ProposalActions({
   id,
@@ -19,7 +20,13 @@ export function ProposalActions({
   async function handleSend() {
     setLoading(true);
     try {
-      await fetch(`/api/proposals/${id}/send`, { method: "POST" });
+      const res = await fetch(`/api/proposals/${id}/send`, { method: "POST" });
+      if (res.ok) {
+        toast.success("Proposal sent to client.");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.error || "Failed to send proposal.");
+      }
       router.refresh();
     } finally {
       setLoading(false);
@@ -33,8 +40,11 @@ export function ProposalActions({
         method: "POST",
       });
       if (res.ok) {
+        toast.success("Converted to invoice.");
         const data = await res.json();
         router.push(`/invoices/${data.invoiceId}`);
+      } else {
+        toast.error("Failed to convert proposal.");
       }
     } finally {
       setLoading(false);

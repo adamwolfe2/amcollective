@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export function ContractActions({
   contractId,
@@ -13,6 +14,12 @@ export function ContractActions({
   const router = useRouter();
   const [loading, setLoading] = useState(false);
 
+  const ACTION_LABELS: Record<string, string> = {
+    send: "Contract sent for signature.",
+    countersign: "Contract activated.",
+    terminate: "Contract terminated.",
+  };
+
   async function handleAction(action: string) {
     setLoading(true);
     try {
@@ -22,7 +29,10 @@ export function ContractActions({
         body: JSON.stringify({ action }),
       });
       if (res.ok) {
+        toast.success(ACTION_LABELS[action] ?? "Contract updated.");
         router.refresh();
+      } else {
+        toast.error("Action failed. Please try again.");
       }
     } finally {
       setLoading(false);

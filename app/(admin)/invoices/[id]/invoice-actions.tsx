@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { sendInvoiceAction, markPaid } from "@/lib/actions/invoices";
 import { Send, CheckCircle, Eye, Copy, RotateCcw, Download } from "lucide-react";
+import { toast } from "sonner";
 
 export function InvoiceActions({
   invoiceId,
@@ -24,7 +25,10 @@ export function InvoiceActions({
     const result = await sendInvoiceAction(invoiceId);
     setLoading(false);
     if (result.success) {
+      toast.success("Invoice sent.");
       router.refresh();
+    } else {
+      toast.error(result.error || "Failed to send invoice.");
     }
   }
 
@@ -33,13 +37,17 @@ export function InvoiceActions({
     const result = await markPaid(invoiceId);
     setLoading(false);
     if (result.success) {
+      toast.success("Marked as paid.");
       router.refresh();
+    } else {
+      toast.error("Failed to update invoice.");
     }
   }
 
   function handleCopyLink() {
     if (paymentLinkUrl) {
       navigator.clipboard.writeText(paymentLinkUrl);
+      toast.success("Payment link copied.");
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }

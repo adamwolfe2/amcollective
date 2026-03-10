@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 type Props = {
   taskId: string;
@@ -31,11 +32,16 @@ export function TaskDetailActions({
   async function update(updates: Record<string, unknown>) {
     setLoading(true);
     try {
-      await fetch(`/api/tasks/${taskId}`, {
+      const res = await fetch(`/api/tasks/${taskId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(updates),
       });
+      if (res.ok) {
+        toast.success("Task updated.");
+      } else {
+        toast.error("Failed to update task.");
+      }
       router.refresh();
     } finally {
       setLoading(false);
@@ -46,8 +52,13 @@ export function TaskDetailActions({
     if (!window.confirm("Archive this task?")) return;
     setLoading(true);
     try {
-      await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
-      router.push("/tasks");
+      const res = await fetch(`/api/tasks/${taskId}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Task archived.");
+        router.push("/tasks");
+      } else {
+        toast.error("Failed to archive task.");
+      }
     } finally {
       setLoading(false);
     }

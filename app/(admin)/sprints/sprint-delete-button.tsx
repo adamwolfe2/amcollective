@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { Trash2 } from "lucide-react";
 import { deleteSprint } from "@/lib/actions/sprints";
+import { toast } from "sonner";
 
 export function SprintDeleteButton({ id, title }: { id: string; title: string }) {
   const [isPending, startTransition] = useTransition();
@@ -13,6 +14,7 @@ export function SprintDeleteButton({ id, title }: { id: string; title: string })
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
     startTransition(async () => {
       await deleteSprint(id);
+      toast.success(`Sprint "${title}" deleted.`);
     });
   }
 

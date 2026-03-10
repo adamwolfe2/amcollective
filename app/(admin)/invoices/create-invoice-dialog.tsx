@@ -22,6 +22,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { createInvoice } from "@/lib/actions/invoices";
 import { Plus, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 type LineItem = {
   description: string;
@@ -98,6 +99,7 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
 
     setLoading(false);
     if (result.success) {
+      toast.success(sendViaStripe ? "Invoice created and sent via Stripe." : "Invoice created.");
       setOpen(false);
       setClientId("");
       setSendViaStripe(false);
@@ -106,6 +108,7 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
       router.refresh();
     } else {
       setError(result.error || "Failed to create invoice");
+      toast.error(result.error || "Failed to create invoice");
     }
   }
 

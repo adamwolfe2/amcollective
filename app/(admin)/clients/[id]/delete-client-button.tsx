@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { deleteClient } from "@/lib/actions/clients";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +30,10 @@ export function DeleteClientButton({
     setPending(false);
 
     if (result.success) {
+      toast.success("Client deleted.");
       router.push("/clients");
+    } else {
+      toast.error("Failed to delete client.");
     }
   }
 

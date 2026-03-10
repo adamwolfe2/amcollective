@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Eye, EyeOff, Copy, Check, Trash2, Plus, X, Pencil, Sparkles } from "lucide-react";
 import { createCredential, updateCredential, deleteCredential } from "@/lib/actions/vault";
+import { toast } from "sonner";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -160,7 +161,9 @@ export function CredentialForm({
 
       if (!result.success) {
         setError(result.error ?? "Unknown error");
+        toast.error(result.error ?? "Failed to save credential.");
       } else {
+        toast.success(editing ? "Credential updated." : "Credential added.");
         onClose();
       }
     });
@@ -263,6 +266,7 @@ export function DeleteButton({ id }: { id: string }) {
           onClick={() =>
             startTransition(async () => {
               await deleteCredential(id);
+              toast.success("Credential deleted.");
             })
           }
           disabled={isPending}

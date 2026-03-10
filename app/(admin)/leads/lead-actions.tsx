@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRightCircle, Archive, ExternalLink } from "lucide-react";
+import { toast } from "sonner";
 
 type Lead = {
   id: string;
@@ -23,8 +24,11 @@ export function LeadActions({ lead }: { lead: Lead }) {
         method: "POST",
       });
       if (res.ok) {
+        toast.success(`${lead.contactName} converted to client.`);
         const data = await res.json();
         router.push(`/clients/${data.clientId}`);
+      } else {
+        toast.error("Failed to convert lead.");
       }
     } finally {
       setLoading(false);
@@ -36,7 +40,12 @@ export function LeadActions({ lead }: { lead: Lead }) {
     if (!confirm(`Archive ${lead.contactName}?`)) return;
     setLoading(true);
     try {
-      await fetch(`/api/leads/${lead.id}`, { method: "DELETE" });
+      const res = await fetch(`/api/leads/${lead.id}`, { method: "DELETE" });
+      if (res.ok) {
+        toast.success("Lead archived.");
+      } else {
+        toast.error("Failed to archive lead.");
+      }
       router.refresh();
     } finally {
       setLoading(false);

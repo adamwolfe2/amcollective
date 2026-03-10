@@ -6,6 +6,7 @@ import { createClient } from "@/lib/actions/clients";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -38,9 +39,11 @@ export function AddClientDialog() {
 
     if (!result.success) {
       setError(result.error || "Failed to create client.");
+      toast.error(result.error || "Failed to create client.");
       return;
     }
 
+    toast.success("Client created.");
     setOpen(false);
     router.refresh();
   }

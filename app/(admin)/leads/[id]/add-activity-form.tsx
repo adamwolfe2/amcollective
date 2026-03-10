@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { toast } from "sonner";
 
 export function AddActivityForm({ leadId }: { leadId: string }) {
   const router = useRouter();
@@ -24,8 +25,11 @@ export function AddActivityForm({ leadId }: { leadId: string }) {
         body: JSON.stringify(body),
       });
       if (res.ok) {
+        toast.success("Activity logged.");
         e.currentTarget.reset();
         router.refresh();
+      } else {
+        toast.error("Failed to log activity.");
       }
     } finally {
       setLoading(false);

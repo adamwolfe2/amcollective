@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export function TaskCommentForm({ taskId }: { taskId: string }) {
   const router = useRouter();
@@ -20,6 +21,8 @@ export function TaskCommentForm({ taskId }: { taskId: string }) {
       if (res.ok) {
         setContent("");
         router.refresh();
+      } else {
+        toast.error("Failed to post comment.");
       }
     } finally {
       setLoading(false);

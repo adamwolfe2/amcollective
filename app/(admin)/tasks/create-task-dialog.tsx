@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 type Props = {
   teamMembers: { id: string; name: string }[];
@@ -36,6 +37,7 @@ export function CreateTaskDialog({ teamMembers, projects }: Props) {
         }),
       });
       if (res.ok) {
+        toast.success("Task created.");
         setOpen(false);
         setTitle("");
         setDescription("");
@@ -44,6 +46,8 @@ export function CreateTaskDialog({ teamMembers, projects }: Props) {
         setProjectId("");
         setDueDate("");
         router.refresh();
+      } else {
+        toast.error("Failed to create task.");
       }
     } finally {
       setLoading(false);
