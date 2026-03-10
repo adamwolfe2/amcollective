@@ -46,6 +46,7 @@ import {
   dailyDigest,
   syncCashSnapshot,
   leadFollowupReminder,
+  syncEmailbisonInbox,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -89,5 +90,6 @@ export const { GET, POST, PUT } = serve({
     dailyDigest,
     syncCashSnapshot,
     leadFollowupReminder,
+    syncEmailbisonInbox,
   ],
 });

@@ -18,6 +18,10 @@ function getAuth() {
   return { apiKey, baseUrl };
 }
 
+export function isConfigured() {
+  return !!(process.env.EMAILBISON_API_KEY && process.env.EMAILBISON_BASE_URL);
+}
+
 async function bisonFetch<T>(path: string): Promise<T> {
   const { apiKey, baseUrl } = getAuth();
   const res = await fetch(`${baseUrl}/api${path}`, {
@@ -28,6 +32,22 @@ async function bisonFetch<T>(path: string): Promise<T> {
     next: { revalidate: 0 },
   });
   if (!res.ok) throw new Error(`EmailBison API ${res.status}: ${path}`);
+  return res.json() as Promise<T>;
+}
+
+async function bisonPost<T>(path: string, body: Record<string, unknown>): Promise<T> {
+  const { apiKey, baseUrl } = getAuth();
+  const res = await fetch(`${baseUrl}/api${path}`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    next: { revalidate: 0 },
+  });
+  if (!res.ok) throw new Error(`EmailBison API ${res.status}: POST ${path}`);
   return res.json() as Promise<T>;
 }
 
@@ -156,4 +176,44 @@ export async function syncCampaigns(): Promise<{
     fetchSenderAccounts(),
   ]);
   return { campaigns, senderAccounts };
+}
+
+// ─── Inbox / Replies ──────────────────────────────────────────────────────────
+
+export interface EmailBisonReply {
+  id: number;
+  campaign_id?: number | null;
+  campaign_name?: string | null;
+  lead_email: string;
+  lead_name?: string | null;
+  sender_email?: string | null;
+  subject?: string | null;
+  body?: string | null;
+  is_read: boolean;
+  is_interested: boolean;
+  received_at?: string | null;
+  created_at: string;
+}
+
+export interface EmailBisonInboxParams {
+  page?: number;
+  perPage?: number;
+  unreadOnly?: boolean;
+}
+
+export async function listReplies(params: EmailBisonInboxParams = {}): Promise<EmailBisonReply[]> {
+  const qs = new URLSearchParams();
+  qs.set("per_page", String(params.perPage ?? 100));
+  if (params.page && params.page > 1) qs.set("page", String(params.page));
+  if (params.unreadOnly) qs.set("status", "unread");
+  const data = await bisonFetch<{ data: EmailBisonReply[] }>(`/unibox?${qs.toString()}`);
+  return data.data ?? [];
+}
+
+export async function markReplyRead(replyId: number): Promise<void> {
+  await bisonPost(`/unibox/${replyId}/mark-read`, {});
+}
+
+export async function markReplyInterested(replyId: number): Promise<void> {
+  await bisonPost(`/unibox/${replyId}/interested`, {});
 }

@@ -38,3 +38,4 @@ export { strategyAnalysis } from "./strategy-analysis";
 export { dailyDigest } from "./daily-digest";
 export { syncCashSnapshot } from "./sync-cash-snapshot";
 export { leadFollowupReminder } from "./lead-followup-reminder";
+export { syncEmailbisonInbox } from "./sync-emailbison-inbox";

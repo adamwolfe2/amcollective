@@ -1,5 +1,5 @@
 /**
- * Outreach Schema — EmailBison campaign data + webhook events
+ * Outreach Schema — EmailBison campaign data, webhook events, and inbox replies
  */
 
 import {
@@ -60,5 +60,35 @@ export const outreachEvents = pgTable(
     index("outreach_events_type_idx").on(table.eventType),
     index("outreach_events_campaign_idx").on(table.campaignId),
     index("outreach_events_created_idx").on(table.createdAt),
+  ]
+);
+
+// ─── Inbox Replies ───────────────────────────────────────────────────────────
+
+export const emailbisonReplies = pgTable(
+  "emailbison_replies",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    externalId: integer("external_id").notNull().unique(),
+    campaignId: integer("campaign_id"),
+    campaignName: varchar("campaign_name", { length: 500 }),
+    leadEmail: varchar("lead_email", { length: 500 }).notNull(),
+    leadName: varchar("lead_name", { length: 500 }),
+    senderEmail: varchar("sender_email", { length: 500 }),
+    subject: varchar("subject", { length: 1000 }),
+    body: text("body"),
+    isRead: boolean("is_read").default(false).notNull(),
+    isInterested: boolean("is_interested").default(false).notNull(),
+    receivedAt: timestamp("received_at", { withTimezone: true }),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("emailbison_replies_external_id_idx").on(table.externalId),
+    index("emailbison_replies_lead_email_idx").on(table.leadEmail),
+    index("emailbison_replies_campaign_idx").on(table.campaignId),
+    index("emailbison_replies_received_idx").on(table.receivedAt),
+    index("emailbison_replies_is_read_idx").on(table.isRead),
   ]
 );

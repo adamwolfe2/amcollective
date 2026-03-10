@@ -55,6 +55,28 @@ type OutreachData = {
   dailyActivity: DailyActivity[];
 };
 
+type InboxReply = {
+  id: string;
+  externalId: number;
+  campaignId: number | null;
+  campaignName: string | null;
+  leadEmail: string;
+  leadName: string | null;
+  senderEmail: string | null;
+  subject: string | null;
+  body: string | null;
+  isRead: boolean;
+  isInterested: boolean;
+  receivedAt: string | null;
+  updatedAt: string;
+};
+
+type InboxData = {
+  replies: InboxReply[];
+  total: number;
+  unreadCount: number;
+};
+
 const EVENT_LABELS: Record<string, string> = {
   email_sent: "Sent",
   contact_first_emailed: "First Contact",
@@ -104,9 +126,12 @@ export function OutreachDashboard() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<string | null>(null);
-  const [tab, setTab] = useState<"overview" | "campaigns" | "events">(
+  const [tab, setTab] = useState<"overview" | "campaigns" | "events" | "inbox">(
     "overview"
   );
+  const [inbox, setInbox] = useState<InboxData | null>(null);
+  const [inboxLoading, setInboxLoading] = useState(false);
+  const [actingOn, setActingOn] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/outreach")
@@ -115,6 +140,50 @@ export function OutreachDashboard() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (tab !== "inbox" || inbox) return;
+    setInboxLoading(true);
+    fetch("/api/outreach/inbox")
+      .then((r) => r.json())
+      .then(setInbox)
+      .catch(() => {})
+      .finally(() => setInboxLoading(false));
+  }, [tab, inbox]);
+
+  async function handleInboxAction(replyId: number, action: "mark_read" | "mark_interested") {
+    setActingOn(replyId);
+    try {
+      await fetch("/api/outreach/inbox", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ replyId, action }),
+      });
+      // Optimistically update local state
+      setInbox((prev) =>
+        prev
+          ? {
+              ...prev,
+              replies: prev.replies.map((r) =>
+                r.externalId === replyId
+                  ? {
+                      ...r,
+                      isRead: action === "mark_read" ? true : r.isRead,
+                      isInterested: action === "mark_interested" ? true : r.isInterested,
+                    }
+                  : r
+              ),
+              unreadCount:
+                action === "mark_read"
+                  ? Math.max(0, prev.unreadCount - 1)
+                  : prev.unreadCount,
+            }
+          : prev
+      );
+    } finally {
+      setActingOn(null);
+    }
+  }
 
   async function handleSync() {
     setSyncing(true);
@@ -170,17 +239,22 @@ export function OutreachDashboard() {
       {/* Tabs + Sync */}
       <div className="flex items-center justify-between">
         <div className="flex gap-0 border border-[#0A0A0A]">
-          {(["overview", "campaigns", "events"] as const).map((t) => (
+          {(["overview", "campaigns", "events", "inbox"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors ${
+              className={`px-4 py-2 font-mono text-xs uppercase tracking-wider transition-colors relative ${
                 tab === t
                   ? "bg-[#0A0A0A] text-white"
                   : "bg-white text-[#0A0A0A]/60 hover:bg-[#0A0A0A]/5"
               }`}
             >
               {t}
+              {t === "inbox" && inbox && inbox.unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white font-mono text-[9px] w-4 h-4 flex items-center justify-center rounded-full">
+                  {inbox.unreadCount > 9 ? "9+" : inbox.unreadCount}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -488,6 +562,143 @@ export function OutreachDashboard() {
               </tbody>
             </table>
           </div>
+        </div>
+      )}
+
+      {/* Inbox Tab */}
+      {tab === "inbox" && (
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-mono text-xs text-[#0A0A0A]/50">
+                {inbox
+                  ? `${inbox.total} replies total · ${inbox.unreadCount} unread`
+                  : "Loading..."}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setInbox(null);
+                setInboxLoading(true);
+                fetch("/api/outreach/inbox")
+                  .then((r) => r.json())
+                  .then(setInbox)
+                  .catch(() => {})
+                  .finally(() => setInboxLoading(false));
+              }}
+              className="px-3 py-1.5 font-mono text-xs uppercase tracking-wider border border-[#0A0A0A]/20 hover:bg-[#0A0A0A]/5 transition-colors"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {inboxLoading && (
+            <div className="py-12 text-center">
+              <p className="font-mono text-xs text-[#0A0A0A]/40">
+                Loading inbox...
+              </p>
+            </div>
+          )}
+
+          {!inboxLoading && inbox && inbox.replies.length === 0 && (
+            <div className="border border-[#0A0A0A] bg-white py-16 text-center">
+              <p className="font-mono text-xs text-[#0A0A0A]/30">
+                No replies synced yet. The inbox syncs every 15 minutes via Inngest.
+              </p>
+            </div>
+          )}
+
+          {!inboxLoading && inbox && inbox.replies.length > 0 && (
+            <div className="border border-[#0A0A0A] bg-white divide-y divide-[#0A0A0A]/5">
+              {inbox.replies.map((reply) => (
+                <div
+                  key={reply.id}
+                  className={`p-4 transition-colors ${
+                    reply.isRead
+                      ? "bg-white"
+                      : "bg-[#0A0A0A]/[0.015] border-l-2 border-[#0A0A0A]"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-serif text-sm font-medium truncate">
+                          {reply.leadName ?? reply.leadEmail}
+                        </span>
+                        {!reply.isRead && (
+                          <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider bg-[#0A0A0A] text-white px-1.5 py-0.5">
+                            New
+                          </span>
+                        )}
+                        {reply.isInterested && (
+                          <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider bg-emerald-600 text-white px-1.5 py-0.5">
+                            Interested
+                          </span>
+                        )}
+                      </div>
+                      {reply.leadName && (
+                        <p className="font-mono text-[10px] text-[#0A0A0A]/40">
+                          {reply.leadEmail}
+                        </p>
+                      )}
+                      {reply.subject && (
+                        <p className="font-mono text-xs text-[#0A0A0A]/60 truncate">
+                          Re: {reply.subject}
+                        </p>
+                      )}
+                      {reply.body && (
+                        <p className="font-mono text-xs text-[#0A0A0A]/70 line-clamp-2 leading-relaxed">
+                          {reply.body}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-3 pt-0.5">
+                        {reply.campaignName && (
+                          <span className="font-mono text-[10px] text-[#0A0A0A]/30">
+                            {reply.campaignName}
+                          </span>
+                        )}
+                        {reply.senderEmail && (
+                          <span className="font-mono text-[10px] text-[#0A0A0A]/30">
+                            via {reply.senderEmail}
+                          </span>
+                        )}
+                        {reply.receivedAt && (
+                          <span className="font-mono text-[10px] text-[#0A0A0A]/30">
+                            {formatDistanceToNow(new Date(reply.receivedAt), {
+                              addSuffix: true,
+                            })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 shrink-0">
+                      {!reply.isRead && (
+                        <button
+                          onClick={() => handleInboxAction(reply.externalId, "mark_read")}
+                          disabled={actingOn === reply.externalId}
+                          className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider border border-[#0A0A0A]/20 hover:bg-[#0A0A0A]/5 transition-colors disabled:opacity-50"
+                        >
+                          Mark Read
+                        </button>
+                      )}
+                      {!reply.isInterested && (
+                        <button
+                          onClick={() => handleInboxAction(reply.externalId, "mark_interested")}
+                          disabled={actingOn === reply.externalId}
+                          className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider border border-emerald-600 text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                        >
+                          Interested
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
