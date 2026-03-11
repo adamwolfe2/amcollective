@@ -36,6 +36,10 @@ import {
   Zap,
   KeyRound,
   Package,
+  Star,
+  FileSignature,
+  Clock,
+  Mail,
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { CompanySwitcher } from "@/components/company-switcher";
@@ -49,7 +53,9 @@ const NAV_ITEMS = [
   { label: "Products", href: "/products", icon: Package },
   { label: "Projects", href: "/projects", icon: FolderKanban },
   { label: "Tasks", href: "/tasks", icon: ListTodo },
+  { label: "Time", href: "/time", icon: Clock },
   { label: "Contracts", href: "/contracts", icon: FileCheck },
+  { label: "Proposals", href: "/proposals", icon: FileSignature },
   { label: "Invoices", href: "/invoices", icon: Receipt },
   { label: "Services", href: "/services", icon: Briefcase },
   { label: "Team", href: "/team", icon: UserCog },
@@ -61,8 +67,10 @@ const NAV_ITEMS = [
   { label: "Rocks", href: "/rocks", icon: Target },
   { label: "Forecast", href: "/forecast", icon: TrendingUp },
   { label: "Analytics", href: "/analytics", icon: LineChart },
+  { label: "NPS", href: "/nps", icon: Star },
   { label: "Scorecard", href: "/scorecard", icon: BarChart3 },
   { label: "Messages", href: "/messages", icon: MessageSquare },
+  { label: "Email", href: "/email", icon: Mail },
   { label: "Outreach", href: "/outreach", icon: Send },
   { label: "AI", href: "/ai", icon: Sparkles },
   { label: "Alerts", href: "/alerts", icon: Bell },
