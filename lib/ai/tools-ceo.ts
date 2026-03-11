@@ -675,6 +675,87 @@ export const CEO_TOOL_DEFINITIONS: Anthropic.Tool[] = [
       required: ["action"],
     },
   },
+  {
+    name: "draft_cold_email",
+    description:
+      "Write a cold email (or full sequence) for a specific campaign using that campaign's knowledge base (ICP, value prop, proof, tone). Use when asked to 'write a cold email', 'draft outreach for [campaign]', 'write an email to [prospect]', or 'generate a follow-up'. Loads campaign knowledge automatically.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        campaignName: { type: "string", description: "Campaign name or partial match to look up knowledge base" },
+        campaignId: { type: "number", description: "Exact EmailBison campaign ID if known" },
+        prospectName: { type: "string", description: "Prospect's full name" },
+        prospectRole: { type: "string", description: "Prospect's job title/role" },
+        prospectCompany: { type: "string", description: "Prospect's company name" },
+        signals: {
+          type: "array",
+          items: { type: "string" },
+          description: "Research signals: funding rounds, hiring patterns, LinkedIn posts, news, tech stack. Each as a short string.",
+        },
+        customAngle: { type: "string", description: "Custom observation or angle to lead with for this specific prospect" },
+        emailType: {
+          type: "string",
+          enum: ["initial", "followup-1", "followup-2", "followup-3", "breakup"],
+          description: "Which email in the sequence. Default: initial.",
+        },
+        instruction: { type: "string", description: "Optional extra instruction — 'make it shorter', 'focus on the ROI angle', etc." },
+        fullSequence: { type: "boolean", description: "If true, draft all 5 emails in the sequence at once (initial + 4 follow-ups)" },
+        useHighQuality: { type: "boolean", description: "Use Sonnet for higher quality drafts (slower). Default: false (Haiku)." },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "set_campaign_knowledge",
+    description:
+      "Set or update the knowledge base for an outreach campaign — ICP, value prop, proof points, tone profile, copy guidelines, and email templates. Use when Adam says 'update the knowledge base for [campaign]', 'add proof points to [campaign]', 'set the ICP for [campaign]', or 'store these templates'. This powers the AI email drafting for that campaign.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        campaignName: { type: "string", description: "Campaign name (partial match OK)" },
+        campaignId: { type: "number", description: "Exact EmailBison campaign ID if known" },
+        productName: { type: "string", description: "Product or service being promoted in this campaign" },
+        valueProp: { type: "string", description: "One-sentence value proposition for this campaign" },
+        toneProfile: {
+          type: "string",
+          enum: ["c-suite", "mid-level", "technical", "founder"],
+          description: "Tone calibration based on audience seniority",
+        },
+        icp: {
+          type: "object",
+          description: "Ideal Customer Profile",
+          properties: {
+            roles: { type: "array", items: { type: "string" }, description: "Target job titles" },
+            industries: { type: "array", items: { type: "string" }, description: "Target industries" },
+            companySizes: { type: "array", items: { type: "string" }, description: "Target company sizes" },
+            painPoints: { type: "array", items: { type: "string" }, description: "Core pain points this campaign addresses" },
+          },
+        },
+        proof: {
+          type: "array",
+          description: "Case studies and social proof",
+          items: {
+            type: "object",
+            properties: {
+              company: { type: "string" },
+              result: { type: "string" },
+              metric: { type: "string" },
+            },
+          },
+        },
+        copyGuidelines: {
+          type: "object",
+          description: "Approved angles and banned phrases",
+          properties: {
+            use: { type: "array", items: { type: "string" } },
+            avoid: { type: "array", items: { type: "string" } },
+          },
+        },
+        notes: { type: "string", description: "Free-form notes — competitor positioning, objections, context" },
+      },
+      required: [],
+    },
+  },
   // ─── Strategy ──────────────────────────────────────────────────────────────
   {
     name: "dismiss_recommendation",
@@ -2053,6 +2134,145 @@ export async function executeCeoTool(
         }
 
         return JSON.stringify({ success: true, campaignId, campaignName, action, newStatus });
+      }
+
+      // ─── Outreach — AI email drafting ────────────────────────────────────────
+
+      case "draft_cold_email": {
+        const { draftColdEmail, draftFullSequence } = await import("@/lib/ai/agents/outreach-agent");
+
+        // Find campaign and load knowledge base
+        let campaign: { externalId: number; name: string; knowledgeBase: unknown } | undefined;
+        if (input.campaignId) {
+          const [c] = await db
+            .select({ externalId: schema.outreachCampaigns.externalId, name: schema.outreachCampaigns.name, knowledgeBase: schema.outreachCampaigns.knowledgeBase })
+            .from(schema.outreachCampaigns)
+            .where(eq(schema.outreachCampaigns.externalId, input.campaignId as number))
+            .limit(1);
+          campaign = c ?? undefined;
+        } else if (input.campaignName) {
+          const [c] = await db
+            .select({ externalId: schema.outreachCampaigns.externalId, name: schema.outreachCampaigns.name, knowledgeBase: schema.outreachCampaigns.knowledgeBase })
+            .from(schema.outreachCampaigns)
+            .where(ilike(schema.outreachCampaigns.name, `%${input.campaignName as string}%`))
+            .limit(1);
+          campaign = c ?? undefined;
+        }
+
+        const knowledgeBase = (campaign?.knowledgeBase as import("@/lib/db/schema/outreach").CampaignKnowledgeBase | null) ?? null;
+        if (!knowledgeBase) {
+          return JSON.stringify({
+            error: `No knowledge base found for campaign "${input.campaignName ?? input.campaignId}". Set one first using set_campaign_knowledge.`,
+            tip: "Use set_campaign_knowledge to define ICP, value prop, proof points, and tone for this campaign.",
+          });
+        }
+
+        const prospect = {
+          fullName: input.prospectName as string | undefined,
+          role: input.prospectRole as string | undefined,
+          company: input.prospectCompany as string | undefined,
+          signals: input.signals as string[] | undefined,
+          customAngle: input.customAngle as string | undefined,
+        };
+
+        const campaignName = campaign?.name ?? (input.campaignName as string) ?? "Unknown";
+
+        if (input.fullSequence) {
+          const drafts = await draftFullSequence(
+            campaignName,
+            knowledgeBase,
+            prospect,
+            (input.useHighQuality as boolean) ?? false
+          );
+          return JSON.stringify({
+            campaign: campaignName,
+            prospect: prospect.fullName ?? "Prospect",
+            sequence: drafts.map((d, i) => ({
+              step: i + 1,
+              type: ["initial", "followup-1", "followup-2", "followup-3", "breakup"][i],
+              subjectLine: d.subjectLine,
+              body: d.body,
+            })),
+          });
+        }
+
+        const draft = await draftColdEmail({
+          campaignName,
+          knowledgeBase,
+          prospect,
+          emailType: (input.emailType as "initial" | "followup-1" | "followup-2" | "followup-3" | "breakup") ?? "initial",
+          instruction: input.instruction as string | undefined,
+          useHighQuality: (input.useHighQuality as boolean) ?? false,
+        });
+
+        return JSON.stringify({
+          campaign: campaignName,
+          prospect: prospect.fullName ?? "Prospect",
+          subjectLine: draft.subjectLine,
+          body: draft.body,
+          reasoning: draft.reasoning,
+          warnings: draft.warnings?.length ? draft.warnings : undefined,
+        });
+      }
+
+      case "set_campaign_knowledge": {
+        type CampaignKB = import("@/lib/db/schema/outreach").CampaignKnowledgeBase;
+
+        // Find campaign
+        let campaign: { id: string; externalId: number; name: string; knowledgeBase: unknown } | undefined;
+        if (input.campaignId) {
+          const [c] = await db
+            .select({ id: schema.outreachCampaigns.id, externalId: schema.outreachCampaigns.externalId, name: schema.outreachCampaigns.name, knowledgeBase: schema.outreachCampaigns.knowledgeBase })
+            .from(schema.outreachCampaigns)
+            .where(eq(schema.outreachCampaigns.externalId, input.campaignId as number))
+            .limit(1);
+          campaign = c ?? undefined;
+        } else if (input.campaignName) {
+          const [c] = await db
+            .select({ id: schema.outreachCampaigns.id, externalId: schema.outreachCampaigns.externalId, name: schema.outreachCampaigns.name, knowledgeBase: schema.outreachCampaigns.knowledgeBase })
+            .from(schema.outreachCampaigns)
+            .where(ilike(schema.outreachCampaigns.name, `%${input.campaignName as string}%`))
+            .limit(1);
+          campaign = c ?? undefined;
+        }
+
+        if (!campaign) {
+          return JSON.stringify({ error: `Campaign "${input.campaignName ?? input.campaignId}" not found. Check /outreach for campaign names.` });
+        }
+
+        // Merge with existing knowledge base (partial updates supported)
+        const existing = (campaign.knowledgeBase as CampaignKB | null) ?? ({} as CampaignKB);
+        const updated: CampaignKB = Object.assign({}, existing, {
+          ...(input.productName ? { productName: input.productName as string } : {}),
+          ...(input.valueProp ? { valueProp: input.valueProp as string } : {}),
+          ...(input.toneProfile ? { toneProfile: input.toneProfile as CampaignKB["toneProfile"] } : {}),
+          ...(input.icp ? { icp: input.icp as CampaignKB["icp"] } : {}),
+          ...(input.proof ? { proof: input.proof as CampaignKB["proof"] } : {}),
+          ...(input.copyGuidelines ? { copyGuidelines: input.copyGuidelines as CampaignKB["copyGuidelines"] } : {}),
+          ...(input.notes ? { notes: input.notes as string } : {}),
+          updatedAt: new Date().toISOString(),
+        });
+
+        // Validate required fields for drafting
+        const missingForDrafting: string[] = [];
+        if (!updated.productName) missingForDrafting.push("productName");
+        if (!updated.valueProp) missingForDrafting.push("valueProp");
+        if (!updated.toneProfile) missingForDrafting.push("toneProfile");
+        if (!updated.icp) missingForDrafting.push("icp");
+        if (!updated.proof?.length) missingForDrafting.push("proof (at least one case study)");
+
+        await db
+          .update(schema.outreachCampaigns)
+          .set({ knowledgeBase: updated, updatedAt: new Date() })
+          .where(eqOp(schema.outreachCampaigns.id, campaign.id));
+
+        return JSON.stringify({
+          updated: true,
+          campaign: campaign.name,
+          readyToDraft: missingForDrafting.length === 0,
+          missingForDrafting: missingForDrafting.length ? missingForDrafting : undefined,
+          knowledgeBase: updated,
+        });
       }
 
       // ─── Strategy ────────────────────────────────────────────────────────────

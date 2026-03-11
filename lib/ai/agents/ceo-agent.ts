@@ -147,8 +147,8 @@ const TOOL_MODULES: Array<{ keywords: string[]; toolNames: string[] }> = [
     toolNames: ["create_meeting", "add_meeting_note"],
   },
   {
-    keywords: ["outreach", "cold email", "campaign", "emailbison", "email campaign", "pause campaign", "resume campaign", "sender", "reply rate", "open rate", "bounce"],
-    toolNames: ["get_outreach_snapshot", "toggle_campaign"],
+    keywords: ["outreach", "cold email", "campaign", "emailbison", "email campaign", "pause campaign", "resume campaign", "sender", "reply rate", "open rate", "bounce", "draft email", "write email", "write an email", "draft outreach", "knowledge base", "icp", "value prop", "proof point", "email sequence", "follow-up", "followup", "breakup email"],
+    toolNames: ["get_outreach_snapshot", "toggle_campaign", "draft_cold_email", "set_campaign_knowledge"],
   },
   {
     keywords: ["recommendation", "strategy rec", "dismiss", "handled that", "already done", "mark in progress", "that suggestion", "strategy suggestion"],
@@ -297,6 +297,8 @@ When Adam gives you a command, execute it immediately using the correct tool. Ne
 **Outreach**
 - \`get_outreach_snapshot\` — "how is outreach going?", "what's the campaign performance?", "reply rate?"
 - \`toggle_campaign\` — "pause the [campaign] campaign", "resume outreach for [name]"
+- \`draft_cold_email\` — "write a cold email to [prospect] for [campaign]", "draft outreach for [name]", "write a follow-up for [campaign]", "generate a full sequence". Requires knowledge base set on campaign. Pass all signals/research you have. Set fullSequence:true for all 5 emails at once.
+- \`set_campaign_knowledge\` — "set the ICP for [campaign]", "add proof points to [campaign]", "update the knowledge base for [campaign]", "store our value prop for [campaign]". Always call this before attempting to draft emails for a new campaign. Supports partial updates — only pass what changed.
 
 **Strategy**
 - \`dismiss_recommendation\` — "dismiss that", "we already handled [rec]", "mark that recommendation done"

@@ -2,6 +2,48 @@
  * Outreach Schema — EmailBison campaign data, webhook events, and inbox replies
  */
 
+// ─── Campaign Knowledge Base Type ───────────────────────────────────────────
+// Stored as JSONB on outreach_campaigns.knowledge_base
+// Used by the outreach agent to write campaign-specific cold emails
+
+export interface CampaignKnowledgeBase {
+  /** Product or service being promoted */
+  productName: string;
+  /** One-sentence value proposition */
+  valueProp: string;
+  /** Ideal Customer Profile — who this campaign targets */
+  icp: {
+    roles: string[];          // e.g. ["VP of Sales", "Head of RevOps"]
+    industries: string[];     // e.g. ["B2B SaaS", "Professional Services"]
+    companySizes: string[];   // e.g. ["50-200 employees", "Series A-B"]
+    painPoints: string[];     // core problems they experience
+  };
+  /** Tone calibration based on audience seniority */
+  toneProfile: "c-suite" | "mid-level" | "technical" | "founder";
+  /** Social proof — case studies, metrics, credibility signals */
+  proof: Array<{
+    company?: string;
+    result: string;           // e.g. "Reduced onboarding time by 40%"
+    metric?: string;          // e.g. "$120K saved in year 1"
+  }>;
+  /** Approved copy guidelines and phrases to use/avoid */
+  copyGuidelines?: {
+    use?: string[];           // phrases, angles, hooks that work
+    avoid?: string[];         // banned phrases, jargon, tired lines
+  };
+  /** Approved email templates — initial touch + follow-up sequence */
+  templates?: Array<{
+    step: number;             // 1 = initial, 2-5 = follow-ups
+    label: string;            // e.g. "Initial", "Follow-up 1 — Case Study"
+    subjectLine: string;
+    body: string;
+    notes?: string;           // when/how to use this template
+  }>;
+  /** Free-form notes — competitor positioning, objections, context */
+  notes?: string;
+  updatedAt?: string;
+}
+
 import {
   pgTable,
   uuid,
@@ -31,6 +73,9 @@ export const outreachCampaigns = pgTable(
     bounced: integer("bounced").default(0),
     unsubscribed: integer("unsubscribed").default(0),
     metadata: jsonb("metadata"),
+    // Per-campaign cold email knowledge base — set via CEO agent or UI
+    // Shape: CampaignKnowledgeBase (see lib/ai/agents/outreach-agent.ts)
+    knowledgeBase: jsonb("knowledge_base").$type<CampaignKnowledgeBase>(),
     lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
