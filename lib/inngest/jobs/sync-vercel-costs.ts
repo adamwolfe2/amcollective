@@ -48,16 +48,52 @@ export const syncVercelCosts = inngest.createFunction(
       return created;
     });
 
-    // Step 2: Fetch projects from Vercel
-    const projectsResult = await step.run("fetch-vercel-projects", async () => {
-      return vercelConnector.getProjects();
-    });
+    // Step 2: Fetch projects + team usage in parallel
+    const [projectsResult, usageResult, activityResult] = await step.run(
+      "fetch-vercel-data",
+      async () =>
+        Promise.all([
+          vercelConnector.getProjects(),
+          vercelConnector.getUsage(),
+          vercelConnector.getPortfolioActivity(),
+        ])
+    );
 
     if (!projectsResult.success || !projectsResult.data) {
       return { success: false, error: projectsResult.error };
     }
 
-    // Step 3: For each project, match to portfolio project and record cost
+    // Calculate team-level overage costs (Vercel Pro plan inclusions)
+    // Pro includes: 1 TB bandwidth, 6000 build minutes, 1M function invocations/month
+    const usage = usageResult.data;
+    const BANDWIDTH_INCLUDED_BYTES = 1_000_000_000_000; // 1 TB
+    const BUILD_MINS_INCLUDED = 6_000;
+    const INVOCATIONS_INCLUDED = 1_000_000;
+
+    const bandwidthOverageBytes = Math.max(
+      0,
+      (usage?.bandwidthBytes ?? 0) - BANDWIDTH_INCLUDED_BYTES
+    );
+    const buildMinsOverage = Math.max(
+      0,
+      (usage?.buildMinutes ?? 0) - BUILD_MINS_INCLUDED
+    );
+    const invocationsOverage = Math.max(
+      0,
+      (usage?.functionInvocations ?? 0) - INVOCATIONS_INCLUDED
+    );
+
+    // Overage pricing: $0.15/GB bandwidth, $0.40/hr build, $0.60/1M invocations
+    const totalOverageCents = Math.round(
+      (bandwidthOverageBytes / 1e9) * 15 +
+        (buildMinsOverage / 60) * 40 +
+        (invocationsOverage / 1_000_000) * 60
+    );
+
+    // Distribute costs proportionally by deploy count across known projects
+    const activities = activityResult.data?.projects ?? [];
+    const totalDeploys = activities.reduce((s, a) => s + a.totalDeploys, 0);
+
     const now = new Date();
     const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -73,11 +109,18 @@ export const syncVercelCosts = inngest.createFunction(
           .where(eq(schema.portfolioProjects.vercelProjectId, vProject.id))
           .limit(1);
 
-        // Record the cost entry (even without a portfolio match)
+        // Proportional overage cost based on this project's deploy share
+        const projectActivity = activities.find((a) => a.projectId === vProject.id);
+        const deployShare =
+          totalDeploys > 0 && projectActivity
+            ? projectActivity.totalDeploys / totalDeploys
+            : 1 / Math.max(projectsResult.data!.length, 1);
+        const projectCostCents = Math.round(totalOverageCents * deployShare);
+
         await db.insert(schema.toolCosts).values({
           toolAccountId: toolAccount.id,
           projectId: portfolio?.id || null,
-          amount: 0, // Vercel doesn't expose per-project costs easily; usage is tracked instead
+          amount: projectCostCents,
           period: "monthly",
           periodStart: periodStart,
           periodEnd: periodEnd,
@@ -85,6 +128,12 @@ export const syncVercelCosts = inngest.createFunction(
             vercelProjectId: vProject.id,
             vercelProjectName: vProject.name,
             framework: vProject.framework,
+            teamBandwidthBytes: usage?.bandwidthBytes ?? 0,
+            teamBuildMinutes: usage?.buildMinutes ?? 0,
+            teamInvocations: usage?.functionInvocations ?? 0,
+            teamOverageCents: totalOverageCents,
+            projectDeployShare: Math.round(deployShare * 100) / 100,
+            projectDeploys: projectActivity?.totalDeploys ?? 0,
           },
         });
 

@@ -66,17 +66,33 @@ export const syncNeonUsage = inngest.createFunction(
           neonConnector.getDatabaseSize(nProject.id),
         ]);
 
+        // Calculate actual cost from Neon usage data
+        // Neon Launch pricing: compute $0.16/CU-hr, storage $0.021/GiB-mo, transfer $0.09/GiB
+        const usage = usageResult.data;
+        const sizeBytes = sizeResult.data?.sizeBytes ?? 0;
+        const computeCostCents = usage
+          ? Math.round((usage.compute_time_seconds / 3600) * 16)
+          : 0;
+        const storageCostCents = Math.round((sizeBytes / (1024 ** 3)) * 2.1);
+        const transferCostCents = usage
+          ? Math.round((usage.data_transfer_bytes / (1024 ** 3)) * 9)
+          : 0;
+        const totalCostCents = computeCostCents + storageCostCents + transferCostCents;
+
         await db.insert(schema.toolCosts).values({
           toolAccountId: toolAccount.id,
-          amount: 0, // Neon pricing is compute-hour based; tracked in metadata
+          amount: totalCostCents,
           period: "monthly",
           periodStart: periodStart,
           periodEnd: periodEnd,
           metadata: {
             neonProjectId: nProject.id,
             neonProjectName: nProject.name,
-            usage: usageResult.data ?? null,
+            usage: usage ?? null,
             sizeMB: sizeResult.data?.sizeMB ?? null,
+            computeCostCents,
+            storageCostCents,
+            transferCostCents,
           },
         });
 

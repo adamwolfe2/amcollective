@@ -15,7 +15,7 @@ async function getCommandCenterMetrics() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
   const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
 
-  const [accounts, mrrResult, activeSubs, toolCostResult, spendResult] =
+  const [accounts, mrrResult, activeSubs, toolCostResult, aiCostResult, spendResult] =
     await Promise.all([
       db.select({ balance: schema.mercuryAccounts.balance }).from(schema.mercuryAccounts),
       stripeConnector.getMRR(),
@@ -27,6 +27,10 @@ async function getCommandCenterMetrics() {
         .select({ total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)` })
         .from(schema.toolCosts)
         .where(gte(schema.toolCosts.createdAt, monthStart)),
+      db
+        .select({ total: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)` })
+        .from(schema.apiUsage)
+        .where(gte(schema.apiUsage.createdAt, monthStart)),
       db
         .select({ totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)` })
         .from(schema.mercuryTransactions)
@@ -49,7 +53,8 @@ async function getCommandCenterMetrics() {
   }, 0);
 
   const toolBurn = Number(toolCostResult[0]?.total ?? 0);
-  const totalMonthlyBurn = subscriptionBurn + toolBurn;
+  const aiApiBurn = Number(aiCostResult[0]?.total ?? 0);
+  const totalMonthlyBurn = subscriptionBurn + toolBurn + aiApiBurn;
   const monthlySpend = Number(spendResult[0]?.totalSpend ?? 0) / 2;
   const runway = monthlySpend > 0 ? totalCash / monthlySpend : null;
 
@@ -58,11 +63,33 @@ async function getCommandCenterMetrics() {
     mrr,
     subscriptionBurn,
     toolBurn,
+    aiApiBurn,
     totalMonthlyBurn,
     net: mrr * 100 - totalMonthlyBurn, // in cents
     runway,
     monthlySpend,
   };
+}
+
+async function getAiUsageBreakdown() {
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  return db
+    .select({
+      agent: sql<string>`COALESCE(${schema.apiUsage.metadata}->>'agent', 'unknown')`,
+      model: sql<string>`COALESCE(${schema.apiUsage.metadata}->>'model', 'unknown')`,
+      calls: sql<number>`COUNT(*)`,
+      tokens: sql<number>`COALESCE(SUM(${schema.apiUsage.tokensUsed}), 0)`,
+      cost: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
+    })
+    .from(schema.apiUsage)
+    .where(gte(schema.apiUsage.createdAt, monthStart))
+    .groupBy(
+      sql`${schema.apiUsage.metadata}->>'agent'`,
+      sql`${schema.apiUsage.metadata}->>'model'`
+    )
+    .orderBy(desc(sql`COALESCE(SUM(${schema.apiUsage.cost}), 0)`));
 }
 
 async function getUpcomingCharges() {
@@ -213,6 +240,7 @@ export default async function CostsPage() {
     projectCosts,
     clientMargins,
     costTrend,
+    aiUsage,
   ] = await Promise.all([
     getCommandCenterMetrics(),
     getUpcomingCharges(),
@@ -221,6 +249,7 @@ export default async function CostsPage() {
     getPerProjectCosts(),
     getClientMargins(),
     getCostTrend(),
+    getAiUsageBreakdown(),
   ]);
 
   // Serialize subscriptions for client component (dates → ISO strings)
@@ -293,7 +322,8 @@ export default async function CostsPage() {
             {formatCents(metrics.totalMonthlyBurn)}
           </p>
           <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-1">
-            Subs + Tools
+            {formatCents(metrics.subscriptionBurn)} subs
+            {metrics.aiApiBurn > 0 ? ` · ${formatCents(metrics.aiApiBurn)} AI` : ""}
           </p>
         </div>
 
@@ -576,6 +606,57 @@ export default async function CostsPage() {
                     </td>
                   </tr>
                 ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ── AI API Usage (This Month) ── */}
+      <div className="mb-8">
+        <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
+          AI API Usage (This Month)
+        </h2>
+        <div className="border border-[#0A0A0A]/10 bg-white overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-[#0A0A0A]/10">
+                <th className="text-left px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">Agent</th>
+                <th className="text-left px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">Model</th>
+                <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">Calls</th>
+                <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">Tokens</th>
+                <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">Cost</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#0A0A0A]/5">
+              {aiUsage.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="px-5 py-8 text-center text-[#0A0A0A]/40 font-serif">
+                    No AI usage this month yet.
+                  </td>
+                </tr>
+              ) : (
+                aiUsage.map((row, i) => (
+                  <tr key={i} className="hover:bg-[#F3F3EF]/50">
+                    <td className="px-5 py-3 font-serif text-sm">{row.agent}</td>
+                    <td className="px-5 py-3 font-mono text-xs text-[#0A0A0A]/50">
+                      {row.model.replace("claude-", "").replace(/-\d{8}$/, "")}
+                    </td>
+                    <td className="px-5 py-3 text-right font-mono text-sm">{Number(row.calls).toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right font-mono text-sm">{Number(row.tokens).toLocaleString()}</td>
+                    <td className="px-5 py-3 text-right font-mono text-sm font-bold">
+                      {Number(row.cost) === 0 ? "<$0.01" : formatCents(Number(row.cost))}
+                    </td>
+                  </tr>
+                ))
+              )}
+              {aiUsage.length > 0 && (
+                <tr className="border-t border-[#0A0A0A]/10 bg-[#F3F3EF]/30">
+                  <td colSpan={4} className="px-5 py-3 font-mono text-xs text-[#0A0A0A]/50 uppercase">Total</td>
+                  <td className="px-5 py-3 text-right font-mono text-sm font-bold">
+                    {metrics.aiApiBurn === 0 ? "<$0.01" : formatCents(metrics.aiApiBurn)}
+                  </td>
+                </tr>
               )}
             </tbody>
           </table>
