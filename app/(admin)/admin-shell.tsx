@@ -40,6 +40,7 @@ import {
   FileSignature,
   Clock,
   Mail,
+  BrainCircuit,
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { CompanySwitcher } from "@/components/company-switcher";
@@ -67,6 +68,7 @@ const NAV_ITEMS = [
   { label: "Rocks", href: "/rocks", icon: Target },
   { label: "Forecast", href: "/forecast", icon: TrendingUp },
   { label: "Analytics", href: "/analytics", icon: LineChart },
+  { label: "Intelligence", href: "/intelligence", icon: BrainCircuit },
   { label: "NPS", href: "/nps", icon: Star },
   { label: "Scorecard", href: "/scorecard", icon: BarChart3 },
   { label: "Messages", href: "/messages", icon: MessageSquare },
