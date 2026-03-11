@@ -111,6 +111,9 @@ export const subscriptionCosts = pgTable(
     name: varchar("name", { length: 255 }).notNull(),
     vendor: varchar("vendor", { length: 255 }).notNull(),
     companyTag: companyTagEnum("company_tag").notNull().default("am_collective"),
+    projectId: uuid("project_id").references(() => portfolioProjects.id, {
+      onDelete: "set null",
+    }),
     amount: integer("amount").notNull(), // cents
     billingCycle: varchar("billing_cycle", { length: 20 }).notNull().default("monthly"), // monthly | annual
     nextRenewal: date("next_renewal", { mode: "date" }),
@@ -126,6 +129,7 @@ export const subscriptionCosts = pgTable(
   },
   (table) => [
     index("subscription_costs_company_tag_idx").on(table.companyTag),
+    index("subscription_costs_project_id_idx").on(table.projectId),
     index("subscription_costs_is_active_idx").on(table.isActive),
     index("subscription_costs_next_renewal_idx").on(table.nextRenewal),
     uniqueIndex("subscription_costs_stripe_sub_id_idx").on(table.stripeSubscriptionId),
@@ -248,6 +252,13 @@ export const cashSnapshots = pgTable(
 );
 
 // ─── Relations ──────────────────────────────────────────────────────────────
+
+export const subscriptionCostsRelations = relations(subscriptionCosts, ({ one }) => ({
+  project: one(portfolioProjects, {
+    fields: [subscriptionCosts.projectId],
+    references: [portfolioProjects.id],
+  }),
+}));
 
 export const toolAccountsRelations = relations(toolAccounts, ({ many }) => ({
   toolCosts: many(toolCosts),

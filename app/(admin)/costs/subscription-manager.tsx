@@ -15,11 +15,17 @@ export type SubscriptionRow = {
   name: string;
   vendor: string;
   companyTag: string;
+  projectId: string | null;
   amount: number; // cents
   billingCycle: string;
   nextRenewal: string | null; // ISO string
   category: string | null;
   notes: string | null;
+};
+
+export type ProjectOption = {
+  id: string;
+  name: string;
 };
 
 const COMPANY_TAGS = [
@@ -53,11 +59,13 @@ function fmt(cents: number) {
 
 function SubForm({
   initial,
+  projects,
   onSave,
   onCancel,
   isPending,
 }: {
   initial?: SubscriptionRow;
+  projects: ProjectOption[];
   onSave: (input: SubscriptionInput) => void;
   onCancel: () => void;
   isPending: boolean;
@@ -67,6 +75,7 @@ function SubForm({
   const [companyTag, setCompanyTag] = useState(
     initial?.companyTag ?? "am_collective"
   );
+  const [projectId, setProjectId] = useState(initial?.projectId ?? "");
   const [amountStr, setAmountStr] = useState(
     initial ? String((initial.amount / 100).toFixed(2)) : ""
   );
@@ -87,6 +96,7 @@ function SubForm({
       name: name.trim(),
       vendor: vendor.trim(),
       companyTag,
+      projectId: projectId || null,
       amountDollars,
       billingCycle,
       nextRenewal: nextRenewal || null,
@@ -137,6 +147,23 @@ function SubForm({
             {COMPANY_TAGS.map((t) => (
               <option key={t} value={t}>
                 {t.replace(/_/g, " ")}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/50 block mb-1">
+            Project
+          </label>
+          <select
+            className={inputCls}
+            value={projectId}
+            onChange={(e) => setProjectId(e.target.value)}
+          >
+            <option value="">-- platform overhead --</option>
+            {projects.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
               </option>
             ))}
           </select>
@@ -231,8 +258,10 @@ function SubForm({
 
 export function SubscriptionManager({
   subscriptions,
+  projects,
 }: {
   subscriptions: SubscriptionRow[];
+  projects: ProjectOption[];
 }) {
   const [isPending, startTransition] = useTransition();
   const [showAddForm, setShowAddForm] = useState(false);
@@ -317,6 +346,7 @@ export function SubscriptionManager({
       {showAddForm && (
         <div className="mb-4">
           <SubForm
+            projects={projects}
             onSave={handleCreate}
             onCancel={() => setShowAddForm(false)}
             isPending={isPending}
@@ -332,7 +362,7 @@ export function SubscriptionManager({
                 Name
               </th>
               <th className="text-left px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
-                Company
+                Project
               </th>
               <th className="text-left px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
                 Category
@@ -373,12 +403,17 @@ export function SubscriptionManager({
                   renewalDate.getTime() - now.getTime() <
                     30 * 24 * 60 * 60 * 1000;
 
+                const projectName = sub.projectId
+                  ? (projects.find((p) => p.id === sub.projectId)?.name ?? "—")
+                  : "platform";
+
                 if (editingId === sub.id) {
                   return (
                     <tr key={sub.id}>
                       <td colSpan={7} className="p-0">
                         <SubForm
                           initial={sub}
+                          projects={projects}
                           onSave={(input) => handleUpdate(sub.id, input)}
                           onCancel={() => setEditingId(null)}
                           isPending={isPending}
@@ -398,7 +433,7 @@ export function SubscriptionManager({
                     </td>
                     <td className="px-5 py-3">
                       <span className="font-mono text-xs px-2 py-0.5 bg-[#0A0A0A]/5 text-[#0A0A0A]/60">
-                        {sub.companyTag.replace(/_/g, " ")}
+                        {projectName}
                       </span>
                     </td>
                     <td className="px-5 py-3 font-mono text-xs text-[#0A0A0A]/50">

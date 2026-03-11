@@ -1,10 +1,10 @@
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { desc, eq, sql, and, gte, asc, lte } from "drizzle-orm";
+import { desc, eq, sql, and, gte, asc, lte, isNotNull } from "drizzle-orm";
 import { formatCents } from "@/lib/stripe/format";
 import { CostTrendChart } from "./cost-trend-chart";
 import { SyncButton } from "./sync-button";
-import { SubscriptionManager } from "./subscription-manager";
+import { SubscriptionManager, type ProjectOption } from "./subscription-manager";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import Link from "next/link";
 
@@ -143,22 +143,67 @@ async function getPerProjectCosts() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
+  const [projects, toolCostRows, subCostRows, aiCostRows] = await Promise.all([
+    db
+      .select({ id: schema.portfolioProjects.id, name: schema.portfolioProjects.name })
+      .from(schema.portfolioProjects)
+      .orderBy(asc(schema.portfolioProjects.name)),
+
+    db
+      .select({
+        projectId: schema.toolCosts.projectId,
+        total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`,
+      })
+      .from(schema.toolCosts)
+      .where(and(isNotNull(schema.toolCosts.projectId), gte(schema.toolCosts.createdAt, monthStart)))
+      .groupBy(schema.toolCosts.projectId),
+
+    db
+      .select({
+        projectId: schema.subscriptionCosts.projectId,
+        total: sql<number>`COALESCE(SUM(
+          CASE WHEN ${schema.subscriptionCosts.billingCycle} = 'annual'
+            THEN ROUND(${schema.subscriptionCosts.amount} / 12.0)
+            ELSE ${schema.subscriptionCosts.amount}
+          END
+        ), 0)`,
+      })
+      .from(schema.subscriptionCosts)
+      .where(and(eq(schema.subscriptionCosts.isActive, true), isNotNull(schema.subscriptionCosts.projectId)))
+      .groupBy(schema.subscriptionCosts.projectId),
+
+    db
+      .select({
+        projectId: schema.apiUsage.projectId,
+        total: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
+      })
+      .from(schema.apiUsage)
+      .where(and(isNotNull(schema.apiUsage.projectId), gte(schema.apiUsage.createdAt, monthStart)))
+      .groupBy(schema.apiUsage.projectId),
+  ]);
+
+  const toolMap = new Map(toolCostRows.map((r) => [r.projectId!, Number(r.total)]));
+  const subMap = new Map(subCostRows.map((r) => [r.projectId!, Number(r.total)]));
+  const aiMap = new Map(aiCostRows.map((r) => [r.projectId!, Number(r.total)]));
+
+  const rows = projects.map((p) => ({
+    projectId: p.id,
+    projectName: p.name,
+    toolCosts: toolMap.get(p.id) ?? 0,
+    subCosts: subMap.get(p.id) ?? 0,
+    aiCosts: aiMap.get(p.id) ?? 0,
+    totalCost: (toolMap.get(p.id) ?? 0) + (subMap.get(p.id) ?? 0) + (aiMap.get(p.id) ?? 0),
+  }));
+
+  rows.sort((a, b) => b.totalCost - a.totalCost);
+  return rows;
+}
+
+async function getPortfolioProjectsList(): Promise<ProjectOption[]> {
   return db
-    .select({
-      projectId: schema.portfolioProjects.id,
-      projectName: schema.portfolioProjects.name,
-      totalCost: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`.as("total_cost"),
-    })
+    .select({ id: schema.portfolioProjects.id, name: schema.portfolioProjects.name })
     .from(schema.portfolioProjects)
-    .leftJoin(
-      schema.toolCosts,
-      and(
-        eq(schema.toolCosts.projectId, schema.portfolioProjects.id),
-        gte(schema.toolCosts.createdAt, monthStart)
-      )
-    )
-    .groupBy(schema.portfolioProjects.id, schema.portfolioProjects.name)
-    .orderBy(desc(sql`total_cost`));
+    .orderBy(asc(schema.portfolioProjects.name));
 }
 
 async function getClientMargins() {
@@ -241,6 +286,7 @@ export default async function CostsPage() {
     clientMargins,
     costTrend,
     aiUsage,
+    portfolioProjects,
   ] = await Promise.all([
     getCommandCenterMetrics(),
     getUpcomingCharges(),
@@ -250,12 +296,14 @@ export default async function CostsPage() {
     getClientMargins(),
     getCostTrend(),
     getAiUsageBreakdown(),
+    getPortfolioProjectsList(),
   ]);
 
   // Serialize subscriptions for client component (dates → ISO strings)
   const serializedSubscriptions = subscriptions.map((sub) => ({
     ...sub,
     amount: Number(sub.amount),
+    projectId: sub.projectId ?? null,
     nextRenewal: sub.nextRenewal ? sub.nextRenewal.toISOString().slice(0, 10) : null,
     createdAt: sub.createdAt.toISOString(),
     updatedAt: sub.updatedAt.toISOString(),
@@ -473,21 +521,13 @@ export default async function CostsPage() {
       )}
 
       {/* ── Subscriptions — CRUD ── */}
-      <SubscriptionManager subscriptions={serializedSubscriptions} />
+      <SubscriptionManager subscriptions={serializedSubscriptions} projects={portfolioProjects} />
 
       {/* ── Per-Project Costs ── */}
       <div className="mb-8">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="font-serif text-lg font-bold text-[#0A0A0A]">
-            Per-Project Costs (This Month)
-          </h2>
-          <Link
-            href="/costs/api-usage"
-            className="font-mono text-xs text-[#0A0A0A]/50 underline underline-offset-2 hover:text-[#0A0A0A]"
-          >
-            AI Usage →
-          </Link>
-        </div>
+        <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
+          Per-Project Costs (This Month)
+        </h2>
         <div className="border border-[#0A0A0A]/10 bg-white overflow-x-auto">
           <table className="w-full">
             <thead>
@@ -496,7 +536,16 @@ export default async function CostsPage() {
                   Project
                 </th>
                 <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
-                  Tool Costs
+                  Subs
+                </th>
+                <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
+                  Tools
+                </th>
+                <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
+                  AI
+                </th>
+                <th className="text-right px-5 py-3 font-mono text-xs uppercase text-[#0A0A0A]/50">
+                  Total
                 </th>
               </tr>
             </thead>
@@ -504,7 +553,7 @@ export default async function CostsPage() {
               {projectCosts.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={2}
+                    colSpan={5}
                     className="px-5 py-8 text-center text-[#0A0A0A]/40 font-serif"
                   >
                     No cost data yet. Run a sync to populate.
@@ -521,8 +570,17 @@ export default async function CostsPage() {
                         {p.projectName}
                       </Link>
                     </td>
-                    <td className="px-5 py-3 text-right font-mono text-sm">
-                      {formatCents(Number(p.totalCost))}
+                    <td className="px-5 py-3 text-right font-mono text-sm text-[#0A0A0A]/60">
+                      {p.subCosts > 0 ? formatCents(p.subCosts) : "—"}
+                    </td>
+                    <td className="px-5 py-3 text-right font-mono text-sm text-[#0A0A0A]/60">
+                      {p.toolCosts > 0 ? formatCents(p.toolCosts) : "—"}
+                    </td>
+                    <td className="px-5 py-3 text-right font-mono text-sm text-[#0A0A0A]/60">
+                      {p.aiCosts > 0 ? formatCents(p.aiCosts) : "—"}
+                    </td>
+                    <td className="px-5 py-3 text-right font-mono text-sm font-bold">
+                      {p.totalCost > 0 ? formatCents(p.totalCost) : "—"}
                     </td>
                   </tr>
                 ))
@@ -530,6 +588,9 @@ export default async function CostsPage() {
             </tbody>
           </table>
         </div>
+        <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-2">
+          Subs = recurring subscriptions attributed to project · Tools = Vercel/Neon overages · AI = Claude API usage
+        </p>
       </div>
 
       {/* ── Client Margins ── */}

@@ -22,6 +22,7 @@ export type SubscriptionInput = {
   name: string;
   vendor: string;
   companyTag: string;
+  projectId: string | null;
   amountDollars: number;
   billingCycle: string;
   nextRenewal: string | null; // ISO date string (YYYY-MM-DD) or null
@@ -42,6 +43,7 @@ export async function createSubscription(
         name: input.name,
         vendor: input.vendor,
         companyTag: input.companyTag as "trackr" | "wholesail" | "taskspace" | "cursive" | "tbgc" | "hook" | "am_collective" | "personal" | "untagged",
+        projectId: input.projectId || null,
         amount: Math.round(input.amountDollars * 100),
         billingCycle: input.billingCycle,
         nextRenewal: input.nextRenewal ? new Date(input.nextRenewal) : null,
@@ -76,6 +78,7 @@ export async function updateSubscription(
         name: input.name,
         vendor: input.vendor,
         companyTag: input.companyTag as "trackr" | "wholesail" | "taskspace" | "cursive" | "tbgc" | "hook" | "am_collective" | "personal" | "untagged",
+        projectId: input.projectId || null,
         amount: Math.round(input.amountDollars * 100),
         billingCycle: input.billingCycle,
         nextRenewal: input.nextRenewal ? new Date(input.nextRenewal) : null,
