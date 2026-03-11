@@ -41,6 +41,9 @@ import {
   Clock,
   Mail,
   BrainCircuit,
+  CalendarDays,
+  Webhook,
+  Download,
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { CompanySwitcher } from "@/components/company-switcher";
@@ -65,6 +68,7 @@ const NAV_ITEMS = [
   { label: "Documents", href: "/documents", icon: FileText },
   { label: "Costs", href: "/costs", icon: DollarSign },
   { label: "Domains", href: "/domains", icon: Globe },
+  { label: "Meetings", href: "/meetings", icon: CalendarDays },
   { label: "Rocks", href: "/rocks", icon: Target },
   { label: "Forecast", href: "/forecast", icon: TrendingUp },
   { label: "Analytics", href: "/analytics", icon: LineChart },
@@ -78,6 +82,8 @@ const NAV_ITEMS = [
   { label: "Alerts", href: "/alerts", icon: Bell },
   { label: "Vault", href: "/vault", icon: KeyRound },
   { label: "Compliance", href: "/compliance", icon: ShieldCheck },
+  { label: "Exports", href: "/exports", icon: Download },
+  { label: "Webhooks", href: "/webhooks", icon: Webhook },
   { label: "Activity", href: "/activity", icon: Activity },
   { label: "Settings", href: "/settings", icon: Settings },
 ] as const;
