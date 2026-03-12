@@ -48,6 +48,14 @@ function getRedis(): Redis | null {
 const CACHE_PREFIX = "amc:conn:";
 const DEFAULT_TTL_SECONDS = 5 * 60; // 5 minutes
 
+/** Exported TTL constants for connectors to use */
+export const CACHE_TTL = {
+  REALTIME: 60,        // 1 min — analytics, alerts
+  STANDARD: 300,       // 5 min — default
+  STABLE: 1800,        // 30 min — MRR, subscriptions
+  SLOW_MOVING: 3600,   // 1 hour — bank balances, project list
+} as const;
+
 // ─── Cache API ────────────────────────────────────────────────────────────────
 
 /**

@@ -7,7 +7,7 @@
 
 import { getStripeClient, isStripeConfigured } from "@/lib/stripe/config";
 import { STRIPE_ACCOUNTS } from "@/lib/stripe/constants";
-import { cached, safeCall, type ConnectorResult } from "./base";
+import { cached, safeCall, CACHE_TTL, type ConnectorResult } from "./base";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -67,26 +67,27 @@ export async function getMRR(): Promise<ConnectorResult<MRRData>> {
   return safeCall(() =>
     cached("stripe:mrr", async () => {
       const stripe = getStripeClient();
-      let totalMrr = 0;
-      let totalSubs = 0;
-
-      for (const account of STRIPE_ACCOUNTS) {
-        const opts = { stripeAccount: account.accountId };
-        const subs = await stripe.subscriptions.list(
-          { status: "active", limit: 100, expand: ["data.items"] },
-          opts
-        );
-
-        for (const sub of subs.data) {
-          for (const item of sub.items.data) {
-            totalMrr += calcItemMrr(item.price, item.quantity ?? 1);
+      const results = await Promise.all(
+        STRIPE_ACCOUNTS.map(async (account) => {
+          const opts = { stripeAccount: account.accountId };
+          const subs = await stripe.subscriptions.list(
+            { status: "active", limit: 100, expand: ["data.items"] },
+            opts
+          );
+          let mrr = 0;
+          for (const sub of subs.data) {
+            for (const item of sub.items.data) {
+              mrr += calcItemMrr(item.price, item.quantity ?? 1);
+            }
           }
-        }
-        totalSubs += subs.data.length;
-      }
+          return { mrr, count: subs.data.length };
+        })
+      );
 
+      const totalMrr = results.reduce((s, r) => s + r.mrr, 0);
+      const totalSubs = results.reduce((s, r) => s + r.count, 0);
       return { mrr: totalMrr, activeSubscriptions: totalSubs };
-    })
+    }, CACHE_TTL.STABLE)
   );
 }
 
@@ -97,33 +98,31 @@ export async function getMRRByCompany(): Promise<ConnectorResult<MRRByCompany[]>
   return safeCall(() =>
     cached("stripe:mrr-by-company", async () => {
       const stripe = getStripeClient();
-      const results: MRRByCompany[] = [];
-
-      for (const account of STRIPE_ACCOUNTS) {
-        const opts = { stripeAccount: account.accountId };
-        const subs = await stripe.subscriptions.list(
-          { status: "active", limit: 100, expand: ["data.items"] },
-          opts
-        );
-
-        let mrr = 0;
-        for (const sub of subs.data) {
-          for (const item of sub.items.data) {
-            mrr += calcItemMrr(item.price, item.quantity ?? 1);
+      const results = await Promise.all(
+        STRIPE_ACCOUNTS.map(async (account) => {
+          const opts = { stripeAccount: account.accountId };
+          const subs = await stripe.subscriptions.list(
+            { status: "active", limit: 100, expand: ["data.items"] },
+            opts
+          );
+          let mrr = 0;
+          for (const sub of subs.data) {
+            for (const item of sub.items.data) {
+              mrr += calcItemMrr(item.price, item.quantity ?? 1);
+            }
           }
-        }
-
-        results.push({
-          accountId: account.accountId,
-          name: account.name,
-          companyTag: account.companyTag,
-          mrr,
-          activeSubscriptions: subs.data.length,
-        });
-      }
+          return {
+            accountId: account.accountId,
+            name: account.name,
+            companyTag: account.companyTag,
+            mrr,
+            activeSubscriptions: subs.data.length,
+          };
+        })
+      );
 
       return results;
-    })
+    }, CACHE_TTL.STABLE)
   );
 }
 
@@ -136,13 +135,11 @@ export async function getRecentCharges(
   return safeCall(() =>
     cached(`stripe:charges:${limit}`, async () => {
       const stripe = getStripeClient();
-      const allCharges: RecentCharge[] = [];
-
-      for (const account of STRIPE_ACCOUNTS) {
-        const opts = { stripeAccount: account.accountId };
-        const charges = await stripe.charges.list({ limit }, opts);
-        for (const c of charges.data) {
-          allCharges.push({
+      const chargeArrays = await Promise.all(
+        STRIPE_ACCOUNTS.map(async (account) => {
+          const opts = { stripeAccount: account.accountId };
+          const charges = await stripe.charges.list({ limit }, opts);
+          return charges.data.map((c) => ({
             id: c.id,
             amount: c.amount,
             currency: c.currency,
@@ -151,9 +148,10 @@ export async function getRecentCharges(
             description: c.description,
             created: c.created,
             accountName: account.name,
-          });
-        }
-      }
+          }));
+        })
+      );
+      const allCharges: RecentCharge[] = chargeArrays.flat();
 
       // Sort by created desc and take the requested limit
       allCharges.sort((a, b) => b.created - a.created);
@@ -175,21 +173,32 @@ export async function getInvoiceStats(): Promise<ConnectorResult<InvoiceStats>> 
       let paidCount = 0, paidTotal = 0;
       let overdueCount = 0, overdueTotal = 0;
 
-      for (const account of STRIPE_ACCOUNTS) {
-        const opts = { stripeAccount: account.accountId };
-        const [open, paid] = await Promise.all([
-          stripe.invoices.list({ status: "open", limit: 100 }, opts),
-          stripe.invoices.list({ status: "paid", limit: 100 }, opts),
-        ]);
+      const accountResults = await Promise.all(
+        STRIPE_ACCOUNTS.map(async (account) => {
+          const opts = { stripeAccount: account.accountId };
+          const [open, paid] = await Promise.all([
+            stripe.invoices.list({ status: "open", limit: 100 }, opts),
+            stripe.invoices.list({ status: "paid", limit: 100 }, opts),
+          ]);
+          const overdue = open.data.filter((i) => i.due_date && i.due_date < now);
+          return {
+            openCount: open.data.length,
+            openTotal: open.data.reduce((s, i) => s + (i.amount_due ?? 0), 0),
+            paidCount: paid.data.length,
+            paidTotal: paid.data.reduce((s, i) => s + (i.amount_paid ?? 0), 0),
+            overdueCount: overdue.length,
+            overdueTotal: overdue.reduce((s, i) => s + (i.amount_due ?? 0), 0),
+          };
+        })
+      );
 
-        openCount += open.data.length;
-        openTotal += open.data.reduce((s, i) => s + (i.amount_due ?? 0), 0);
-        paidCount += paid.data.length;
-        paidTotal += paid.data.reduce((s, i) => s + (i.amount_paid ?? 0), 0);
-
-        const overdue = open.data.filter((i) => i.due_date && i.due_date < now);
-        overdueCount += overdue.length;
-        overdueTotal += overdue.reduce((s, i) => s + (i.amount_due ?? 0), 0);
+      for (const r of accountResults) {
+        openCount += r.openCount;
+        openTotal += r.openTotal;
+        paidCount += r.paidCount;
+        paidTotal += r.paidTotal;
+        overdueCount += r.overdueCount;
+        overdueTotal += r.overdueTotal;
       }
 
       return {
@@ -220,25 +229,25 @@ export async function getRevenueTrend(
           const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
           const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 1);
 
-          let revenue = 0;
-
-          for (const account of STRIPE_ACCOUNTS) {
-            const opts = { stripeAccount: account.accountId };
-            const charges = await stripe.charges.list(
-              {
-                created: {
-                  gte: Math.floor(start.getTime() / 1000),
-                  lt: Math.floor(end.getTime() / 1000),
+          const accountRevenues = await Promise.all(
+            STRIPE_ACCOUNTS.map(async (account) => {
+              const opts = { stripeAccount: account.accountId };
+              const charges = await stripe.charges.list(
+                {
+                  created: {
+                    gte: Math.floor(start.getTime() / 1000),
+                    lt: Math.floor(end.getTime() / 1000),
+                  },
+                  limit: 100,
                 },
-                limit: 100,
-              },
-              opts
-            );
-
-            revenue += charges.data
-              .filter((c) => c.status === "succeeded")
-              .reduce((s, c) => s + c.amount, 0);
-          }
+                opts
+              );
+              return charges.data
+                .filter((c) => c.status === "succeeded")
+                .reduce((s, c) => s + c.amount, 0);
+            })
+          );
+          const revenue = accountRevenues.reduce((s, r) => s + r, 0);
 
           points.push({
             month: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`,
@@ -259,15 +268,15 @@ export async function getCustomerCount(): Promise<ConnectorResult<number>> {
   return safeCall(() =>
     cached("stripe:customer-count", async () => {
       const stripe = getStripeClient();
-      let total = 0;
+      const counts = await Promise.all(
+        STRIPE_ACCOUNTS.map(async (account) => {
+          const opts = { stripeAccount: account.accountId };
+          const customers = await stripe.customers.list({ limit: 100 }, opts);
+          return customers.data.length;
+        })
+      );
 
-      for (const account of STRIPE_ACCOUNTS) {
-        const opts = { stripeAccount: account.accountId };
-        const customers = await stripe.customers.list({ limit: 100 }, opts);
-        total += customers.data.length;
-      }
-
-      return total;
+      return counts.reduce((s, c) => s + c, 0);
     })
   );
 }

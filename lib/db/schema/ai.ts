@@ -6,6 +6,7 @@ import {
   timestamp,
   integer,
   index,
+  uniqueIndex,
   jsonb,
   customType,
 } from "drizzle-orm/pg-core";
@@ -113,6 +114,7 @@ export const embeddings = pgTable(
     index("embeddings_source_type_idx").on(table.sourceType),
     index("embeddings_source_id_idx").on(table.sourceId),
     index("embeddings_created_at_idx").on(table.createdAt),
+    uniqueIndex("embeddings_source_type_source_id_idx").on(table.sourceType, table.sourceId),
   ]
 );
 

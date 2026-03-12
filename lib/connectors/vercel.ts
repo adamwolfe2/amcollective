@@ -5,7 +5,7 @@
  * VERCEL_API_TOKEN and VERCEL_TEAM_ID must be set in env.
  */
 
-import { cached, safeCall, invalidateCache, type ConnectorResult } from "./base";
+import { cached, safeCall, invalidateCache, CACHE_TTL, type ConnectorResult } from "./base";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -98,7 +98,7 @@ export async function getProjects(): Promise<ConnectorResult<VercelProject[]>> {
         "/v9/projects?limit=50"
       );
       return res.projects;
-    })
+    }, CACHE_TTL.SLOW_MOVING)
   );
 }
 
@@ -107,7 +107,8 @@ export async function getProject(
 ): Promise<ConnectorResult<VercelProject>> {
   return safeCall(() =>
     cached(`vercel:project:${projectId}`, () =>
-      vercelFetch<VercelProject>(`/v9/projects/${projectId}`)
+      vercelFetch<VercelProject>(`/v9/projects/${projectId}`),
+      CACHE_TTL.SLOW_MOVING
     )
   );
 }
@@ -169,7 +170,8 @@ export async function getProjectDetail(
 ): Promise<ConnectorResult<VercelProjectDetail>> {
   return safeCall(() =>
     cached(`vercel:project-detail:${projectId}`, () =>
-      vercelFetch<VercelProjectDetail>(`/v13/projects/${projectId}`)
+      vercelFetch<VercelProjectDetail>(`/v13/projects/${projectId}`),
+      CACHE_TTL.SLOW_MOVING
     )
   );
 }

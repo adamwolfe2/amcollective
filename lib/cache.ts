@@ -41,6 +41,17 @@ const redis =
 
 const memoryCache = new Map<string, { data: unknown; expiresAt: number }>();
 
+// Periodic cleanup of expired in-memory cache entries (every 60s)
+const _cleanupInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of memoryCache) {
+    if (entry.expiresAt <= now) {
+      memoryCache.delete(key);
+    }
+  }
+}, 60_000);
+_cleanupInterval.unref(); // Don't block process exit
+
 export const cache = {
   async get<T>(key: string): Promise<T | null> {
     if (redis) {

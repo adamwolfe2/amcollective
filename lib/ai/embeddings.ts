@@ -15,6 +15,42 @@ import { eq, and, sql, desc } from "drizzle-orm";
 
 type EmbeddingSourceType = "sop" | "client_note" | "project_doc" | "invoice" | "meeting" | "conversation";
 
+// ─── Embedding Query Cache (in-memory, 1-hour TTL, max 500 entries) ──────────
+
+const EMBEDDING_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const EMBEDDING_CACHE_MAX_SIZE = 500;
+
+const embeddingCache = new Map<string, { embedding: number[]; expires: number }>();
+
+function getCachedEmbedding(query: string): number[] | null {
+  const entry = embeddingCache.get(query);
+  if (!entry) return null;
+  if (Date.now() > entry.expires) {
+    embeddingCache.delete(query);
+    return null;
+  }
+  return entry.embedding;
+}
+
+function setCachedEmbedding(query: string, embedding: number[]): void {
+  // Evict oldest entries if at capacity
+  if (embeddingCache.size >= EMBEDDING_CACHE_MAX_SIZE) {
+    let oldestKey: string | null = null;
+    let oldestExpires = Infinity;
+    for (const [key, entry] of embeddingCache) {
+      if (entry.expires < oldestExpires) {
+        oldestExpires = entry.expires;
+        oldestKey = key;
+      }
+    }
+    if (oldestKey) embeddingCache.delete(oldestKey);
+  }
+  embeddingCache.set(query, {
+    embedding,
+    expires: Date.now() + EMBEDDING_CACHE_TTL_MS,
+  });
+}
+
 // ─── Generate Embedding ──────────────────────────────────────────────────────
 
 export async function generateEmbedding(text: string): Promise<number[] | null> {
@@ -60,23 +96,25 @@ export async function storeEmbedding(
   const embedding = await generateEmbedding(content);
   if (!embedding) return false;
 
-  // Upsert: delete existing for same source, then insert
+  // Atomic upsert on (sourceType, sourceId) unique index
   await db
-    .delete(schema.embeddings)
-    .where(
-      and(
-        eq(schema.embeddings.sourceType, sourceType),
-        eq(schema.embeddings.sourceId, sourceId)
-      )
-    );
-
-  await db.insert(schema.embeddings).values({
-    content,
-    embedding,
-    sourceType,
-    sourceId,
-    metadata: metadata ?? null,
-  });
+    .insert(schema.embeddings)
+    .values({
+      content,
+      embedding,
+      sourceType,
+      sourceId,
+      metadata: metadata ?? null,
+    })
+    .onConflictDoUpdate({
+      target: [schema.embeddings.sourceType, schema.embeddings.sourceId],
+      set: {
+        content,
+        embedding,
+        metadata: metadata ?? null,
+        createdAt: new Date(),
+      },
+    });
 
   return true;
 }
@@ -88,8 +126,14 @@ export async function searchSimilar(
   limit = 5,
   sourceType?: EmbeddingSourceType
 ): Promise<Array<{ content: string; sourceType: string; sourceId: string | null; similarity: number; metadata: unknown }>> {
-  const queryEmbedding = await generateEmbedding(query);
-  if (!queryEmbedding) return [];
+  // Check in-memory cache first to avoid redundant OpenAI API calls
+  let queryEmbedding = getCachedEmbedding(query);
+  if (!queryEmbedding) {
+    const generated = await generateEmbedding(query);
+    if (!generated) return [];
+    queryEmbedding = generated;
+    setCachedEmbedding(query, queryEmbedding);
+  }
 
   const vectorStr = `[${queryEmbedding.join(",")}]`;
 
