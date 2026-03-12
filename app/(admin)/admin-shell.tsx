@@ -304,7 +304,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex h-screen overflow-hidden">
       {/* Desktop Sidebar */}
       <aside className="w-60 bg-[#0A0A0A] p-5 hidden md:flex md:flex-col overflow-y-auto shrink-0 border-r border-white/10">
         <div className="mb-6 px-1">
@@ -355,8 +355,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="border-b border-[#0A0A0A]/10 px-4 md:px-6 py-3 flex items-center justify-between bg-[#F3F3EF]">
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="shrink-0 border-b border-[#0A0A0A]/10 px-4 md:px-6 py-3 flex items-center justify-between bg-[#F3F3EF]">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileOpen(true)}
@@ -395,7 +395,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             />
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6 pb-safe bg-[#F3F3EF]">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-safe bg-[#F3F3EF]">{children}</main>
       </div>
     </div>
   );
