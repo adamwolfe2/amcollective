@@ -17,8 +17,11 @@ const SUPER_ADMIN_USER_IDS = (
  * Gracefully handles missing Clerk config for local dev.
  */
 export async function getAuthUserId(): Promise<string | null> {
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return "dev-admin";
   const { userId } = await auth();
+  if (!userId) {
+    if (process.env.NODE_ENV === "development") return "dev-admin";
+    return null;
+  }
   return userId;
 }
 
@@ -35,8 +38,8 @@ export async function requireAuth(): Promise<string> {
  * Get the current user's role. Super admins always get "owner".
  */
 export async function getCurrentRole(): Promise<string> {
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return "owner";
   const { sessionClaims } = await auth();
+  if (!sessionClaims && process.env.NODE_ENV === "development") return "owner";
   const user = await currentUser();
   const email = user?.emailAddresses?.[0]?.emailAddress;
   const { resolveRole } = await import("./require-admin");
@@ -50,9 +53,11 @@ export async function getCurrentRole(): Promise<string> {
  * Uses session claims for role, with super admin IDs from SUPER_ADMIN_USER_IDS env var.
  */
 export async function checkAdmin(): Promise<string | null> {
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return "dev-admin";
   const { userId, sessionClaims } = await auth();
-  if (!userId) return null;
+  if (!userId) {
+    if (process.env.NODE_ENV === "development") return "dev-admin";
+    return null;
+  }
   const role = (sessionClaims?.publicMetadata as Record<string, unknown>)?.role;
   if (role === "owner" || role === "admin") return userId;
   if (SUPER_ADMIN_USER_IDS.includes(userId)) return userId;

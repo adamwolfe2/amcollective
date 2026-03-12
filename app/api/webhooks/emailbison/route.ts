@@ -13,6 +13,16 @@ import { createAuditLog } from "@/lib/db/repositories/audit";
 
 export async function POST(request: NextRequest) {
   try {
+    // Verify shared secret via X-API-Key header
+    const expectedKey = process.env.EMAILBISON_API_KEY;
+    if (expectedKey) {
+      const providedKey = request.headers.get("x-api-key");
+      if (providedKey !== expectedKey) {
+        console.warn("[EmailBison Webhook] Invalid or missing X-API-Key header");
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+    }
+
     const body = await request.json();
 
     // EmailBison sends event_type at the top level
@@ -45,8 +55,10 @@ export async function POST(request: NextRequest) {
       payload: body,
     });
 
-    // Update campaign stats if we have a campaign ID
-    if (campaignId) {
+    // Update campaign stats if we have a valid campaign ID
+    if (campaignId == null) {
+      console.warn(`[EmailBison Webhook] No campaignId in ${eventType} event, skipping campaign upsert`);
+    } else {
       const columnMap: Record<string, keyof typeof schema.outreachCampaigns> = {
         email_sent: "contacted",
         contact_first_emailed: "contacted",

@@ -70,13 +70,12 @@ export function resolveRole(
 export async function requireRole(
   allowedRoles: readonly string[]
 ): Promise<AuthResult> {
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-    return { userId: "dev-admin", role: "owner", error: null };
-  }
-
   const { userId, sessionClaims } = await auth();
 
   if (!userId) {
+    if (process.env.NODE_ENV === "development") {
+      return { userId: "dev-admin", role: "owner", error: null };
+    }
     return {
       userId: null,
       role: null,

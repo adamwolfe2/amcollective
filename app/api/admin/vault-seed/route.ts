@@ -155,7 +155,6 @@ export async function POST() {
     success: true,
     seeded,
     skipped,
-    skippedMissing,
-    message: `Seeded ${seeded} credentials into vault. Skipped ${skipped} (${skippedMissing.length} env vars not set).`,
+    message: `Seeded ${seeded} credentials into vault. Skipped ${skipped}.`,
   });
 }

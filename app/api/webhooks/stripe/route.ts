@@ -147,24 +147,6 @@ async function recalculateClientLtv(clientId: string) {
     .where(eq(schema.clients.id, clientId));
 }
 
-// ─── Webhook Event Recording ─────────────────────────────────────────────────
-
-/**
- * Record a processed webhook event for idempotency and observability.
- * If the handler threw, we still record the event (with the error message)
- * so we can debug later without reprocessing on retry.
- */
-async function recordWebhookEvent(event: Stripe.Event, error?: string) {
-  await db.insert(schema.webhookEvents).values({
-    source: "stripe",
-    externalId: event.id,
-    eventType: event.type,
-    payload: event.data.object as unknown as Record<string, unknown>,
-    processedAt: error ? null : new Date(),
-    error: error ?? null,
-  });
-}
-
 // ─── Invoice Handlers ─────────────────────────────────────────────────────────
 
 async function handleInvoiceCreated(event: Stripe.Event) {
@@ -1362,26 +1344,33 @@ export async function POST(req: NextRequest) {
     return json({ error: message }, 400);
   }
 
-  // ── 4. Idempotency check ───────────────────────────────────────────────────
+  // ── 4. Atomic idempotency: INSERT first, skip if already recorded ────────
+  // Uses onConflictDoNothing on the (source, externalId) unique index.
+  // If the row already exists, the insert is a no-op and we return early.
   try {
-    const existing = await db
-      .select({ id: schema.webhookEvents.id })
-      .from(schema.webhookEvents)
-      .where(
-        and(
-          eq(schema.webhookEvents.source, "stripe"),
-          eq(schema.webhookEvents.externalId, event.id)
-        )
-      )
-      .limit(1);
+    const inserted = await db
+      .insert(schema.webhookEvents)
+      .values({
+        source: "stripe",
+        externalId: event.id,
+        eventType: event.type,
+        payload: event.data.object as unknown as Record<string, unknown>,
+        processedAt: null, // will be set after successful processing
+        error: null,
+      })
+      .onConflictDoNothing({
+        target: [schema.webhookEvents.source, schema.webhookEvents.externalId],
+      })
+      .returning({ id: schema.webhookEvents.id });
 
-    if (existing.length > 0) {
+    if (inserted.length === 0) {
+      // Row already existed — this is a duplicate delivery
       return json({ received: true, deduplicated: true });
     }
   } catch (err) {
-    // If the idempotency check fails, log but continue processing.
+    // If the idempotency insert fails, log but continue processing.
     // Better to risk a duplicate than to drop the event entirely.
-    console.error("[stripe-webhook] Idempotency check failed:", err);
+    console.error("[stripe-webhook] Idempotency insert failed:", err);
   }
 
   // ── 5. Dispatch to handler ─────────────────────────────────────────────────
@@ -1392,8 +1381,16 @@ export async function POST(req: NextRequest) {
     }
     // Unhandled event types are still recorded for observability
 
-    // ── 6. Record successful processing ────────────────────────────────────
-    await recordWebhookEvent(event);
+    // ── 6. Mark event as successfully processed ─────────────────────────────
+    await db
+      .update(schema.webhookEvents)
+      .set({ processedAt: new Date(), error: null })
+      .where(
+        and(
+          eq(schema.webhookEvents.source, "stripe"),
+          eq(schema.webhookEvents.externalId, event.id)
+        )
+      );
 
     return json({ received: true, type: event.type, handled: !!handler });
   } catch (err) {
@@ -1404,13 +1401,20 @@ export async function POST(req: NextRequest) {
       message
     );
 
-    // Record the failed event so we have a trace, but still return 500
-    // so Stripe retries delivery.
+    // Record the error on the already-inserted event row
     try {
-      await recordWebhookEvent(event, message);
+      await db
+        .update(schema.webhookEvents)
+        .set({ error: message })
+        .where(
+          and(
+            eq(schema.webhookEvents.source, "stripe"),
+            eq(schema.webhookEvents.externalId, event.id)
+          )
+        );
     } catch (recordErr) {
       console.error(
-        "[stripe-webhook] Failed to record webhook event:",
+        "[stripe-webhook] Failed to record webhook error:",
         recordErr
       );
     }

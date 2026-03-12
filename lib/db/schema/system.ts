@@ -7,6 +7,7 @@ import {
   timestamp,
   integer,
   index,
+  uniqueIndex,
   jsonb,
   date,
 } from "drizzle-orm/pg-core";
@@ -157,6 +158,7 @@ export const webhookEvents = pgTable(
     index("webhook_events_source_idx").on(table.source),
     index("webhook_events_external_id_idx").on(table.externalId),
     index("webhook_events_created_at_idx").on(table.createdAt),
+    uniqueIndex("webhook_events_source_external_id_uniq").on(table.source, table.externalId),
   ]
 );
 

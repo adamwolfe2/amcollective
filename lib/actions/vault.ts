@@ -11,8 +11,11 @@ import { encryptPassword } from "@/lib/vault/crypto";
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 async function getUserId() {
-  if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) return "dev-admin";
   const { userId } = await auth();
+  if (!userId) {
+    if (process.env.NODE_ENV === "development") return "dev-admin";
+    throw new Error("Not authenticated");
+  }
   return userId;
 }
 

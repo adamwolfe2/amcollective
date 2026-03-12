@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { and, eq, desc, sql, ilike } from "drizzle-orm";
+import { and, eq, desc, or, ilike } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
@@ -51,8 +51,9 @@ export async function GET(request: NextRequest) {
       );
     }
     if (search) {
+      const pattern = `%${search}%`
       conditions.push(
-        sql`(${ilike(schema.leads.contactName, `%${search}%`)} OR ${ilike(schema.leads.companyName, `%${search}%`)})`
+        or(ilike(schema.leads.contactName, pattern), ilike(schema.leads.companyName, pattern))!
       );
     }
 
