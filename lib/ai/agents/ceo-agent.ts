@@ -147,8 +147,12 @@ const TOOL_MODULES: Array<{ keywords: string[]; toolNames: string[] }> = [
     toolNames: ["create_meeting", "add_meeting_note"],
   },
   {
-    keywords: ["outreach", "cold email", "campaign", "emailbison", "email campaign", "pause campaign", "resume campaign", "sender", "reply rate", "open rate", "bounce", "draft email", "write email", "write an email", "draft outreach", "knowledge base", "icp", "value prop", "proof point", "email sequence", "follow-up", "followup", "breakup email"],
-    toolNames: ["get_outreach_snapshot", "toggle_campaign", "draft_cold_email", "set_campaign_knowledge"],
+    keywords: ["outreach", "cold email", "campaign", "emailbison", "email campaign", "pause campaign", "resume campaign", "sender", "reply rate", "open rate", "bounce", "draft email", "write email", "write an email", "draft outreach", "knowledge base", "icp", "value prop", "proof point", "email sequence", "follow-up", "followup", "breakup email", "send email", "email them", "send it", "fire off", "send that email", "email to"],
+    toolNames: ["get_outreach_snapshot", "toggle_campaign", "draft_cold_email", "set_campaign_knowledge", "send_email"],
+  },
+  {
+    keywords: ["sync", "refresh", "force sync", "update data", "stale data", "re-sync", "pull latest", "resync"],
+    toolNames: ["force_sync"],
   },
   {
     keywords: ["recommendation", "strategy rec", "dismiss", "handled that", "already done", "mark in progress", "that suggestion", "strategy suggestion"],
@@ -420,6 +424,10 @@ export async function runCeoAgent(
     anthropicMessages.push({ role: "user", content: toolResults });
 
     try {
+      // NOTE: tools must be re-sent on every iteration because the Anthropic
+      // API requires tools to be defined when messages contain tool_use blocks.
+      // Omitting tools here would cause a 400 error. Token savings are handled
+      // upstream by selectToolsForQuery() which limits tools to ~14-35 per request.
       response = await anthropic.messages.create({
         model: activeModel,
         max_tokens: maxTokens,

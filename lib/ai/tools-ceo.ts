@@ -15,6 +15,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc, and, ilike, or } from "drizzle-orm";
 import { sql, count } from "drizzle-orm";
+import { createAuditLog } from "@/lib/db/repositories/audit";
 
 // ─── Tool Definitions ────────────────────────────────────────────────────────
 
@@ -756,6 +757,39 @@ export const CEO_TOOL_DEFINITIONS: Anthropic.Tool[] = [
       required: [],
     },
   },
+  // ─── Sync ────────────────────────────────────────────────────────────────
+  {
+    name: "force_sync",
+    description:
+      "Force-sync a specific connector or product data right now. Use when data seems stale or when asked to 'refresh [product]', 'sync stripe', 'update vercel data', etc.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        service: {
+          type: "string",
+          enum: ["stripe", "vercel", "neon", "mercury", "posthog", "trackr", "taskspace", "wholesail", "cursive", "tbgc", "hook", "emailbison", "all"],
+          description: "Which service or product to force-sync",
+        },
+      },
+      required: ["service"],
+    },
+  },
+  // ─── Email ──────────────────────────────────────────────────────────────
+  {
+    name: "send_email",
+    description:
+      "Send an email via Resend. Use when asked to 'send an email to [person]', 'email [client] about [topic]', or to send a drafted cold email. Requires to, subject, and body.",
+    input_schema: {
+      type: "object" as const,
+      properties: {
+        to: { type: "string", description: "Recipient email address" },
+        subject: { type: "string", description: "Email subject line" },
+        body: { type: "string", description: "Email body in plain text" },
+        replyTo: { type: "string", description: "Optional reply-to email address" },
+      },
+      required: ["to", "subject", "body"],
+    },
+  },
   // ─── Strategy ──────────────────────────────────────────────────────────────
   {
     name: "dismiss_recommendation",
@@ -1468,6 +1502,37 @@ export async function executeCeoTool(
               payingOrgs: d.payingOrgs,
               mrrCents: d.mrrCents,
               criticalOrgs: d.orgs.filter((o) => o.riskLevel === "critical").map((o) => o.name),
+            };
+          })() : Promise.resolve(),
+
+          // TBGC
+          (fetchAll || platform === "tbgc") ? (async () => {
+            const { getSnapshot: tbSnap, isConfigured: tbOk } = await import("@/lib/connectors/tbgc");
+            if (!tbOk()) { results.tbgc = { error: "Not configured" }; return; }
+            const r = await tbSnap();
+            if (!r.success) { results.tbgc = { error: r.error }; return; }
+            const d = r.data!;
+            results.tbgc = {
+              mrrCents: d.mrrCents,
+              activeSubscriptions: d.activeSubscriptions,
+              stage: d.stage,
+              notes: d.notes,
+            };
+          })() : Promise.resolve(),
+
+          // Hook
+          (fetchAll || platform === "hook") ? (async () => {
+            const { getSnapshot: hkSnap, isConfigured: hkOk } = await import("@/lib/connectors/hook");
+            if (!hkOk()) { results.hook = { error: "Not configured" }; return; }
+            const r = await hkSnap();
+            if (!r.success) { results.hook = { error: r.error }; return; }
+            const d = r.data!;
+            results.hook = {
+              mrrCents: d.mrrCents,
+              activeSubscriptions: d.activeSubscriptions,
+              trialingSubscriptions: d.trialingSubscriptions,
+              stage: d.stage,
+              notes: d.notes,
             };
           })() : Promise.resolve(),
         ]);
@@ -2498,6 +2563,86 @@ export async function executeCeoTool(
           amount: `$${(invoice.amount / 100).toLocaleString()}`,
           paidAt: now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
         });
+      }
+
+      case "force_sync": {
+        const { inngest } = await import("@/lib/inngest/client");
+        const service = input.service as string;
+
+        const serviceToEvent: Record<string, string> = {
+          stripe: "stripe/sync-full",
+          vercel: "vercel/sync-full",
+          trackr: "trackr/sync",
+          taskspace: "taskspace/sync",
+          wholesail: "wholesail/sync",
+          cursive: "cursive/sync",
+          tbgc: "tbgc/sync",
+          hook: "hook/sync",
+          emailbison: "emailbison/sync-inbox",
+        };
+
+        if (service === "all") {
+          const events = Object.entries(serviceToEvent).map(([, eventName]) => ({
+            name: eventName,
+            data: { manual: true },
+          }));
+          await inngest.send(events);
+          return JSON.stringify({
+            triggered: true,
+            service: "all",
+            eventNames: Object.values(serviceToEvent),
+            count: events.length,
+          });
+        }
+
+        const eventName = serviceToEvent[service];
+        if (!eventName) {
+          return JSON.stringify({ error: `No sync event mapped for service: ${service}` });
+        }
+
+        await inngest.send({ name: eventName, data: { manual: true } });
+        return JSON.stringify({ triggered: true, service, eventName });
+      }
+
+      case "send_email": {
+        const { Resend } = await import("resend");
+        const apiKey = process.env.RESEND_API_KEY;
+        if (!apiKey) return JSON.stringify({ error: "RESEND_API_KEY not configured" });
+
+        const resend = new Resend(apiKey);
+        const fromEmail = process.env.RESEND_FROM_EMAIL || "team@amcollectivecapital.com";
+        const to = input.to as string;
+        const subject = input.subject as string;
+        const body = input.body as string;
+        const replyTo = input.replyTo as string | undefined;
+
+        const sendOptions: {
+          from: string;
+          to: string;
+          subject: string;
+          text: string;
+          reply_to?: string;
+        } = {
+          from: fromEmail,
+          to,
+          subject,
+          text: body,
+        };
+        if (replyTo) sendOptions.reply_to = replyTo;
+
+        const result = await resend.emails.send(sendOptions);
+
+        // Audit log
+        await createAuditLog({
+          actorId: "claudebot",
+          actorType: "system",
+          action: "email.sent",
+          entityType: "email",
+          entityId: (result.data as { id?: string })?.id ?? "unknown",
+          metadata: { to, subject, fromEmail },
+        });
+
+        return JSON.stringify({ sent: true, to, subject, id: (result.data as { id?: string })?.id });
       }
 
       default:
