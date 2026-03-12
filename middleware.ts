@@ -39,6 +39,7 @@ const isPublicRoute = createRouteMatcher([
   "/sign-up(.*)",
   "/api/health",        // monitoring endpoint — intentionally public
   "/api/webhooks(.*)",
+  "/api/inngest",       // Inngest serve endpoint — authenticated via INNGEST_SIGNING_KEY, not Clerk
   "/api/contact",
   "/contracts/sign/(.*)",
   "/proposals/(.*)",
