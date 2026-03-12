@@ -44,7 +44,8 @@ import {
   CalendarDays,
   Webhook,
   Download,
-  ChevronRight,
+  Minus,
+  Plus,
   type LucideIcon,
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
@@ -52,109 +53,114 @@ import { CompanySwitcher } from "@/components/company-switcher";
 
 // ─── Nav Structure ─────────────────────────────────────────────────────────
 
-interface NavItem {
+interface NavChild {
   label: string;
   href: string;
-  icon: LucideIcon;
 }
 
-interface NavSection {
+interface NavItem {
   label: string;
-  items: NavItem[];
+  href?: string;
+  icon: LucideIcon;
+  children?: NavChild[];
 }
 
-// Top-level items (always visible, no section header)
-const TOP_LEVEL: NavItem[] = [
+// All nav items — items with children are collapsible, items with href are links
+const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Strategy", href: "/strategy", icon: TrendingUp },
   { label: "AI", href: "/ai", icon: Sparkles },
-];
-
-const NAV_SECTIONS: NavSection[] = [
   {
     label: "Pipeline",
-    items: [
-      { label: "Leads", href: "/leads", icon: Crosshair },
-      { label: "Clients", href: "/clients", icon: Users },
-      { label: "Proposals", href: "/proposals", icon: FileSignature },
-      { label: "Contracts", href: "/contracts", icon: FileCheck },
+    icon: Crosshair,
+    children: [
+      { label: "Leads", href: "/leads" },
+      { label: "Clients", href: "/clients" },
+      { label: "Proposals", href: "/proposals" },
+      { label: "Contracts", href: "/contracts" },
     ],
   },
   {
     label: "Operations",
-    items: [
-      { label: "Sprints", href: "/sprints", icon: Zap },
-      { label: "Tasks", href: "/tasks", icon: ListTodo },
-      { label: "Time", href: "/time", icon: Clock },
-      { label: "Rocks", href: "/rocks", icon: Target },
-      { label: "Meetings", href: "/meetings", icon: CalendarDays },
-      { label: "Scorecard", href: "/scorecard", icon: BarChart3 },
+    icon: Zap,
+    children: [
+      { label: "Sprints", href: "/sprints" },
+      { label: "Tasks", href: "/tasks" },
+      { label: "Time", href: "/time" },
+      { label: "Rocks", href: "/rocks" },
+      { label: "Meetings", href: "/meetings" },
+      { label: "Scorecard", href: "/scorecard" },
     ],
   },
   {
     label: "Portfolio",
-    items: [
-      { label: "Products", href: "/products", icon: Package },
-      { label: "Projects", href: "/projects", icon: FolderKanban },
-      { label: "Services", href: "/services", icon: Briefcase },
-      { label: "Domains", href: "/domains", icon: Globe },
+    icon: Package,
+    children: [
+      { label: "Products", href: "/products" },
+      { label: "Projects", href: "/projects" },
+      { label: "Services", href: "/services" },
+      { label: "Domains", href: "/domains" },
     ],
   },
   {
     label: "Finance",
-    items: [
-      { label: "Invoices", href: "/invoices", icon: Receipt },
-      { label: "Finance", href: "/finance", icon: Landmark },
-      { label: "Costs", href: "/costs", icon: DollarSign },
-      { label: "Forecast", href: "/forecast", icon: TrendingUp },
+    icon: Landmark,
+    children: [
+      { label: "Invoices", href: "/invoices" },
+      { label: "Overview", href: "/finance" },
+      { label: "Costs", href: "/costs" },
+      { label: "Forecast", href: "/forecast" },
     ],
   },
   {
     label: "Comms",
-    items: [
-      { label: "Messages", href: "/messages", icon: MessageSquare },
-      { label: "Email", href: "/email", icon: Mail },
-      { label: "Outreach", href: "/outreach", icon: Send },
-      { label: "NPS", href: "/nps", icon: Star },
+    icon: MessageSquare,
+    children: [
+      { label: "Messages", href: "/messages" },
+      { label: "Email", href: "/email" },
+      { label: "Outreach", href: "/outreach" },
+      { label: "NPS", href: "/nps" },
     ],
   },
   {
     label: "Knowledge",
-    items: [
-      { label: "Knowledge", href: "/knowledge", icon: BookOpen },
-      { label: "Documents", href: "/documents", icon: FileText },
-      { label: "Analytics", href: "/analytics", icon: LineChart },
-      { label: "Intelligence", href: "/intelligence", icon: BrainCircuit },
+    icon: BookOpen,
+    children: [
+      { label: "Library", href: "/knowledge" },
+      { label: "Documents", href: "/documents" },
+      { label: "Analytics", href: "/analytics" },
+      { label: "Intelligence", href: "/intelligence" },
     ],
   },
   {
     label: "System",
-    items: [
-      { label: "Team", href: "/team", icon: UserCog },
-      { label: "Alerts", href: "/alerts", icon: Bell },
-      { label: "Vault", href: "/vault", icon: KeyRound },
-      { label: "Compliance", href: "/compliance", icon: ShieldCheck },
-      { label: "Exports", href: "/exports", icon: Download },
-      { label: "Webhooks", href: "/webhooks", icon: Webhook },
-      { label: "Activity", href: "/activity", icon: Activity },
-      { label: "Settings", href: "/settings", icon: Settings },
+    icon: Settings,
+    children: [
+      { label: "Team", href: "/team" },
+      { label: "Alerts", href: "/alerts" },
+      { label: "Vault", href: "/vault" },
+      { label: "Compliance", href: "/compliance" },
+      { label: "Exports", href: "/exports" },
+      { label: "Webhooks", href: "/webhooks" },
+      { label: "Activity", href: "/activity" },
+      { label: "Settings", href: "/settings" },
     ],
   },
 ];
 
 // ─── Collapse State ────────────────────────────────────────────────────────
 
-const LS_COLLAPSED_KEY = "am_nav_collapsed";
+const LS_KEY = "am_nav_expanded";
 
-function useCollapsedSections(pathname: string) {
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+function useExpandedItems(pathname: string) {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loaded, setLoaded] = useState(false);
 
   // Load from localStorage on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(LS_COLLAPSED_KEY);
-      if (stored) setCollapsed(new Set(JSON.parse(stored)));
+      const stored = localStorage.getItem(LS_KEY);
+      if (stored) setExpanded(new Set(JSON.parse(stored)));
     } catch {}
     setLoaded(true);
   }, []);
@@ -163,27 +169,28 @@ function useCollapsedSections(pathname: string) {
   useEffect(() => {
     if (!loaded) return;
     try {
-      localStorage.setItem(
-        LS_COLLAPSED_KEY,
-        JSON.stringify([...collapsed])
-      );
+      localStorage.setItem(LS_KEY, JSON.stringify([...expanded]));
     } catch {}
-  }, [collapsed, loaded]);
+  }, [expanded, loaded]);
 
-  // Check if a section has an active child
-  const sectionHasActive = useCallback(
-    (section: NavSection) =>
-      section.items.some(
-        (item) =>
-          pathname === item.href ||
-          (item.href !== "/dashboard" &&
-            pathname.startsWith(item.href + "/"))
-      ),
-    [pathname]
-  );
+  // Auto-expand items whose children contain the active page
+  useEffect(() => {
+    if (!loaded) return;
+    for (const item of NAV_ITEMS) {
+      if (!item.children) continue;
+      const hasActive = item.children.some(
+        (child) =>
+          pathname === child.href ||
+          (child.href !== "/dashboard" && pathname.startsWith(child.href + "/"))
+      );
+      if (hasActive && !expanded.has(item.label)) {
+        setExpanded((prev) => new Set([...prev, item.label]));
+      }
+    }
+  }, [pathname, loaded]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggle = useCallback((label: string) => {
-    setCollapsed((prev) => {
+    setExpanded((prev) => {
       const next = new Set(prev);
       if (next.has(label)) next.delete(label);
       else next.add(label);
@@ -191,104 +198,115 @@ function useCollapsedSections(pathname: string) {
     });
   }, []);
 
-  const isCollapsed = useCallback(
-    (section: NavSection) => {
-      // If section has the active page, always expand
-      if (sectionHasActive(section)) return false;
-      return collapsed.has(section.label);
-    },
-    [collapsed, sectionHasActive]
+  const isExpanded = useCallback(
+    (label: string) => expanded.has(label),
+    [expanded]
   );
 
-  return { toggle, isCollapsed, loaded };
+  return { toggle, isExpanded, loaded };
 }
 
-// ─── Nav Link ──────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────
 
-function NavLink({
-  item,
-  pathname,
-  onNavigate,
-}: {
-  item: NavItem;
-  pathname: string;
-  onNavigate?: () => void;
-}) {
-  const isActive =
-    pathname === item.href ||
-    (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
-
+function isActive(pathname: string, href: string) {
   return (
-    <Link
-      href={item.href}
-      onClick={onNavigate}
-      className={`flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors ${
-        isActive
-          ? "bg-white/10 text-white"
-          : "text-white/50 hover:bg-white/[0.06] hover:text-white/80"
-      }`}
-    >
-      <item.icon className="h-4 w-4 shrink-0" />
-      {item.label}
-    </Link>
+    pathname === href ||
+    (href !== "/dashboard" && pathname.startsWith(href + "/"))
   );
+}
+
+function itemHasActive(item: NavItem, pathname: string) {
+  if (item.href) return isActive(pathname, item.href);
+  return item.children?.some((c) => isActive(pathname, c.href)) ?? false;
 }
 
 // ─── Sidebar Nav ───────────────────────────────────────────────────────────
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const { toggle, isCollapsed, loaded } = useCollapsedSections(pathname);
+  const { toggle, isExpanded, loaded } = useExpandedItems(pathname);
 
   return (
-    <nav className="flex-1 space-y-1">
-      {/* Top-level items */}
-      {TOP_LEVEL.map((item) => (
-        <NavLink
-          key={item.href}
-          item={item}
-          pathname={pathname}
-          onNavigate={onNavigate}
-        />
-      ))}
+    <nav className="flex-1 space-y-0.5">
+      {NAV_ITEMS.map((item) => {
+        const active = itemHasActive(item, pathname);
 
-      {/* Sections */}
-      {NAV_SECTIONS.map((section) => {
-        const sectionCollapsed = loaded ? isCollapsed(section) : false;
-        const hasActive = section.items.some(
-          (item) =>
-            pathname === item.href ||
-            (item.href !== "/dashboard" &&
-              pathname.startsWith(item.href + "/"))
-        );
-
-        return (
-          <div key={section.label} className="pt-2">
-            <button
-              onClick={() => toggle(section.label)}
-              className={`flex items-center justify-between w-full px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest transition-colors ${
-                hasActive
-                  ? "text-white/60"
-                  : "text-white/25 hover:text-white/40"
+        // Simple link item (no children)
+        if (item.href) {
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              onClick={onNavigate}
+              className={`flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors ${
+                isActive(pathname, item.href)
+                  ? "bg-white/10 text-white"
+                  : "text-white/50 hover:bg-white/[0.06] hover:text-white/80"
               }`}
             >
-              {section.label}
-              <ChevronRight
-                className={`h-3 w-3 transition-transform duration-150 ${
-                  sectionCollapsed ? "" : "rotate-90"
-                }`}
-              />
+              <item.icon className="h-4 w-4 shrink-0" />
+              {item.label}
+            </Link>
+          );
+        }
+
+        // Collapsible parent item
+        const open = loaded ? isExpanded(item.label) || active : false;
+
+        return (
+          <div key={item.label}>
+            <button
+              onClick={() => toggle(item.label)}
+              className={`flex items-center justify-between w-full px-3 py-2 text-sm font-medium transition-colors ${
+                active
+                  ? "text-white"
+                  : "text-white/50 hover:bg-white/[0.06] hover:text-white/80"
+              }`}
+            >
+              <span className="flex items-center gap-3">
+                <item.icon className="h-4 w-4 shrink-0" />
+                {item.label}
+              </span>
+              {open ? (
+                <Minus className="h-3 w-3 shrink-0 text-white/30" />
+              ) : (
+                <Plus className="h-3 w-3 shrink-0 text-white/30" />
+              )}
             </button>
-            {!sectionCollapsed && (
-              <div className="mt-0.5">
-                {section.items.map((item) => (
-                  <NavLink
-                    key={item.href}
-                    item={item}
-                    pathname={pathname}
-                    onNavigate={onNavigate}
-                  />
-                ))}
+
+            {/* Children with tree-line connector */}
+            {open && item.children && (
+              <div className="ml-[23px] border-l border-white/10">
+                {item.children.map((child, idx) => {
+                  const childActive = isActive(pathname, child.href);
+                  const isLast = idx === item.children!.length - 1;
+
+                  return (
+                    <div key={child.href} className="relative">
+                      {/* Horizontal branch line */}
+                      <div
+                        className={`absolute left-0 top-1/2 w-3 border-t border-white/10 ${
+                          isLast ? "border-l-0" : ""
+                        }`}
+                      />
+                      {/* Hide vertical line below last item */}
+                      {isLast && (
+                        <div className="absolute left-[-1px] top-1/2 bottom-0 w-[1px] bg-[#0A0A0A]" />
+                      )}
+                      <Link
+                        href={child.href}
+                        onClick={onNavigate}
+                        className={`block pl-5 pr-3 py-1.5 text-sm transition-colors ${
+                          childActive
+                            ? "text-white bg-white/10"
+                            : "text-white/40 hover:text-white/70 hover:bg-white/[0.04]"
+                        }`}
+                      >
+                        {child.label}
+                      </Link>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
