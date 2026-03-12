@@ -50,7 +50,7 @@ export async function getCurrentRole(): Promise<string> {
  * Lightweight admin check for API routes — returns userId if admin/owner, null otherwise.
  * This is the SINGLE source of truth. Do not duplicate this function.
  *
- * Uses session claims for role, with super admin IDs from SUPER_ADMIN_USER_IDS env var.
+ * Checks (in order): session metadata role, super admin user IDs, super admin emails.
  */
 export async function checkAdmin(): Promise<string | null> {
   const { userId, sessionClaims } = await auth();
@@ -58,8 +58,17 @@ export async function checkAdmin(): Promise<string | null> {
     if (process.env.NODE_ENV === "development") return "dev-admin";
     return null;
   }
-  const role = (sessionClaims?.publicMetadata as Record<string, unknown>)?.role;
+  // Check session metadata role
+  const publicMeta = sessionClaims?.publicMetadata as Record<string, unknown> | undefined;
+  const meta = sessionClaims?.metadata as Record<string, unknown> | undefined;
+  const role = (publicMeta?.role as string) || (meta?.role as string);
   if (role === "owner" || role === "admin") return userId;
+  // Check super admin user IDs
   if (SUPER_ADMIN_USER_IDS.includes(userId)) return userId;
+  // Check super admin emails (matches requireAdmin behavior)
+  const { isSuperAdmin } = await import("./require-admin");
+  const user = await currentUser();
+  const email = user?.emailAddresses?.[0]?.emailAddress;
+  if (isSuperAdmin(email)) return userId;
   return null;
 }
