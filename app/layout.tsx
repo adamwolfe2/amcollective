@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
+import { PostHogProvider } from "@/components/providers/posthog-provider";
 import "./globals.css";
 
 export const viewport: Viewport = {
@@ -113,7 +114,9 @@ export default function RootLayout({
           color: "var(--text-body)",
         }}
       >
-        {children}
+        <PostHogProvider>
+          {children}
+        </PostHogProvider>
       </body>
     </html>
   );
