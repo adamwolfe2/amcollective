@@ -45,20 +45,28 @@ export async function POST(request: Request) {
   const { origin } = new URL(request.url);
   const redirectUrl = `${origin}/api/integrations/gmail/callback`;
 
-  const result = await initiateGmailConnection({
-    userId,
-    redirectUrl,
-  });
-
-  // Create a pending connected account record
-  if (result.connectionId) {
-    await db.insert(schema.connectedAccounts).values({
+  try {
+    const result = await initiateGmailConnection({
       userId,
-      provider: "gmail",
-      composioAccountId: result.connectionId,
-      status: "expired", // Will be set to "active" on callback
+      redirectUrl,
     });
-  }
 
-  return NextResponse.json({ redirectUrl: result.redirectUrl });
+    // Create a pending connected account record
+    if (result.connectionId) {
+      await db.insert(schema.connectedAccounts).values({
+        userId,
+        provider: "gmail",
+        composioAccountId: result.connectionId,
+        status: "expired", // Will be set to "active" on callback
+      });
+    }
+
+    return NextResponse.json({ redirectUrl: result.redirectUrl });
+  } catch (err) {
+    console.error("[gmail/connect] Composio error:", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Failed to initiate Gmail connection" },
+      { status: 500 }
+    );
+  }
 }
