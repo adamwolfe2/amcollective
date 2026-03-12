@@ -30,7 +30,8 @@ export async function GET() {
         schema.clients,
         eq(schema.proposals.clientId, schema.clients.id)
       )
-      .orderBy(desc(schema.proposals.createdAt));
+      .orderBy(desc(schema.proposals.createdAt))
+      .limit(500);
 
     return NextResponse.json(rows);
   } catch (error) {

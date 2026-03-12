@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   CommandDialog,
@@ -96,13 +96,17 @@ export function CommandPalette() {
     return () => clearTimeout(timeout);
   }, [query]);
 
+  const actionInFlight = useRef(false);
   const handleSelect = useCallback(
     (url: string, isAction?: boolean) => {
+      if (isAction && actionInFlight.current) return; // prevent double-fire
       setOpen(false);
       setQuery("");
       if (isAction) {
-        // Fire API action
-        fetch(url, { method: "POST" }).catch(() => {});
+        actionInFlight.current = true;
+        fetch(url, { method: "POST" })
+          .catch(() => {})
+          .finally(() => { actionInFlight.current = false; });
       } else {
         router.push(url);
       }

@@ -43,38 +43,40 @@ export async function POST(_request: NextRequest, ctx: RouteContext) {
       );
     }
 
-    // Create client from lead data
-    const [client] = await db
-      .insert(schema.clients)
-      .values({
-        name: lead.contactName,
-        companyName: lead.companyName,
-        email: lead.email,
-        phone: lead.phone,
-        website: lead.website,
-        portalAccess: true,
-      })
-      .returning();
+    // Atomic transaction — create client + update lead + log activity + notify
+    const client = await db.transaction(async (tx) => {
+      const [newClient] = await tx
+        .insert(schema.clients)
+        .values({
+          name: lead.contactName,
+          companyName: lead.companyName,
+          email: lead.email,
+          phone: lead.phone,
+          website: lead.website,
+          portalAccess: true,
+        })
+        .returning();
 
-    // Update lead with conversion info
-    await db
-      .update(schema.leads)
-      .set({
-        convertedToClientId: client.id,
-        convertedAt: new Date(),
-        stage: "closed_won",
-      })
-      .where(eq(schema.leads.id, id));
+      await tx
+        .update(schema.leads)
+        .set({
+          convertedToClientId: newClient.id,
+          convertedAt: new Date(),
+          stage: "closed_won",
+        })
+        .where(eq(schema.leads.id, id));
 
-    // Log activity
-    await db.insert(schema.leadActivities).values({
-      leadId: id,
-      type: "stage_change",
-      content: `Converted to client: ${client.name} (${client.id})`,
-      createdById: userId,
+      await tx.insert(schema.leadActivities).values({
+        leadId: id,
+        type: "stage_change",
+        content: `Converted to client: ${newClient.name} (${newClient.id})`,
+        createdById: userId,
+      });
+
+      return newClient;
     });
 
-    // Notification
+    // Non-transactional side effects (ok to fail independently)
     await createNotification({
       userId,
       type: "general",

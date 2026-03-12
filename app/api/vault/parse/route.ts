@@ -5,7 +5,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { checkAdmin } from "@/lib/auth";
+import { captureError } from "@/lib/errors";
 import Anthropic from "@anthropic-ai/sdk";
 
 const client = new Anthropic();
@@ -13,12 +14,17 @@ const client = new Anthropic();
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {
-  const { userId } = await auth();
+  const userId = await checkAdmin();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
   const { text } = body as { text?: string };
 
   if (!text || text.trim().length < 5) {
@@ -55,8 +61,11 @@ export async function POST(req: NextRequest) {
     const cleaned = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "").trim();
     parsed = JSON.parse(cleaned);
   } catch {
+    captureError(new Error("Vault parse: AI returned invalid JSON"), {
+      tags: { route: "vault/parse" },
+    });
     return NextResponse.json(
-      { error: "Could not parse AI response", raw },
+      { error: "Could not parse AI response" },
       { status: 422 }
     );
   }

@@ -129,42 +129,46 @@ export const generateRecurringInvoices = inngest.createFunction(
             .filter(Boolean)
             .join("\n");
 
-          const [invoice] = await db
-            .insert(schema.invoices)
-            .values({
-              clientId: template.clientId,
-              number: invoiceNumber,
-              status: "draft",
-              amount: template.total,
-              lineItems: template.lineItems,
-              subtotal: template.subtotal ?? 0,
-              taxRate: template.taxRate ?? 0,
-              taxAmount: template.taxAmount ?? 0,
-              dueDate: new Date(dueDate + "T00:00:00Z"),
-              notes: invoiceNotes || null,
-              recurringInvoiceId: template.id,
-            })
-            .returning();
-
-          // 2. Auto-send if enabled
-          if (template.autoSend) {
-            await sendInvoice(invoice.id, "system");
-          }
-
-          // 3. Advance nextBillingDate
+          // Atomic: create invoice + advance billing date in one transaction
           const nextDate = advanceBillingDate(
             template.nextBillingDate,
             template.interval as BillingInterval
           );
 
-          await db
-            .update(schema.recurringInvoices)
-            .set({
-              nextBillingDate: nextDate,
-              invoicesGenerated: sql`${schema.recurringInvoices.invoicesGenerated} + 1`,
-              lastGeneratedAt: new Date(),
-            })
-            .where(eq(schema.recurringInvoices.id, template.id));
+          const [invoice] = await db.transaction(async (tx) => {
+            const [inv] = await tx
+              .insert(schema.invoices)
+              .values({
+                clientId: template.clientId,
+                number: invoiceNumber,
+                status: "draft",
+                amount: template.total,
+                lineItems: template.lineItems,
+                subtotal: template.subtotal ?? 0,
+                taxRate: template.taxRate ?? 0,
+                taxAmount: template.taxAmount ?? 0,
+                dueDate: new Date(dueDate + "T00:00:00Z"),
+                notes: invoiceNotes || null,
+                recurringInvoiceId: template.id,
+              })
+              .returning();
+
+            await tx
+              .update(schema.recurringInvoices)
+              .set({
+                nextBillingDate: nextDate,
+                invoicesGenerated: sql`${schema.recurringInvoices.invoicesGenerated} + 1`,
+                lastGeneratedAt: new Date(),
+              })
+              .where(eq(schema.recurringInvoices.id, template.id));
+
+            return [inv];
+          });
+
+          // Auto-send if enabled (outside transaction — ok to retry independently)
+          if (template.autoSend) {
+            await sendInvoice(invoice.id, "system");
+          }
 
           // 4. Audit log
           await createAuditLog({

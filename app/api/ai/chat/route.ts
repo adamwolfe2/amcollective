@@ -246,7 +246,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body = await req.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const { messages, conversationId, action } = body as {
     messages: UIMessage[];
     conversationId?: string;
@@ -266,11 +271,19 @@ export async function POST(req: NextRequest) {
     if (!query) {
       return NextResponse.json({ error: "Query required" }, { status: 400 });
     }
-    const result = await runResearch(query, userId);
-    return NextResponse.json({
-      response: result.summary,
-      sources: result.sources,
-    });
+    try {
+      const result = await runResearch(query, userId);
+      return NextResponse.json({
+        response: result.summary,
+        sources: result.sources,
+      });
+    } catch (err) {
+      captureError(err, { tags: { route: "ai/chat", action: "research" } });
+      return NextResponse.json(
+        { error: "Research failed. Please try again." },
+        { status: 500 }
+      );
+    }
   }
 
   // Detect CEO users (Adam / Maggie) — they get CEO system prompt + tools + memory

@@ -37,22 +37,26 @@ export async function POST(req: NextRequest) {
     }
 
     if (type === "cards") {
-      for (const item of items) {
-        const updates: Record<string, unknown> = { position: item.position };
-        if (item.columnId) updates.columnId = item.columnId;
+      await db.transaction(async (tx) => {
+        for (const item of items) {
+          const updates: Record<string, unknown> = { position: item.position };
+          if (item.columnId) updates.columnId = item.columnId;
 
-        await db
-          .update(schema.kanbanCards)
-          .set(updates)
-          .where(eq(schema.kanbanCards.id, item.id));
-      }
+          await tx
+            .update(schema.kanbanCards)
+            .set(updates)
+            .where(eq(schema.kanbanCards.id, item.id));
+        }
+      });
     } else if (type === "columns") {
-      for (const item of items) {
-        await db
-          .update(schema.kanbanColumns)
-          .set({ position: item.position })
-          .where(eq(schema.kanbanColumns.id, item.id));
-      }
+      await db.transaction(async (tx) => {
+        for (const item of items) {
+          await tx
+            .update(schema.kanbanColumns)
+            .set({ position: item.position })
+            .where(eq(schema.kanbanColumns.id, item.id));
+        }
+      });
     } else {
       return NextResponse.json(
         { error: "type must be 'cards' or 'columns'" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Send, Sparkles } from "lucide-react";
 
@@ -11,10 +11,13 @@ import { Send, Sparkles } from "lucide-react";
 export function FloatingChatBar() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   function submit() {
+    if (submitting) return;
     const text = inputRef.current?.value.trim() ?? "";
     if (inputRef.current) inputRef.current.value = "";
+    setSubmitting(true);
     router.push(text ? `/ai?q=${encodeURIComponent(text)}` : "/ai");
   }
 
@@ -28,15 +31,17 @@ export function FloatingChatBar() {
             ref={inputRef}
             type="text"
             placeholder="Ask AM Agent anything…"
+            disabled={submitting}
             onKeyDown={(e) => {
               if (e.key === "Enter") submit();
             }}
-            className="flex-1 bg-transparent text-sm font-mono placeholder:text-[#0A0A0A]/30 text-[#0A0A0A] focus:outline-none"
+            className="flex-1 bg-transparent text-sm font-mono placeholder:text-[#0A0A0A]/30 text-[#0A0A0A] focus:outline-none disabled:opacity-50"
           />
           <button
             onClick={submit}
+            disabled={submitting}
             aria-label="Ask AM Agent"
-            className="w-7 h-7 flex items-center justify-center bg-[#0A0A0A] rounded-full hover:bg-[#0A0A0A]/80 transition-colors shrink-0"
+            className="w-7 h-7 flex items-center justify-center bg-[#0A0A0A] rounded-full hover:bg-[#0A0A0A]/80 transition-colors shrink-0 disabled:opacity-50"
           >
             <Send className="w-3 h-3 text-white" />
           </button>

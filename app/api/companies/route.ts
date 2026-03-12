@@ -21,7 +21,8 @@ export async function GET() {
     const companies = await db
       .select()
       .from(schema.companies)
-      .orderBy(asc(schema.companies.name));
+      .orderBy(asc(schema.companies.name))
+      .limit(200);
 
     return NextResponse.json(companies);
   } catch (error) {
