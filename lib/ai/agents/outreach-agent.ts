@@ -208,7 +208,7 @@ export async function draftColdEmail(req: DraftRequest): Promise<DraftResult> {
     };
   }
 
-  const client = getAnthropicClient();
+  const client = getAnthropicClient()!;
   const model = req.useHighQuality ? MODEL_SONNET : MODEL_HAIKU;
 
   const message = await client.messages.create({

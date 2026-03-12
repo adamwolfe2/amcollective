@@ -2329,7 +2329,7 @@ export async function executeCeoTool(
         await db
           .update(schema.outreachCampaigns)
           .set({ knowledgeBase: updated, updatedAt: new Date() })
-          .where(eqOp(schema.outreachCampaigns.id, campaign.id));
+          .where(eq(schema.outreachCampaigns.id, campaign.id));
 
         return JSON.stringify({
           updated: true,

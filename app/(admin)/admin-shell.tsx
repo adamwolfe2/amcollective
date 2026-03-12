@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { UserButton } from "@clerk/nextjs";
 import {
   LayoutDashboard,
@@ -44,93 +44,261 @@ import {
   CalendarDays,
   Webhook,
   Download,
+  ChevronRight,
+  type LucideIcon,
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
 import { CompanySwitcher } from "@/components/company-switcher";
 
-const NAV_ITEMS = [
+// ─── Nav Structure ─────────────────────────────────────────────────────────
+
+interface NavItem {
+  label: string;
+  href: string;
+  icon: LucideIcon;
+}
+
+interface NavSection {
+  label: string;
+  items: NavItem[];
+}
+
+// Top-level items (always visible, no section header)
+const TOP_LEVEL: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Strategy", href: "/strategy", icon: TrendingUp },
-  { label: "Sprints", href: "/sprints", icon: Zap },
-  { label: "Leads", href: "/leads", icon: Crosshair },
-  { label: "Clients", href: "/clients", icon: Users },
-  { label: "Products", href: "/products", icon: Package },
-  { label: "Projects", href: "/projects", icon: FolderKanban },
-  { label: "Tasks", href: "/tasks", icon: ListTodo },
-  { label: "Time", href: "/time", icon: Clock },
-  { label: "Contracts", href: "/contracts", icon: FileCheck },
-  { label: "Proposals", href: "/proposals", icon: FileSignature },
-  { label: "Invoices", href: "/invoices", icon: Receipt },
-  { label: "Services", href: "/services", icon: Briefcase },
-  { label: "Team", href: "/team", icon: UserCog },
-  { label: "Finance", href: "/finance", icon: Landmark },
-  { label: "Knowledge", href: "/knowledge", icon: BookOpen },
-  { label: "Documents", href: "/documents", icon: FileText },
-  { label: "Costs", href: "/costs", icon: DollarSign },
-  { label: "Domains", href: "/domains", icon: Globe },
-  { label: "Meetings", href: "/meetings", icon: CalendarDays },
-  { label: "Rocks", href: "/rocks", icon: Target },
-  { label: "Forecast", href: "/forecast", icon: TrendingUp },
-  { label: "Analytics", href: "/analytics", icon: LineChart },
-  { label: "Intelligence", href: "/intelligence", icon: BrainCircuit },
-  { label: "NPS", href: "/nps", icon: Star },
-  { label: "Scorecard", href: "/scorecard", icon: BarChart3 },
-  { label: "Messages", href: "/messages", icon: MessageSquare },
-  { label: "Email", href: "/email", icon: Mail },
-  { label: "Outreach", href: "/outreach", icon: Send },
   { label: "AI", href: "/ai", icon: Sparkles },
-  { label: "Alerts", href: "/alerts", icon: Bell },
-  { label: "Vault", href: "/vault", icon: KeyRound },
-  { label: "Compliance", href: "/compliance", icon: ShieldCheck },
-  { label: "Exports", href: "/exports", icon: Download },
-  { label: "Webhooks", href: "/webhooks", icon: Webhook },
-  { label: "Activity", href: "/activity", icon: Activity },
-  { label: "Settings", href: "/settings", icon: Settings },
-] as const;
+];
 
-const LS_KEY = "am_hidden_nav";
+const NAV_SECTIONS: NavSection[] = [
+  {
+    label: "Pipeline",
+    items: [
+      { label: "Leads", href: "/leads", icon: Crosshair },
+      { label: "Clients", href: "/clients", icon: Users },
+      { label: "Proposals", href: "/proposals", icon: FileSignature },
+      { label: "Contracts", href: "/contracts", icon: FileCheck },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { label: "Sprints", href: "/sprints", icon: Zap },
+      { label: "Tasks", href: "/tasks", icon: ListTodo },
+      { label: "Time", href: "/time", icon: Clock },
+      { label: "Rocks", href: "/rocks", icon: Target },
+      { label: "Meetings", href: "/meetings", icon: CalendarDays },
+      { label: "Scorecard", href: "/scorecard", icon: BarChart3 },
+    ],
+  },
+  {
+    label: "Portfolio",
+    items: [
+      { label: "Products", href: "/products", icon: Package },
+      { label: "Projects", href: "/projects", icon: FolderKanban },
+      { label: "Services", href: "/services", icon: Briefcase },
+      { label: "Domains", href: "/domains", icon: Globe },
+    ],
+  },
+  {
+    label: "Finance",
+    items: [
+      { label: "Invoices", href: "/invoices", icon: Receipt },
+      { label: "Finance", href: "/finance", icon: Landmark },
+      { label: "Costs", href: "/costs", icon: DollarSign },
+      { label: "Forecast", href: "/forecast", icon: TrendingUp },
+    ],
+  },
+  {
+    label: "Comms",
+    items: [
+      { label: "Messages", href: "/messages", icon: MessageSquare },
+      { label: "Email", href: "/email", icon: Mail },
+      { label: "Outreach", href: "/outreach", icon: Send },
+      { label: "NPS", href: "/nps", icon: Star },
+    ],
+  },
+  {
+    label: "Knowledge",
+    items: [
+      { label: "Knowledge", href: "/knowledge", icon: BookOpen },
+      { label: "Documents", href: "/documents", icon: FileText },
+      { label: "Analytics", href: "/analytics", icon: LineChart },
+      { label: "Intelligence", href: "/intelligence", icon: BrainCircuit },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { label: "Team", href: "/team", icon: UserCog },
+      { label: "Alerts", href: "/alerts", icon: Bell },
+      { label: "Vault", href: "/vault", icon: KeyRound },
+      { label: "Compliance", href: "/compliance", icon: ShieldCheck },
+      { label: "Exports", href: "/exports", icon: Download },
+      { label: "Webhooks", href: "/webhooks", icon: Webhook },
+      { label: "Activity", href: "/activity", icon: Activity },
+      { label: "Settings", href: "/settings", icon: Settings },
+    ],
+  },
+];
 
-function useVisibleNavItems() {
-  const [hidden, setHidden] = useState<string[]>([]);
+// ─── Collapse State ────────────────────────────────────────────────────────
+
+const LS_COLLAPSED_KEY = "am_nav_collapsed";
+
+function useCollapsedSections(pathname: string) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [loaded, setLoaded] = useState(false);
+
+  // Load from localStorage on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(LS_KEY);
-      if (stored) setHidden(JSON.parse(stored));
+      const stored = localStorage.getItem(LS_COLLAPSED_KEY);
+      if (stored) setCollapsed(new Set(JSON.parse(stored)));
     } catch {}
+    setLoaded(true);
   }, []);
-  return NAV_ITEMS.filter((item) => !hidden.includes(item.href));
+
+  // Persist to localStorage on change
+  useEffect(() => {
+    if (!loaded) return;
+    try {
+      localStorage.setItem(
+        LS_COLLAPSED_KEY,
+        JSON.stringify([...collapsed])
+      );
+    } catch {}
+  }, [collapsed, loaded]);
+
+  // Check if a section has an active child
+  const sectionHasActive = useCallback(
+    (section: NavSection) =>
+      section.items.some(
+        (item) =>
+          pathname === item.href ||
+          (item.href !== "/dashboard" &&
+            pathname.startsWith(item.href + "/"))
+      ),
+    [pathname]
+  );
+
+  const toggle = useCallback((label: string) => {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label);
+      else next.add(label);
+      return next;
+    });
+  }, []);
+
+  const isCollapsed = useCallback(
+    (section: NavSection) => {
+      // If section has the active page, always expand
+      if (sectionHasActive(section)) return false;
+      return collapsed.has(section.label);
+    },
+    [collapsed, sectionHasActive]
+  );
+
+  return { toggle, isCollapsed, loaded };
 }
+
+// ─── Nav Link ──────────────────────────────────────────────────────────────
+
+function NavLink({
+  item,
+  pathname,
+  onNavigate,
+}: {
+  item: NavItem;
+  pathname: string;
+  onNavigate?: () => void;
+}) {
+  const isActive =
+    pathname === item.href ||
+    (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+
+  return (
+    <Link
+      href={item.href}
+      onClick={onNavigate}
+      className={`flex items-center gap-3 px-3 py-2 text-sm font-medium transition-colors ${
+        isActive
+          ? "bg-white/10 text-white"
+          : "text-white/50 hover:bg-white/[0.06] hover:text-white/80"
+      }`}
+    >
+      <item.icon className="h-4 w-4 shrink-0" />
+      {item.label}
+    </Link>
+  );
+}
+
+// ─── Sidebar Nav ───────────────────────────────────────────────────────────
 
 function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
-  const visibleItems = useVisibleNavItems();
+  const { toggle, isCollapsed, loaded } = useCollapsedSections(pathname);
 
   return (
-    <nav className="space-y-0.5 flex-1">
-      {visibleItems.map((item) => {
-        const isActive =
-          pathname === item.href ||
-          (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
+    <nav className="flex-1 space-y-1">
+      {/* Top-level items */}
+      {TOP_LEVEL.map((item) => (
+        <NavLink
+          key={item.href}
+          item={item}
+          pathname={pathname}
+          onNavigate={onNavigate}
+        />
+      ))}
+
+      {/* Sections */}
+      {NAV_SECTIONS.map((section) => {
+        const sectionCollapsed = loaded ? isCollapsed(section) : false;
+        const hasActive = section.items.some(
+          (item) =>
+            pathname === item.href ||
+            (item.href !== "/dashboard" &&
+              pathname.startsWith(item.href + "/"))
+        );
 
         return (
-          <Link
-            key={item.href}
-            href={item.href}
-            onClick={onNavigate}
-            className={`flex items-center gap-3 px-3 py-3 md:py-2.5 text-sm font-medium transition-colors ${
-              isActive
-                ? "bg-white/10 text-white"
-                : "text-white/50 hover:bg-white/[0.06] hover:text-white/80"
-            }`}
-          >
-            <item.icon className="h-4 w-4 shrink-0" />
-            {item.label}
-          </Link>
+          <div key={section.label} className="pt-2">
+            <button
+              onClick={() => toggle(section.label)}
+              className={`flex items-center justify-between w-full px-3 py-1.5 text-[10px] font-mono uppercase tracking-widest transition-colors ${
+                hasActive
+                  ? "text-white/60"
+                  : "text-white/25 hover:text-white/40"
+              }`}
+            >
+              {section.label}
+              <ChevronRight
+                className={`h-3 w-3 transition-transform duration-150 ${
+                  sectionCollapsed ? "" : "rotate-90"
+                }`}
+              />
+            </button>
+            {!sectionCollapsed && (
+              <div className="mt-0.5">
+                {section.items.map((item) => (
+                  <NavLink
+                    key={item.href}
+                    item={item}
+                    pathname={pathname}
+                    onNavigate={onNavigate}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         );
       })}
     </nav>
   );
 }
+
+// ─── Shell ─────────────────────────────────────────────────────────────────
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -139,7 +307,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     <div className="flex min-h-screen">
       {/* Desktop Sidebar */}
       <aside className="w-60 bg-[#0A0A0A] p-5 hidden md:flex md:flex-col overflow-y-auto shrink-0 border-r border-white/10">
-        <div className="mb-8 px-1">
+        <div className="mb-6 px-1">
           <Link
             href="/dashboard"
             className="font-serif font-bold text-xl text-white tracking-tight"
@@ -167,7 +335,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="flex items-center justify-between mb-8 px-1">
+        <div className="flex items-center justify-between mb-6 px-1">
           <Link
             href="/dashboard"
             className="font-serif font-bold text-xl text-white tracking-tight"
