@@ -13,6 +13,7 @@ import { createAuditLog } from "@/lib/db/repositories/audit";
 import { generateContractNumber } from "@/lib/invoices/number";
 import { buildSectionsFromProposal, DEFAULT_CONTRACT_SECTIONS } from "@/lib/contracts/templates";
 import crypto from "crypto";
+import { aj } from "@/lib/middleware/arcjet";
 
 export async function GET() {
   try {
@@ -40,6 +41,13 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  if (aj) {
+    const decision = await aj.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   try {
     const userId = await checkAdmin();
     if (!userId) {

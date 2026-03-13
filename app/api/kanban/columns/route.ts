@@ -13,6 +13,7 @@ import { eq, asc } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
+import { aj } from "@/lib/middleware/arcjet";
 
 export async function GET(req: NextRequest) {
   const userId = await checkAdmin();
@@ -38,6 +39,13 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (aj) {
+    const decision = await aj.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   const userId = await checkAdmin();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

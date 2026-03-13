@@ -10,6 +10,7 @@ import { eq, desc, and, sql } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { aj } from "@/lib/middleware/arcjet";
 
 export async function GET(request: NextRequest) {
   try {
@@ -78,6 +79,13 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (aj) {
+    const decision = await aj.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   try {
     const userId = await checkAdmin();
     if (!userId) {

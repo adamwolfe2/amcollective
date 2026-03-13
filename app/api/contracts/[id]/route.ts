@@ -13,6 +13,7 @@ import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { sendContractEmail, sendContractExecutedEmail } from "@/lib/email/notifications";
 import { after } from "next/server";
+import { aj } from "@/lib/middleware/arcjet";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -52,6 +53,13 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
 }
 
 export async function PATCH(request: NextRequest, ctx: RouteContext) {
+  if (aj) {
+    const decision = await aj.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   try {
     const userId = await checkAdmin();
     if (!userId) {

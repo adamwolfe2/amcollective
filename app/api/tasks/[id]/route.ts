@@ -11,6 +11,7 @@ import { eq, asc } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { aj } from "@/lib/middleware/arcjet";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -63,6 +64,13 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
 }
 
 export async function PATCH(request: NextRequest, ctx: RouteContext) {
+  if (aj) {
+    const decision = await aj.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   try {
     const userId = await checkAdmin();
     if (!userId) {
@@ -121,6 +129,13 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
 }
 
 export async function DELETE(_request: NextRequest, ctx: RouteContext) {
+  if (aj) {
+    const decision = await aj.protect(_request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   try {
     const userId = await checkAdmin();
     if (!userId) {
