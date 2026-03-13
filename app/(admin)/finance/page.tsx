@@ -4,6 +4,7 @@ import { desc, eq, and, gte, lte, sql, count } from "drizzle-orm";
 import { format } from "date-fns";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as mercuryConnector from "@/lib/connectors/mercury";
+import type { MercuryAccount } from "@/lib/connectors/mercury";
 import { CashFlowChart } from "./cash-flow-chart";
 import { TransactionFeed } from "./transaction-feed";
 import { MercurySyncButton } from "./sync-button";
@@ -11,154 +12,179 @@ import { MercurySyncButton } from "./sync-button";
 const PAGE_SIZE = 50;
 
 async function getMetrics() {
-  const sixtyDaysAgo = new Date();
-  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
+  try {
+    const sixtyDaysAgo = new Date();
+    sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
 
-  const [accountsResult, mrrResult, spendResult] = await Promise.all([
-    mercuryConnector.getAccounts(),
-    stripeConnector.getMRR(),
-    db
-      .select({ totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)` })
-      .from(schema.mercuryTransactions)
-      .where(
-        and(
-          eq(schema.mercuryTransactions.direction, "debit"),
-          gte(schema.mercuryTransactions.postedAt, sixtyDaysAgo)
-        )
-      ),
-  ]);
+    const [accountsResult, mrrResult, spendResult] = await Promise.all([
+      mercuryConnector.getAccounts(),
+      stripeConnector.getMRR(),
+      db
+        .select({ totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)` })
+        .from(schema.mercuryTransactions)
+        .where(
+          and(
+            eq(schema.mercuryTransactions.direction, "debit"),
+            gte(schema.mercuryTransactions.postedAt, sixtyDaysAgo)
+          )
+        ),
+    ]);
 
-  const accounts = accountsResult.success ? (accountsResult.data ?? []) : [];
-  const totalCash = accounts.reduce((s, a) => s + a.currentBalance, 0);
-  const mrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) / 100 : 0;
-  const arr = mrr * 12;
-  const monthlySpend = Number(spendResult[0]?.totalSpend ?? 0) / 2;
-  const runway = monthlySpend > 0 ? totalCash / monthlySpend : null;
+    const accounts = accountsResult.success ? (accountsResult.data ?? []) : [];
+    const totalCash = accounts.reduce((s, a) => s + a.currentBalance, 0);
+    const mrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) / 100 : 0;
+    const arr = mrr * 12;
+    const monthlySpend = Number(spendResult[0]?.totalSpend ?? 0) / 2;
+    const runway = monthlySpend > 0 ? totalCash / monthlySpend : null;
 
-  return { totalCash, mrr, arr, runway, monthlySpend, accounts };
+    return { totalCash, mrr, arr, runway, monthlySpend, accounts };
+  } catch (err) {
+    console.error("[Finance] getMetrics failed:", err);
+    return { totalCash: 0, mrr: 0, arr: 0, runway: null, monthlySpend: 0, accounts: [] as MercuryAccount[] };
+  }
 }
 
 async function getCashFlowData() {
-  const ninetyDaysAgo = new Date();
-  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+  try {
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 
-  const dailyTxns = await db
-    .select({
-      date: sql<string>`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`,
-      credits: sql<string>`COALESCE(SUM(CASE WHEN ${schema.mercuryTransactions.direction} = 'credit' THEN ABS(${schema.mercuryTransactions.amount}) ELSE 0 END), 0)`,
-      debits: sql<string>`COALESCE(SUM(CASE WHEN ${schema.mercuryTransactions.direction} = 'debit' THEN ABS(${schema.mercuryTransactions.amount}) ELSE 0 END), 0)`,
-    })
-    .from(schema.mercuryTransactions)
-    .where(gte(schema.mercuryTransactions.postedAt, ninetyDaysAgo))
-    .groupBy(
-      sql`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`
-    )
-    .orderBy(
-      sql`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`
-    );
+    const dailyTxns = await db
+      .select({
+        date: sql<string>`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`,
+        credits: sql<string>`COALESCE(SUM(CASE WHEN ${schema.mercuryTransactions.direction} = 'credit' THEN ABS(${schema.mercuryTransactions.amount}) ELSE 0 END), 0)`,
+        debits: sql<string>`COALESCE(SUM(CASE WHEN ${schema.mercuryTransactions.direction} = 'debit' THEN ABS(${schema.mercuryTransactions.amount}) ELSE 0 END), 0)`,
+      })
+      .from(schema.mercuryTransactions)
+      .where(gte(schema.mercuryTransactions.postedAt, ninetyDaysAgo))
+      .groupBy(
+        sql`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`
+      )
+      .orderBy(
+        sql`TO_CHAR(${schema.mercuryTransactions.postedAt}, 'YYYY-MM-DD')`
+      );
 
-  // Calculate running balance
-  let balance = 0;
-  return dailyTxns.map((d) => {
-    const credits = Number(d.credits);
-    const debits = Number(d.debits);
-    balance += credits - debits;
-    return {
-      date: d.date ?? "",
-      credits,
-      debits,
-      balance,
-    };
-  });
+    // Calculate running balance
+    let balance = 0;
+    return dailyTxns.map((d) => {
+      const credits = Number(d.credits);
+      const debits = Number(d.debits);
+      balance += credits - debits;
+      return {
+        date: d.date ?? "",
+        credits,
+        debits,
+        balance,
+      };
+    });
+  } catch (err) {
+    console.error("[Finance] getCashFlowData failed:", err);
+    return [];
+  }
 }
 
 async function getTransactions(page: number) {
-  const offset = (page - 1) * PAGE_SIZE;
+  try {
+    const offset = (page - 1) * PAGE_SIZE;
 
-  const [totalRows, txns] = await Promise.all([
-    db.select({ total: count() }).from(schema.mercuryTransactions),
-    db
-      .select({
-        id: schema.mercuryTransactions.id,
-        accountName: schema.mercuryAccounts.name,
-        counterpartyName: schema.mercuryTransactions.counterpartyName,
-        amount: schema.mercuryTransactions.amount,
-        direction: schema.mercuryTransactions.direction,
-        status: schema.mercuryTransactions.status,
-        description: schema.mercuryTransactions.description,
-        companyTag: schema.mercuryTransactions.companyTag,
-        postedAt: schema.mercuryTransactions.postedAt,
-        createdAt: schema.mercuryTransactions.createdAt,
-      })
-      .from(schema.mercuryTransactions)
-      .innerJoin(
-        schema.mercuryAccounts,
-        eq(schema.mercuryTransactions.accountId, schema.mercuryAccounts.id)
-      )
-      .orderBy(desc(schema.mercuryTransactions.postedAt))
-      .limit(PAGE_SIZE)
-      .offset(offset),
-  ]);
+    const [totalRows, txns] = await Promise.all([
+      db.select({ total: count() }).from(schema.mercuryTransactions),
+      db
+        .select({
+          id: schema.mercuryTransactions.id,
+          accountName: schema.mercuryAccounts.name,
+          counterpartyName: schema.mercuryTransactions.counterpartyName,
+          amount: schema.mercuryTransactions.amount,
+          direction: schema.mercuryTransactions.direction,
+          status: schema.mercuryTransactions.status,
+          description: schema.mercuryTransactions.description,
+          companyTag: schema.mercuryTransactions.companyTag,
+          postedAt: schema.mercuryTransactions.postedAt,
+          createdAt: schema.mercuryTransactions.createdAt,
+        })
+        .from(schema.mercuryTransactions)
+        .innerJoin(
+          schema.mercuryAccounts,
+          eq(schema.mercuryTransactions.accountId, schema.mercuryAccounts.id)
+        )
+        .orderBy(desc(schema.mercuryTransactions.postedAt))
+        .limit(PAGE_SIZE)
+        .offset(offset),
+    ]);
 
-  return {
-    transactions: txns.map((t) => ({
-      ...t,
-      amount: String(t.amount),
-      postedAt: t.postedAt?.toISOString() ?? null,
-      createdAt: t.createdAt.toISOString(),
-    })),
-    totalCount: totalRows[0]?.total ?? 0,
-  };
+    return {
+      transactions: txns.map((t) => ({
+        ...t,
+        amount: String(t.amount),
+        postedAt: t.postedAt?.toISOString() ?? null,
+        createdAt: t.createdAt.toISOString(),
+      })),
+      totalCount: totalRows[0]?.total ?? 0,
+    };
+  } catch (err) {
+    console.error("[Finance] getTransactions failed:", err);
+    return { transactions: [], totalCount: 0 };
+  }
 }
 
 async function getRevenueTrend() {
-  const result = await stripeConnector.getRevenueTrend(6);
-  if (!result.success || !result.data) return [];
-  return result.data.map((p) => ({
-    month: p.month,
-    revenue: p.revenue / 100,
-  }));
+  try {
+    const result = await stripeConnector.getRevenueTrend(6);
+    if (!result.success || !result.data) return [];
+    return result.data.map((p) => ({
+      month: p.month,
+      revenue: p.revenue / 100,
+    }));
+  } catch (err) {
+    console.error("[Finance] getRevenueTrend failed:", err);
+    return [];
+  }
 }
 
 async function getCostData() {
-  const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+  try {
+    const thirtyDaysFromNow = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-  const [activeCosts, upcomingRenewals] = await Promise.all([
-    db
-      .select()
-      .from(schema.subscriptionCosts)
-      .where(eq(schema.subscriptionCosts.isActive, true))
-      .orderBy(desc(schema.subscriptionCosts.amount)),
-    db
-      .select()
-      .from(schema.subscriptionCosts)
-      .where(
-        and(
-          eq(schema.subscriptionCosts.isActive, true),
-          lte(schema.subscriptionCosts.nextRenewal, thirtyDaysFromNow)
+    const [activeCosts, upcomingRenewals] = await Promise.all([
+      db
+        .select()
+        .from(schema.subscriptionCosts)
+        .where(eq(schema.subscriptionCosts.isActive, true))
+        .orderBy(desc(schema.subscriptionCosts.amount)),
+      db
+        .select()
+        .from(schema.subscriptionCosts)
+        .where(
+          and(
+            eq(schema.subscriptionCosts.isActive, true),
+            lte(schema.subscriptionCosts.nextRenewal, thirtyDaysFromNow)
+          )
         )
-      )
-      .orderBy(schema.subscriptionCosts.nextRenewal),
-  ]);
+        .orderBy(schema.subscriptionCosts.nextRenewal),
+    ]);
 
-  // Group by company tag for burn breakdown
-  const burnByCompany = new Map<string, number>();
-  let totalMonthlyBurn = 0;
-  for (const cost of activeCosts) {
-    const monthly = cost.billingCycle === "annual" ? cost.amount / 12 : cost.amount;
-    totalMonthlyBurn += monthly;
-    const current = burnByCompany.get(cost.companyTag) ?? 0;
-    burnByCompany.set(cost.companyTag, current + monthly);
+    // Group by company tag for burn breakdown
+    const burnByCompany = new Map<string, number>();
+    let totalMonthlyBurn = 0;
+    for (const cost of activeCosts) {
+      const monthly = cost.billingCycle === "annual" ? cost.amount / 12 : cost.amount;
+      totalMonthlyBurn += monthly;
+      const current = burnByCompany.get(cost.companyTag) ?? 0;
+      burnByCompany.set(cost.companyTag, current + monthly);
+    }
+
+    return {
+      activeCosts,
+      upcomingRenewals,
+      totalMonthlyBurn: Math.round(totalMonthlyBurn) / 100,
+      burnByCompany: Array.from(burnByCompany.entries())
+        .map(([tag, amount]) => ({ tag, amount: Math.round(amount) / 100 }))
+        .sort((a, b) => b.amount - a.amount),
+    };
+  } catch (err) {
+    console.error("[Finance] getCostData failed:", err);
+    return { activeCosts: [], upcomingRenewals: [], totalMonthlyBurn: 0, burnByCompany: [] };
   }
-
-  return {
-    activeCosts,
-    upcomingRenewals,
-    totalMonthlyBurn: Math.round(totalMonthlyBurn) / 100,
-    burnByCompany: Array.from(burnByCompany.entries())
-      .map(([tag, amount]) => ({ tag, amount: Math.round(amount) / 100 }))
-      .sort((a, b) => b.amount - a.amount),
-  };
 }
 
 export default async function FinancePage({

@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { getClientByClerkId } from "@/lib/db/repositories/clients";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, asc, and } from "drizzle-orm";
+import { eq, asc } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
 
 const PRIORITY_STYLES: Record<string, string> = {

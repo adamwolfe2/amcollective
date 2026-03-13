@@ -12,7 +12,7 @@
 
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { inArray, desc, gte } from "drizzle-orm";
+import { inArray, desc } from "drizzle-orm";
 import { formatMemoryForPrompt } from "@/lib/db/repositories/bot-memory";
 
 const CONVERSATION_LOOKBACK_DAYS = 14;

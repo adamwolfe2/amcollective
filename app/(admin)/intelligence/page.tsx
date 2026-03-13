@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 import { AlertTriangle, ArrowUp, TrendingUp, Users, Zap } from "lucide-react";
 
 const CATEGORY_ICONS: Record<string, typeof AlertTriangle> = {

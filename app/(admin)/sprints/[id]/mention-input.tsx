@@ -51,7 +51,7 @@ export function MentionInput({
     setOpen(false);
   }
 
-  function handleClear() {
+  function _handleClear() {
     onChange("");
     onSelect(null);
     inputRef.current?.focus();

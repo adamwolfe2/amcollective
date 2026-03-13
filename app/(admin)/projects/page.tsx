@@ -20,7 +20,7 @@ import { AddProjectDialog } from "./add-project-dialog";
 import { formatDistanceToNow } from "date-fns";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { count, eq } from "drizzle-orm";
+import { count } from "drizzle-orm";
 
 const statusStyles: Record<string, string> = {
   active: "border-green-600 text-green-700 bg-green-50",

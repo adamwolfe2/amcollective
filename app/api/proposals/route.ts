@@ -3,7 +3,8 @@
  * POST /api/proposals — Create a new proposal.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
@@ -11,6 +12,27 @@ import * as schema from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { generateProposalNumber } from "@/lib/invoices/number";
+import { aj } from "@/lib/middleware/arcjet";
+
+const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "am_collective", "personal", "untagged"] as const;
+
+const proposalSchema = z.object({
+  clientId: z.string().uuid(),
+  companyTag: z.enum(companyTags).optional(),
+  title: z.string().min(1).max(500).trim(),
+  summary: z.string().max(10000).optional().nullable(),
+  scope: z.unknown().optional().nullable(),
+  deliverables: z.unknown().optional().nullable(),
+  timeline: z.unknown().optional().nullable(),
+  lineItems: z.unknown().optional().nullable(),
+  subtotal: z.number().min(0).max(100_000_000).optional().nullable(),
+  taxRate: z.number().min(0).max(100).optional(),
+  taxAmount: z.number().min(0).max(100_000_000).optional(),
+  total: z.number().min(0).max(100_000_000).optional().nullable(),
+  paymentTerms: z.string().max(1000).optional(),
+  validUntil: z.string().optional().nullable(),
+  internalNotes: z.string().max(5000).optional().nullable(),
+});
 
 export async function GET() {
   try {
@@ -46,22 +68,37 @@ export async function GET() {
   }
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  if (aj) {
+    const decision = await aj.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+  }
+
   try {
     const userId = await checkAdmin();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
-
-    if (!body.title || typeof body.title !== "string") {
-      return NextResponse.json({ error: "title is required" }, { status: 400 });
-    }
-    if (body.title.length > 500) {
-      return NextResponse.json({ error: "title must be 500 characters or fewer" }, { status: 400 });
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
+    const parsed = proposalSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const firstError = parsed.error.errors[0];
+      return NextResponse.json(
+        { error: "Validation failed", field: firstError?.path?.join("."), message: firstError?.message },
+        { status: 400 }
+      );
+    }
+
+    const body = parsed.data;
     const proposalNumber = await generateProposalNumber();
 
     const [proposal] = await db
@@ -69,13 +106,13 @@ export async function POST(req: Request) {
       .values({
         clientId: body.clientId,
         companyTag: body.companyTag ?? "am_collective",
-        title: body.title.slice(0, 500),
+        title: body.title,
         proposalNumber,
-        summary: body.summary ? String(body.summary).slice(0, 10000) : null,
-        scope: body.scope ?? null,
-        deliverables: body.deliverables ?? null,
-        timeline: body.timeline ?? null,
-        lineItems: body.lineItems ?? null,
+        summary: body.summary ?? null,
+        scope: (body.scope ?? null) as typeof schema.proposals.$inferInsert.scope,
+        deliverables: (body.deliverables ?? null) as typeof schema.proposals.$inferInsert.deliverables,
+        timeline: (body.timeline as string) ?? null,
+        lineItems: (body.lineItems ?? null) as typeof schema.proposals.$inferInsert.lineItems,
         subtotal: body.subtotal ?? null,
         taxRate: body.taxRate ?? 0,
         taxAmount: body.taxAmount ?? 0,

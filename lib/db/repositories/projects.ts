@@ -6,7 +6,7 @@ import {
   clientProjects,
   clients,
 } from "@/lib/db/schema";
-import { eq, desc, count, sql } from "drizzle-orm";
+import { eq, desc, count } from "drizzle-orm";
 import { createAuditLog } from "./audit";
 
 export type PortfolioProject = typeof portfolioProjects.$inferSelect;

@@ -6,7 +6,7 @@ import { getClientInvoices } from "@/lib/db/repositories/invoices";
 import { getEntityActivity } from "@/lib/db/repositories/activity";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import {

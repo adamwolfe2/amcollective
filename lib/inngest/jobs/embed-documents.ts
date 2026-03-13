@@ -11,7 +11,7 @@ import { captureError } from "@/lib/errors";
 import { storeEmbedding } from "@/lib/ai/embeddings";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { sql, gt } from "drizzle-orm";
+import { gt } from "drizzle-orm";
 
 export const embedDocuments = inngest.createFunction(
   {

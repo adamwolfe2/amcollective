@@ -23,7 +23,7 @@ import { storeEmbedding } from "@/lib/ai/embeddings";
 import { snoozeAlert, resolveAlert, getAlerts } from "@/lib/db/repositories/alerts";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { sanitizeUserInput } from "@/lib/ai/sanitize";
 import { ajWebhook } from "@/lib/middleware/arcjet";
 

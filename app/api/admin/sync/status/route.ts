@@ -9,7 +9,7 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { desc, sql } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 
 export const runtime = "nodejs";
 

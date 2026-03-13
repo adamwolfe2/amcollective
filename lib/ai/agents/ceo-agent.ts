@@ -186,7 +186,7 @@ function getToolsMap(): Map<string, Anthropic.Tool> {
  */
 function selectToolsForQuery(message: string): Anthropic.Tool[] {
   const lower = message.toLowerCase();
-  const map = getToolsMap();
+  const _map = getToolsMap();
   const selected = new Set<string>(CORE_TOOL_NAMES);
 
   for (const mod of TOOL_MODULES) {

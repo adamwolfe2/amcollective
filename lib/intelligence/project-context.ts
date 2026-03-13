@@ -8,7 +8,7 @@
 
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, desc, and, gte, sql, count, isNull } from "drizzle-orm";
+import { eq, desc, and, sql, isNull } from "drizzle-orm";
 
 export type SprintWeek = {
   sprintId: string;

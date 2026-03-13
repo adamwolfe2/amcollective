@@ -12,7 +12,6 @@ import { checkAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { encryptPassword } from "@/lib/vault/crypto";
-import { ilike } from "drizzle-orm";
 
 // ─── Credential Map ───────────────────────────────────────────────────────────
 // Each entry: { label, service, envVar, url?, notes? }

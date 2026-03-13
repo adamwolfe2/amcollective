@@ -7,7 +7,7 @@
 import { getAnthropicClient, MODEL_HAIKU } from "../client";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { sql, gte, eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { createAlert } from "@/lib/db/repositories/alerts";
 
 interface CostSummary {

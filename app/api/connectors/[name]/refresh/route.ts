@@ -10,7 +10,7 @@
 
 import { NextResponse } from "next/server";
 import { checkAdmin } from "@/lib/auth";
-import { invalidateCache, getCachedAt } from "@/lib/connectors/base";
+import { invalidateCache } from "@/lib/connectors/base";
 
 // Known connector cache keys — invalidate all keys for the given connector name
 const CONNECTOR_KEYS: Record<string, string[]> = {

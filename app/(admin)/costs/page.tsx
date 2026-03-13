@@ -11,267 +11,310 @@ import Link from "next/link";
 // ─── Data Fetchers ────────────────────────────────────────────────────────────
 
 async function getCommandCenterMetrics() {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const sixtyDaysAgo = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000);
 
-  const [accounts, mrrResult, activeSubs, toolCostResult, aiCostResult, spendResult] =
-    await Promise.all([
-      db.select({ balance: schema.mercuryAccounts.balance }).from(schema.mercuryAccounts),
-      stripeConnector.getMRR(),
-      db
-        .select({ amount: schema.subscriptionCosts.amount, billingCycle: schema.subscriptionCosts.billingCycle })
-        .from(schema.subscriptionCosts)
-        .where(eq(schema.subscriptionCosts.isActive, true)),
-      db
-        .select({ total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)` })
-        .from(schema.toolCosts)
-        .where(gte(schema.toolCosts.createdAt, monthStart)),
-      db
-        .select({ total: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)` })
-        .from(schema.apiUsage)
-        .where(gte(schema.apiUsage.createdAt, monthStart)),
-      db
-        .select({ totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)` })
-        .from(schema.mercuryTransactions)
-        .where(
-          and(
-            eq(schema.mercuryTransactions.direction, "debit"),
-            gte(schema.mercuryTransactions.postedAt, sixtyDaysAgo)
-          )
-        ),
-    ]);
+    const [accounts, mrrResult, activeSubs, toolCostResult, aiCostResult, spendResult] =
+      await Promise.all([
+        db.select({ balance: schema.mercuryAccounts.balance }).from(schema.mercuryAccounts),
+        stripeConnector.getMRR(),
+        db
+          .select({ amount: schema.subscriptionCosts.amount, billingCycle: schema.subscriptionCosts.billingCycle })
+          .from(schema.subscriptionCosts)
+          .where(eq(schema.subscriptionCosts.isActive, true)),
+        db
+          .select({ total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)` })
+          .from(schema.toolCosts)
+          .where(gte(schema.toolCosts.createdAt, monthStart)),
+        db
+          .select({ total: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)` })
+          .from(schema.apiUsage)
+          .where(gte(schema.apiUsage.createdAt, monthStart)),
+        db
+          .select({ totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)` })
+          .from(schema.mercuryTransactions)
+          .where(
+            and(
+              eq(schema.mercuryTransactions.direction, "debit"),
+              gte(schema.mercuryTransactions.postedAt, sixtyDaysAgo)
+            )
+          ),
+      ]);
 
-  const totalCash = accounts.reduce((s, a) => s + Number(a.balance), 0);
-  const mrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) / 100 : 0;
+    const totalCash = accounts.reduce((s, a) => s + Number(a.balance), 0);
+    const mrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) / 100 : 0;
 
-  const subscriptionBurn = activeSubs.reduce((sum, sub) => {
-    const monthly = sub.billingCycle === "annual"
-      ? Math.round(sub.amount / 12)
-      : sub.amount;
-    return sum + monthly;
-  }, 0);
+    const subscriptionBurn = activeSubs.reduce((sum, sub) => {
+      const monthly = sub.billingCycle === "annual"
+        ? Math.round(sub.amount / 12)
+        : sub.amount;
+      return sum + monthly;
+    }, 0);
 
-  const toolBurn = Number(toolCostResult[0]?.total ?? 0);
-  const aiApiBurn = Number(aiCostResult[0]?.total ?? 0);
-  const totalMonthlyBurn = subscriptionBurn + toolBurn + aiApiBurn;
-  const monthlySpend = Number(spendResult[0]?.totalSpend ?? 0) / 2;
-  const runway = monthlySpend > 0 ? totalCash / monthlySpend : null;
+    const toolBurn = Number(toolCostResult[0]?.total ?? 0);
+    const aiApiBurn = Number(aiCostResult[0]?.total ?? 0);
+    const totalMonthlyBurn = subscriptionBurn + toolBurn + aiApiBurn;
+    const monthlySpend = Number(spendResult[0]?.totalSpend ?? 0) / 2;
+    const runway = monthlySpend > 0 ? totalCash / monthlySpend : null;
 
-  return {
-    totalCash,
-    mrr,
-    subscriptionBurn,
-    toolBurn,
-    aiApiBurn,
-    totalMonthlyBurn,
-    net: mrr * 100 - totalMonthlyBurn, // in cents
-    runway,
-    monthlySpend,
-  };
+    return {
+      totalCash,
+      mrr,
+      subscriptionBurn,
+      toolBurn,
+      aiApiBurn,
+      totalMonthlyBurn,
+      net: mrr * 100 - totalMonthlyBurn, // in cents
+      runway,
+      monthlySpend,
+    };
+  } catch (err) {
+    console.error("[Costs] getCommandCenterMetrics failed:", err);
+    return { totalCash: 0, mrr: 0, subscriptionBurn: 0, toolBurn: 0, aiApiBurn: 0, totalMonthlyBurn: 0, net: 0, runway: null, monthlySpend: 0 };
+  }
 }
 
 async function getAiUsageBreakdown() {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  return db
-    .select({
-      agent: sql<string>`COALESCE(${schema.apiUsage.metadata}->>'agent', 'unknown')`,
-      model: sql<string>`COALESCE(${schema.apiUsage.metadata}->>'model', 'unknown')`,
-      calls: sql<number>`COUNT(*)`,
-      tokens: sql<number>`COALESCE(SUM(${schema.apiUsage.tokensUsed}), 0)`,
-      cost: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
-    })
-    .from(schema.apiUsage)
-    .where(gte(schema.apiUsage.createdAt, monthStart))
-    .groupBy(
-      sql`${schema.apiUsage.metadata}->>'agent'`,
-      sql`${schema.apiUsage.metadata}->>'model'`
-    )
-    .orderBy(desc(sql`COALESCE(SUM(${schema.apiUsage.cost}), 0)`));
+    return db
+      .select({
+        agent: sql<string>`COALESCE(${schema.apiUsage.metadata}->>'agent', 'unknown')`,
+        model: sql<string>`COALESCE(${schema.apiUsage.metadata}->>'model', 'unknown')`,
+        calls: sql<number>`COUNT(*)`,
+        tokens: sql<number>`COALESCE(SUM(${schema.apiUsage.tokensUsed}), 0)`,
+        cost: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
+      })
+      .from(schema.apiUsage)
+      .where(gte(schema.apiUsage.createdAt, monthStart))
+      .groupBy(
+        sql`${schema.apiUsage.metadata}->>'agent'`,
+        sql`${schema.apiUsage.metadata}->>'model'`
+      )
+      .orderBy(desc(sql`COALESCE(SUM(${schema.apiUsage.cost}), 0)`));
+  } catch (err) {
+    console.error("[Costs] getAiUsageBreakdown failed:", err);
+    return [];
+  }
 }
 
 async function getUpcomingCharges() {
-  const fourteenDaysOut = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
+  try {
+    const fourteenDaysOut = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000);
 
-  const upcoming = await db
-    .select()
-    .from(schema.subscriptionCosts)
-    .where(
-      and(
-        eq(schema.subscriptionCosts.isActive, true),
-        lte(schema.subscriptionCosts.nextRenewal, fourteenDaysOut)
+    return db
+      .select()
+      .from(schema.subscriptionCosts)
+      .where(
+        and(
+          eq(schema.subscriptionCosts.isActive, true),
+          lte(schema.subscriptionCosts.nextRenewal, fourteenDaysOut)
+        )
       )
-    )
-    .orderBy(asc(schema.subscriptionCosts.nextRenewal));
-
-  return upcoming;
+      .orderBy(asc(schema.subscriptionCosts.nextRenewal));
+  } catch (err) {
+    console.error("[Costs] getUpcomingCharges failed:", err);
+    return [];
+  }
 }
 
 async function getSubscriptions() {
-  return db
-    .select()
-    .from(schema.subscriptionCosts)
-    .where(eq(schema.subscriptionCosts.isActive, true))
-    .orderBy(asc(schema.subscriptionCosts.nextRenewal));
+  try {
+    return await db
+      .select()
+      .from(schema.subscriptionCosts)
+      .where(eq(schema.subscriptionCosts.isActive, true))
+      .orderBy(asc(schema.subscriptionCosts.nextRenewal));
+  } catch (err) {
+    console.error("[Costs] getSubscriptions failed:", err);
+    return [];
+  }
 }
 
 async function getCostSummary() {
-  const now = new Date();
-  const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+  try {
+    const now = new Date();
+    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
 
-  return db
-    .select({
-      id: schema.toolAccounts.id,
-      name: schema.toolAccounts.name,
-      monthlyBudget: schema.toolAccounts.monthlyBudget,
-      totalCost: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`.as("total_cost"),
-    })
-    .from(schema.toolAccounts)
-    .leftJoin(
-      schema.toolCosts,
-      and(
-        eq(schema.toolCosts.toolAccountId, schema.toolAccounts.id),
-        gte(schema.toolCosts.createdAt, threeMonthsAgo)
-      )
-    )
-    .groupBy(schema.toolAccounts.id);
-}
-
-async function getPerProjectCosts() {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  const [projects, toolCostRows, subCostRows, aiCostRows] = await Promise.all([
-    db
-      .select({ id: schema.portfolioProjects.id, name: schema.portfolioProjects.name })
-      .from(schema.portfolioProjects)
-      .orderBy(asc(schema.portfolioProjects.name)),
-
-    db
+    return await db
       .select({
-        projectId: schema.toolCosts.projectId,
-        total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`,
-      })
-      .from(schema.toolCosts)
-      .where(and(isNotNull(schema.toolCosts.projectId), gte(schema.toolCosts.createdAt, monthStart)))
-      .groupBy(schema.toolCosts.projectId),
-
-    db
-      .select({
-        projectId: schema.subscriptionCosts.projectId,
-        total: sql<number>`COALESCE(SUM(
-          CASE WHEN ${schema.subscriptionCosts.billingCycle} = 'annual'
-            THEN ROUND(${schema.subscriptionCosts.amount} / 12.0)
-            ELSE ${schema.subscriptionCosts.amount}
-          END
-        ), 0)`,
-      })
-      .from(schema.subscriptionCosts)
-      .where(and(eq(schema.subscriptionCosts.isActive, true), isNotNull(schema.subscriptionCosts.projectId)))
-      .groupBy(schema.subscriptionCosts.projectId),
-
-    db
-      .select({
-        projectId: schema.apiUsage.projectId,
-        total: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
-      })
-      .from(schema.apiUsage)
-      .where(and(isNotNull(schema.apiUsage.projectId), gte(schema.apiUsage.createdAt, monthStart)))
-      .groupBy(schema.apiUsage.projectId),
-  ]);
-
-  const toolMap = new Map(toolCostRows.map((r) => [r.projectId!, Number(r.total)]));
-  const subMap = new Map(subCostRows.map((r) => [r.projectId!, Number(r.total)]));
-  const aiMap = new Map(aiCostRows.map((r) => [r.projectId!, Number(r.total)]));
-
-  const rows = projects.map((p) => ({
-    projectId: p.id,
-    projectName: p.name,
-    toolCosts: toolMap.get(p.id) ?? 0,
-    subCosts: subMap.get(p.id) ?? 0,
-    aiCosts: aiMap.get(p.id) ?? 0,
-    totalCost: (toolMap.get(p.id) ?? 0) + (subMap.get(p.id) ?? 0) + (aiMap.get(p.id) ?? 0),
-  }));
-
-  rows.sort((a, b) => b.totalCost - a.totalCost);
-  return rows;
-}
-
-async function getPortfolioProjectsList(): Promise<ProjectOption[]> {
-  return db
-    .select({ id: schema.portfolioProjects.id, name: schema.portfolioProjects.name })
-    .from(schema.portfolioProjects)
-    .orderBy(asc(schema.portfolioProjects.name));
-}
-
-async function getClientMargins() {
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-
-  const [clients, clientCosts] = await Promise.all([
-    db
-      .select({
-        clientId: schema.clients.id,
-        clientName: schema.clients.name,
-        companyName: schema.clients.companyName,
-        revenue: sql<number>`COALESCE(SUM(CASE WHEN ${schema.invoices.status} = 'paid' THEN ${schema.invoices.amount} ELSE 0 END), 0)`.as("revenue"),
-      })
-      .from(schema.clients)
-      .leftJoin(
-        schema.invoices,
-        and(
-          eq(schema.invoices.clientId, schema.clients.id),
-          gte(schema.invoices.createdAt, monthStart)
-        )
-      )
-      .groupBy(schema.clients.id),
-    db
-      .select({
-        clientId: schema.clientProjects.clientId,
+        id: schema.toolAccounts.id,
+        name: schema.toolAccounts.name,
+        monthlyBudget: schema.toolAccounts.monthlyBudget,
         totalCost: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`.as("total_cost"),
       })
-      .from(schema.clientProjects)
+      .from(schema.toolAccounts)
       .leftJoin(
         schema.toolCosts,
         and(
-          eq(schema.toolCosts.projectId, schema.clientProjects.projectId),
-          gte(schema.toolCosts.createdAt, monthStart)
+          eq(schema.toolCosts.toolAccountId, schema.toolAccounts.id),
+          gte(schema.toolCosts.createdAt, threeMonthsAgo)
         )
       )
-      .groupBy(schema.clientProjects.clientId),
-  ]);
+      .groupBy(schema.toolAccounts.id);
+  } catch (err) {
+    console.error("[Costs] getCostSummary failed:", err);
+    return [];
+  }
+}
 
-  const costMap = new Map(clientCosts.map((c) => [c.clientId, c.totalCost]));
+async function getPerProjectCosts() {
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  return clients.map((c) => {
-    const costs = costMap.get(c.clientId) ?? 0;
-    const revenue = c.revenue;
-    const margin = revenue > 0 ? revenue - costs : 0;
-    const marginPct = revenue > 0 ? ((margin / revenue) * 100) : 0;
-    return {
-      ...c,
-      costs,
-      margin,
-      marginPct: Math.round(marginPct * 10) / 10,
-    };
-  });
+    const [projects, toolCostRows, subCostRows, aiCostRows] = await Promise.all([
+      db
+        .select({ id: schema.portfolioProjects.id, name: schema.portfolioProjects.name })
+        .from(schema.portfolioProjects)
+        .orderBy(asc(schema.portfolioProjects.name)),
+
+      db
+        .select({
+          projectId: schema.toolCosts.projectId,
+          total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`,
+        })
+        .from(schema.toolCosts)
+        .where(and(isNotNull(schema.toolCosts.projectId), gte(schema.toolCosts.createdAt, monthStart)))
+        .groupBy(schema.toolCosts.projectId),
+
+      db
+        .select({
+          projectId: schema.subscriptionCosts.projectId,
+          total: sql<number>`COALESCE(SUM(
+            CASE WHEN ${schema.subscriptionCosts.billingCycle} = 'annual'
+              THEN ROUND(${schema.subscriptionCosts.amount} / 12.0)
+              ELSE ${schema.subscriptionCosts.amount}
+          END
+          ), 0)`,
+        })
+        .from(schema.subscriptionCosts)
+        .where(and(eq(schema.subscriptionCosts.isActive, true), isNotNull(schema.subscriptionCosts.projectId)))
+        .groupBy(schema.subscriptionCosts.projectId),
+
+      db
+        .select({
+          projectId: schema.apiUsage.projectId,
+          total: sql<number>`COALESCE(SUM(${schema.apiUsage.cost}), 0)`,
+        })
+        .from(schema.apiUsage)
+        .where(and(isNotNull(schema.apiUsage.projectId), gte(schema.apiUsage.createdAt, monthStart)))
+        .groupBy(schema.apiUsage.projectId),
+    ]);
+
+    const toolMap = new Map(toolCostRows.map((r) => [r.projectId!, Number(r.total)]));
+    const subMap = new Map(subCostRows.map((r) => [r.projectId!, Number(r.total)]));
+    const aiMap = new Map(aiCostRows.map((r) => [r.projectId!, Number(r.total)]));
+
+    const rows = projects.map((p) => ({
+      projectId: p.id,
+      projectName: p.name,
+      toolCosts: toolMap.get(p.id) ?? 0,
+      subCosts: subMap.get(p.id) ?? 0,
+      aiCosts: aiMap.get(p.id) ?? 0,
+      totalCost: (toolMap.get(p.id) ?? 0) + (subMap.get(p.id) ?? 0) + (aiMap.get(p.id) ?? 0),
+    }));
+
+    rows.sort((a, b) => b.totalCost - a.totalCost);
+    return rows;
+  } catch (err) {
+    console.error("[Costs] getPerProjectCosts failed:", err);
+    return [];
+  }
+}
+
+async function getPortfolioProjectsList(): Promise<ProjectOption[]> {
+  try {
+    return await db
+      .select({ id: schema.portfolioProjects.id, name: schema.portfolioProjects.name })
+      .from(schema.portfolioProjects)
+      .orderBy(asc(schema.portfolioProjects.name));
+  } catch (err) {
+    console.error("[Costs] getPortfolioProjectsList failed:", err);
+    return [];
+  }
+}
+
+async function getClientMargins() {
+  try {
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const [clients, clientCosts] = await Promise.all([
+      db
+        .select({
+          clientId: schema.clients.id,
+          clientName: schema.clients.name,
+          companyName: schema.clients.companyName,
+          revenue: sql<number>`COALESCE(SUM(CASE WHEN ${schema.invoices.status} = 'paid' THEN ${schema.invoices.amount} ELSE 0 END), 0)`.as("revenue"),
+        })
+        .from(schema.clients)
+        .leftJoin(
+          schema.invoices,
+          and(
+            eq(schema.invoices.clientId, schema.clients.id),
+            gte(schema.invoices.createdAt, monthStart)
+          )
+        )
+        .groupBy(schema.clients.id),
+      db
+        .select({
+          clientId: schema.clientProjects.clientId,
+          totalCost: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`.as("total_cost"),
+        })
+        .from(schema.clientProjects)
+        .leftJoin(
+          schema.toolCosts,
+          and(
+            eq(schema.toolCosts.projectId, schema.clientProjects.projectId),
+            gte(schema.toolCosts.createdAt, monthStart)
+          )
+        )
+        .groupBy(schema.clientProjects.clientId),
+    ]);
+
+    const costMap = new Map(clientCosts.map((c) => [c.clientId, c.totalCost]));
+
+    return clients.map((c) => {
+      const costs = costMap.get(c.clientId) ?? 0;
+      const revenue = c.revenue;
+      const margin = revenue > 0 ? revenue - costs : 0;
+      const marginPct = revenue > 0 ? ((margin / revenue) * 100) : 0;
+      return {
+        ...c,
+        costs,
+        margin,
+        marginPct: Math.round(marginPct * 10) / 10,
+      };
+    });
+  } catch (err) {
+    console.error("[Costs] getClientMargins failed:", err);
+    return [];
+  }
 }
 
 async function getCostTrend() {
-  const now = new Date();
-  const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+  try {
+    const now = new Date();
+    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
 
-  return db
-    .select({
-      month: sql<string>`TO_CHAR(${schema.toolCosts.createdAt}, 'YYYY-MM')`.as("month"),
-      total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`.as("total"),
-    })
-    .from(schema.toolCosts)
-    .where(gte(schema.toolCosts.createdAt, threeMonthsAgo))
-    .groupBy(sql`TO_CHAR(${schema.toolCosts.createdAt}, 'YYYY-MM')`)
-    .orderBy(sql`month`);
+    return db
+      .select({
+        month: sql<string>`TO_CHAR(${schema.toolCosts.createdAt}, 'YYYY-MM')`.as("month"),
+        total: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`.as("total"),
+      })
+      .from(schema.toolCosts)
+      .where(gte(schema.toolCosts.createdAt, threeMonthsAgo))
+      .groupBy(sql`TO_CHAR(${schema.toolCosts.createdAt}, 'YYYY-MM')`)
+      .orderBy(sql`month`);
+  } catch (err) {
+    console.error("[Costs] getCostTrend failed:", err);
+    return [];
+  }
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────

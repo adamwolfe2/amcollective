@@ -2,7 +2,7 @@ import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, desc, ilike, or, sql, count, and } from "drizzle-orm";
+import { eq, desc, ilike, or, sql, and } from "drizzle-orm";
 import * as clientsRepo from "@/lib/db/repositories/clients";
 import {
   Table,

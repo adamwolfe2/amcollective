@@ -36,8 +36,6 @@ import {
   Send,
   FileCheck,
   Zap,
-  Check,
-  ExternalLink,
 } from "lucide-react";
 
 function greeting() {

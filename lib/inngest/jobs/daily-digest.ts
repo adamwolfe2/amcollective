@@ -59,7 +59,7 @@ export const dailyDigest = inngest.createFunction(
         dueSoonTasks,
         recentActivity,
         yesterdaySnapshot,
-        todaySnapshot,
+        _todaySnapshot,
       ] = await Promise.all([
         // Live MRR from Stripe
         stripeConnector.getMRR(),

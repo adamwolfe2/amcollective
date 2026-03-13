@@ -69,13 +69,13 @@ const PRIORITY_STYLES: Record<string, string> = {
 
 export function KanbanBoard({
   clientId,
-  clientName,
+  clientName: _clientName,
   initialColumns,
   initialCards,
   teamMembers,
 }: KanbanBoardProps) {
-  const router = useRouter();
-  const [columns, setColumns] = useState(initialColumns);
+  const _router = useRouter();
+  const [columns, _setColumns] = useState(initialColumns);
   const [cards, setCards] = useState(initialCards);
   const [selectedCard, setSelectedCard] = useState<KanbanCard | null>(null);
   const [cardComments, setCardComments] = useState<KanbanComment[]>([]);

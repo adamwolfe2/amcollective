@@ -15,11 +15,10 @@ import { createAuditLog } from "@/lib/db/repositories/audit";
 import { inngest } from "@/lib/inngest/client";
 import crypto from "crypto";
 
-function verifySignature(rawBody: string, signature: string | null): boolean {
+function verifySignature(rawBody: string, signature: string | null): boolean | "unconfigured" {
   const secret = process.env.COMPOSIO_WEBHOOK_SECRET;
   if (!secret) {
-    console.warn("[composio] COMPOSIO_WEBHOOK_SECRET not set — accepting all webhook requests");
-    return true;
+    return "unconfigured";
   }
   if (!signature) return false;
   const expected = crypto
@@ -35,7 +34,14 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get("x-composio-signature") ??
       request.headers.get("x-webhook-secret") ?? null;
 
-    if (!verifySignature(rawBody, signature)) {
+    const sigResult = verifySignature(rawBody, signature);
+    if (sigResult === "unconfigured") {
+      return NextResponse.json(
+        { error: "Webhook secret not configured" },
+        { status: 503 }
+      );
+    }
+    if (!sigResult) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
@@ -86,3 +92,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true });
   }
 }
+

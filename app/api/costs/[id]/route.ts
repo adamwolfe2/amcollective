@@ -13,11 +13,19 @@ import { eq } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { aj } from "@/lib/middleware/arcjet";
 
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (aj) {
+    const decision = await aj.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+  }
+
   const userId = await checkAdmin();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -76,6 +84,13 @@ export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (aj) {
+    const decision = await aj.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+  }
+
   const userId = await checkAdmin();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

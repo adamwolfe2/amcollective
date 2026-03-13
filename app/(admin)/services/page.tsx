@@ -10,7 +10,7 @@ import {
 import { AddServiceDialog } from "./add-service-dialog";
 import { ServiceRow } from "./service-row";
 
-function formatPrice(cents: number | null, period: string | null): string {
+function formatPrice(cents: number | null, _period: string | null): string {
   if (cents === null) return "\u2014";
   const dollars = (cents / 100).toLocaleString("en-US", {
     minimumFractionDigits: 0,

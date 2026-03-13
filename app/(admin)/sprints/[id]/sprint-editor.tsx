@@ -342,7 +342,7 @@ function TaskRow({
       {/* Subtask checklist */}
       {subtasksExpanded && !task.isCompleted && (
         <div className="ml-6.5 mt-1.5 space-y-1">
-          {localSubtasks.map((sub, idx) => (
+          {localSubtasks.map((sub, _idx) => (
             <SubtaskItemRow
               key={sub.id}
               item={sub}
@@ -449,7 +449,7 @@ function SectionBlock({
   onToggleTask,
   onUpdateTask,
   onDeleteTask,
-  projects,
+  projects: _projects,
 }: {
   section: SprintSection;
   sprintId: string;
@@ -462,7 +462,7 @@ function SectionBlock({
   projects: ProjectOption[];
 }) {
   const isUnassigned = section.id === "__unassigned__";
-  const [isPending, startTransition] = useTransition();
+  const [_isPending, startTransition] = useTransition();
   const [newTaskContent, setNewTaskContent] = useState("");
   const [showTaskInput, setShowTaskInput] = useState(false);
   const taskInputRef = useRef<HTMLInputElement>(null);

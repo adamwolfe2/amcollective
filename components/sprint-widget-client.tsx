@@ -35,8 +35,8 @@ export function SprintWidgetClient({
   sprintPageUrl,
   sections,
   initialTasks,
-  totalTasks: initialTotal,
-  doneTasks: initialDone,
+  totalTasks: _initialTotal,
+  doneTasks: _initialDone,
 }: SprintWidgetClientProps) {
   const [tasks, setTasks] = useState<SprintTaskItem[]>(initialTasks);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});

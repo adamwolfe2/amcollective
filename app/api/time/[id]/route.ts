@@ -5,6 +5,7 @@ import { createAuditLog } from "@/lib/db/repositories/audit";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { aj } from "@/lib/middleware/arcjet";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -43,6 +44,13 @@ export async function GET(_request: NextRequest, context: RouteContext) {
  * PATCH /api/time/:id — Update a time entry
  */
 export async function PATCH(request: NextRequest, context: RouteContext) {
+  if (aj) {
+    const decision = await aj.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+  }
+
   const userId = await checkAdmin();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -101,7 +109,14 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
 /**
  * DELETE /api/time/:id — Delete a time entry (only if not invoiced)
  */
-export async function DELETE(_request: NextRequest, context: RouteContext) {
+export async function DELETE(request: NextRequest, context: RouteContext) {
+  if (aj) {
+    const decision = await aj.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+  }
+
   const userId = await checkAdmin();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

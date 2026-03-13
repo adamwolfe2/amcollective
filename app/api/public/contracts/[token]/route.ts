@@ -53,7 +53,7 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     }
 
     // Remove sensitive fields for public view
-    const { token: _token, signerIp, signerUserAgent, ...safeContract } =
+    const { token: _token, signerIp: _signerIp, signerUserAgent: _signerUserAgent, ...safeContract } =
       row.contract;
 
     return NextResponse.json({

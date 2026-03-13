@@ -14,62 +14,73 @@
 import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { SUPER_ADMIN_EMAILS, isSuperAdmin } from "@/lib/auth/require-admin";
+import { captureError } from "@/lib/errors";
 
 export async function POST() {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  const user = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress;
+    const user = await currentUser();
+    const email = user?.emailAddresses?.[0]?.emailAddress;
 
-  if (!isSuperAdmin(email)) {
-    return NextResponse.json(
-      {
-        error: "Forbidden — not a super admin",
-        email,
-        allowedEmails: SUPER_ADMIN_EMAILS,
+    if (!isSuperAdmin(email)) {
+      return NextResponse.json(
+        {
+          error: "Forbidden — not a super admin",
+          email,
+          allowedEmails: SUPER_ADMIN_EMAILS,
+        },
+        { status: 403 }
+      );
+    }
+
+    // Set publicMetadata on the Clerk user
+    const client = await clerkClient();
+    await client.users.updateUser(userId, {
+      publicMetadata: {
+        role: "owner",
+        superAdmin: true,
+        bootstrappedAt: new Date().toISOString(),
       },
-      { status: 403 }
-    );
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `Super admin role set for ${email}`,
+      userId,
+      publicMetadata: {
+        role: "owner",
+        superAdmin: true,
+      },
+    });
+  } catch (error) {
+    captureError(error, { tags: { route: "POST /api/admin/bootstrap" } });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  // Set publicMetadata on the Clerk user
-  const client = await clerkClient();
-  await client.users.updateUser(userId, {
-    publicMetadata: {
-      role: "owner",
-      superAdmin: true,
-      bootstrappedAt: new Date().toISOString(),
-    },
-  });
-
-  return NextResponse.json({
-    success: true,
-    message: `Super admin role set for ${email}`,
-    userId,
-    publicMetadata: {
-      role: "owner",
-      superAdmin: true,
-    },
-  });
 }
 
 export async function GET() {
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try {
+    const { userId } = await auth();
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = await currentUser();
+    const email = user?.emailAddresses?.[0]?.emailAddress;
+
+    return NextResponse.json({
+      userId,
+      email,
+      isSuperAdmin: isSuperAdmin(email),
+      currentMetadata: user?.publicMetadata,
+      superAdminEmails: SUPER_ADMIN_EMAILS,
+    });
+  } catch (error) {
+    captureError(error, { tags: { route: "GET /api/admin/bootstrap" } });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  const user = await currentUser();
-  const email = user?.emailAddresses?.[0]?.emailAddress;
-
-  return NextResponse.json({
-    userId,
-    email,
-    isSuperAdmin: isSuperAdmin(email),
-    currentMetadata: user?.publicMetadata,
-    superAdminEmails: SUPER_ADMIN_EMAILS,
-  });
 }

@@ -17,7 +17,7 @@ import {
   type ToolSet,
 } from "ai";
 import { anthropic } from "@ai-sdk/anthropic";
-import { allTools, allCeoTools, coreTools, vercelTools, posthogTools, mercuryTools, linearTools, ceoTools } from "@/lib/ai/tools-sdk";
+import { allTools, allCeoTools, coreTools, ceoTools } from "@/lib/ai/tools-sdk";
 
 // ─── Tool selection (reduce 59 tools → ~10-15 per request) ──────────────────
 

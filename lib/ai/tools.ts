@@ -8,10 +8,8 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { getClients, getClient } from "@/lib/db/repositories/clients";
 import { getActiveProjectCount } from "@/lib/db/repositories/projects";
-import { getAlerts, getUnresolvedCount } from "@/lib/db/repositories/alerts";
+import { getAlerts } from "@/lib/db/repositories/alerts";
 import { getRocks } from "@/lib/db/repositories/rocks";
-import { getRecentActivity } from "@/lib/db/repositories/activity";
-import { getUnreadCount } from "@/lib/db/repositories/messages";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { searchSimilar } from "./embeddings";

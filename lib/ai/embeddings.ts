@@ -11,7 +11,7 @@
 
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, and, sql, desc } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 
 type EmbeddingSourceType = "sop" | "client_note" | "project_doc" | "invoice" | "meeting" | "conversation";
 

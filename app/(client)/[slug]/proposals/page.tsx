@@ -14,7 +14,7 @@ export default async function ClientProposalsPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
-  const { slug } = await params;
+  const { slug: _slug } = await params;
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 

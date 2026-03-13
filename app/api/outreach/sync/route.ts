@@ -9,7 +9,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { syncCampaigns } from "@/lib/connectors/emailbison";
 

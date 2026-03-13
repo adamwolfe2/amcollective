@@ -6,7 +6,7 @@
 
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, desc, asc, and, gte, lte } from "drizzle-orm";
+import { eq, asc, and, gte } from "drizzle-orm";
 import { createAuditLog } from "./audit";
 
 /** Get the Monday (week start) for a given date */

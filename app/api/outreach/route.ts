@@ -7,7 +7,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { desc, gte, count, eq, sql } from "drizzle-orm";
+import { desc, gte, count, sql } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 
 export async function GET() {

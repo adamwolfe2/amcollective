@@ -7,7 +7,7 @@
 
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { desc, eq, or, and } from "drizzle-orm";
+import { desc, eq, or } from "drizzle-orm";
 import { StrategyClient, type StrategyRec, type StrategyMetricsData } from "./strategy-client";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { redirect } from "next/navigation";

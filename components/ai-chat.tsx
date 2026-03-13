@@ -18,7 +18,6 @@ import {
   Search,
   History,
   Download,
-  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 

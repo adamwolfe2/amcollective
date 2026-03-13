@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, desc, sql, and } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import {
   Table,
   TableBody,
