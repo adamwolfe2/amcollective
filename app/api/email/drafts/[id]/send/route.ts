@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { Resend } from "resend";
+import { aj } from "@/lib/middleware/arcjet";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -16,6 +17,13 @@ const FROM_EMAIL =
  * POST /api/email/drafts/:id/send — Send an email draft via Resend
  */
 export async function POST(_request: NextRequest, context: RouteContext) {
+  if (aj) {
+    const decision = await aj.protect(_request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   const userId = await checkAdmin();
   if (!userId)
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

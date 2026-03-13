@@ -50,7 +50,7 @@ export async function GET() {
         eq(schema.recurringInvoices.clientId, schema.clients.id)
       )
       .orderBy(desc(schema.recurringInvoices.createdAt))
-      .limit(500);
+      .limit(200);
 
     return NextResponse.json(templates);
   } catch (error) {

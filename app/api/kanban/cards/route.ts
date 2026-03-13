@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
@@ -14,6 +15,17 @@ import { createAuditLog } from "@/lib/db/repositories/audit";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { aj } from "@/lib/middleware/arcjet";
+
+const kanbanCardSchema = z.object({
+  columnId: z.string().uuid("Invalid column ID"),
+  clientId: z.string().uuid("Invalid client ID"),
+  title: z.string().min(1, "Title is required").max(500).trim(),
+  description: z.string().max(5000).optional().nullable(),
+  dueDate: z.string().optional().nullable(),
+  assigneeId: z.string().uuid().optional().nullable(),
+  priority: z.enum(["high", "urgent", "medium", "low"]).optional(),
+  labels: z.unknown().optional().nullable(),
+});
 
 export async function GET(req: NextRequest) {
   const userId = await checkAdmin();
@@ -71,15 +83,23 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const body = await req.json();
-    const { columnId, clientId, title, description, dueDate, assigneeId, priority, labels } = body;
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
 
-    if (!columnId || !clientId || !title) {
+    const parsed = kanbanCardSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const firstError = parsed.error.errors[0];
       return NextResponse.json(
-        { error: "columnId, clientId, and title are required" },
+        { error: "Validation failed", field: firstError?.path?.join("."), message: firstError?.message },
         { status: 400 }
       );
     }
+
+    const { columnId, clientId, title, description, dueDate, assigneeId, priority, labels } = parsed.data;
 
     // Get max position in target column
     const existing = await db
@@ -101,7 +121,7 @@ export async function POST(req: NextRequest) {
         assigneeId: assigneeId || null,
         priority: priority || "medium",
         position: maxPos + 1,
-        labels: labels || null,
+        labels: (labels || null) as typeof schema.kanbanCards.$inferInsert.labels,
       })
       .returning();
 

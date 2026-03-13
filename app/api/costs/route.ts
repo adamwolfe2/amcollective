@@ -43,11 +43,13 @@ export async function GET(req: NextRequest) {
           .select()
           .from(schema.subscriptionCosts)
           .orderBy(desc(schema.subscriptionCosts.createdAt))
+          .limit(200)
       : await db
           .select()
           .from(schema.subscriptionCosts)
           .where(eq(schema.subscriptionCosts.isActive, true))
-          .orderBy(desc(schema.subscriptionCosts.createdAt));
+          .orderBy(desc(schema.subscriptionCosts.createdAt))
+          .limit(200);
 
     return NextResponse.json({ costs });
   } catch (err) {

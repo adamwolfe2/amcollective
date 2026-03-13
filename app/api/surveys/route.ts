@@ -5,6 +5,7 @@ import { createAuditLog } from "@/lib/db/repositories/audit";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, eq, and } from "drizzle-orm";
+import { aj } from "@/lib/middleware/arcjet";
 
 /**
  * GET /api/surveys — List surveys with NPS summary
@@ -45,6 +46,13 @@ export async function GET(request: NextRequest) {
  * POST /api/surveys — Create a survey for a client
  */
 export async function POST(request: NextRequest) {
+  if (aj) {
+    const decision = await aj.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   const userId = await checkAdmin();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 

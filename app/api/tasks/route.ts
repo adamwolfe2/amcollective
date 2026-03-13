@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc, and, sql } from "drizzle-orm";
@@ -11,6 +12,22 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { aj } from "@/lib/middleware/arcjet";
+
+const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "am_collective", "personal", "untagged"] as const;
+
+const taskSchema = z.object({
+  title: z.string().min(1, "Title is required").max(500).trim(),
+  description: z.string().max(10000).optional().nullable(),
+  status: z.enum(["backlog", "todo", "in_progress", "in_review", "done", "cancelled"]).optional(),
+  priority: z.enum(["high", "urgent", "medium", "low"]).optional(),
+  dueDate: z.string().optional().nullable(),
+  assigneeId: z.string().uuid().optional().nullable(),
+  projectId: z.string().uuid().optional().nullable(),
+  clientId: z.string().uuid().optional().nullable(),
+  companyTag: z.enum(companyTags).optional(),
+  labels: z.unknown().optional().nullable(),
+  source: z.enum(["manual", "linear", "voice", "webhook", "sprint"]).optional(),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -92,7 +109,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+
+    const parsed = taskSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const firstError = parsed.error.errors[0];
+      return NextResponse.json(
+        { error: "Validation failed", field: firstError?.path?.join("."), message: firstError?.message },
+        { status: 400 }
+      );
+    }
+
+    const body = parsed.data;
 
     const [task] = await db
       .insert(schema.tasks)
@@ -107,7 +140,7 @@ export async function POST(request: NextRequest) {
         projectId: body.projectId ?? null,
         clientId: body.clientId ?? null,
         companyTag: body.companyTag ?? "am_collective",
-        labels: body.labels ?? null,
+        labels: body.labels as typeof schema.tasks.$inferInsert.labels ?? null,
         source: body.source ?? "manual",
       })
       .returning();

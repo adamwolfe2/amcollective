@@ -1,308 +1,309 @@
-import { Resend } from "resend";
+import { getResend, FROM_EMAIL, APP_URL, buildBaseHtml, type OrderEmailData } from "./shared";
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;");
-}
+// ---------------------------------------------------------------------------
+// sendContractEmail — send contract signing link to client
+// ---------------------------------------------------------------------------
 
-const resend = process.env.RESEND_API_KEY
-  ? new Resend(process.env.RESEND_API_KEY)
-  : null;
-
-const FROM = process.env.RESEND_FROM_EMAIL || "AM Collective <team@amcollectivecapital.com>";
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "adamwolfe102@gmail.com";
-
-function send(opts: { to: string; subject: string; html: string }) {
-  if (!resend) {
-    console.log(`[email] Would send to ${opts.to}: ${opts.subject}`);
-    return;
-  }
-  return resend.emails.send({ from: FROM, ...opts }).catch((err) => {
-    console.error("[email] Failed to send:", err);
-  });
-}
-
-// ── Admin: New intake submission ────────────────────────────────────────────
-
-export function notifyAdminNewIntake(data: {
-  companyName: string;
-  contactName: string;
-  contactEmail: string;
-  industry: string;
-  featureCount: number;
-}) {
-  return send({
-    to: ADMIN_EMAIL,
-    subject: `New portal inquiry: ${data.companyName}`,
-    html: `
-      <div style="font-family: monospace; font-size: 14px; color: #0F1523;">
-        <h2 style="margin: 0 0 16px;">New Intake Submission</h2>
-        <table style="border-collapse: collapse;">
-          <tr><td style="padding: 4px 16px 4px 0; color: #8B92A5;">Company</td><td><strong>${escapeHtml(data.companyName)}</strong></td></tr>
-          <tr><td style="padding: 4px 16px 4px 0; color: #8B92A5;">Contact</td><td>${escapeHtml(data.contactName)} (${escapeHtml(data.contactEmail)})</td></tr>
-          <tr><td style="padding: 4px 16px 4px 0; color: #8B92A5;">Industry</td><td>${escapeHtml(data.industry)}</td></tr>
-          <tr><td style="padding: 4px 16px 4px 0; color: #8B92A5;">Features</td><td>${data.featureCount} selected</td></tr>
-        </table>
-        <p style="margin-top: 20px;">
-          <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://amcollective.vercel.app"}/admin" style="color: #2A52BE;">
-            View in Admin Dashboard →
-          </a>
-        </p>
-      </div>
-    `,
-  });
-}
-
-// ── Client: Intake confirmation ─────────────────────────────────────────────
-
-export function sendIntakeConfirmation(data: {
-  contactName: string;
-  contactEmail: string;
-  companyName: string;
-}) {
-  return send({
-    to: data.contactEmail,
-    subject: `We received your info, ${data.contactName}`,
-    html: `
-      <div style="font-family: monospace; font-size: 14px; color: #0F1523; max-width: 500px;">
-        <h2 style="margin: 0 0 8px;">Thanks, ${escapeHtml(data.contactName)}.</h2>
-        <p style="color: #3D4556; line-height: 1.6;">
-          We've received your portal inquiry for <strong>${escapeHtml(data.companyName)}</strong>.
-          Our team will review your submission and reach out within 24 hours to schedule your consultation call.
-        </p>
-        <p style="color: #3D4556; line-height: 1.6;">
-          In the meantime, you can check your build status anytime at:
-        </p>
-        <p>
-          <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://amcollective.vercel.app"}/status" style="color: #2A52BE;">
-            ${process.env.NEXT_PUBLIC_APP_URL || "https://amcollective.vercel.app"}/status
-          </a>
-        </p>
-        <p style="color: #8B92A5; font-size: 12px; margin-top: 24px;">
-          — The Wholesail Team
-        </p>
-      </div>
-    `,
-  });
-}
-
-// ── Client: Status change notification ──────────────────────────────────────
-
-export function notifyClientStatusChange(data: {
-  contactName: string;
-  contactEmail: string;
-  companyName: string;
-  newStatus: string;
-  currentPhase: number;
-  message?: string;
-}) {
-  const statusLabels: Record<string, string> = {
-    ONBOARDING: "Onboarding",
-    BUILDING: "Building",
-    REVIEW: "In Review",
-    LIVE: "Live",
-  };
-
-  const label = statusLabels[data.newStatus] || data.newStatus;
-
-  return send({
-    to: data.contactEmail,
-    subject: `${data.companyName} portal update: ${label}`,
-    html: `
-      <div style="font-family: monospace; font-size: 14px; color: #0F1523; max-width: 500px;">
-        <h2 style="margin: 0 0 8px;">Build Update</h2>
-        <p style="color: #3D4556; line-height: 1.6;">
-          Hi ${escapeHtml(data.contactName)}, your portal build for <strong>${escapeHtml(data.companyName)}</strong>
-          has moved to <strong>${escapeHtml(label)}</strong> (Phase ${data.currentPhase}/15).
-        </p>
-        ${data.message ? `<p style="color: #3D4556; line-height: 1.6;">${escapeHtml(data.message)}</p>` : ""}
-        <p>
-          <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://amcollective.vercel.app"}/status" style="color: #2A52BE;">
-            Check your full build progress →
-          </a>
-        </p>
-        <p style="color: #8B92A5; font-size: 12px; margin-top: 24px;">
-          — The Wholesail Team
-        </p>
-      </div>
-    `,
-  });
-}
-
-// ── Contract: Send signing link to client ───────────────────────────────────
-
-export function sendContractEmail(data: {
+export async function sendContractEmail(data: {
   clientName: string;
   clientEmail: string;
   contractTitle: string;
   contractNumber: string;
   signingUrl: string;
-  totalValue?: number | null; // cents
-  expiresAt?: Date | null;
+  totalValue: number | null;
+  expiresAt: Date | string | null;
 }) {
-  const valueStr =
-    data.totalValue != null
-      ? `$${(data.totalValue / 100).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-      : null;
+  const r = getResend();
+  if (!r) return null;
 
-  const expiresStr = data.expiresAt
-    ? new Intl.DateTimeFormat("en-US", {
-        month: "long",
-        day: "numeric",
-        year: "numeric",
-      }).format(data.expiresAt)
-    : null;
+  const totalStr = data.totalValue
+    ? `$${(data.totalValue / 100).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+    : "";
 
-  return send({
-    to: data.clientEmail,
-    subject: `Action required: ${data.contractTitle} is ready for your signature`,
-    html: `
-      <div style="font-family: Georgia, serif; font-size: 14px; color: #0A0A0A; max-width: 540px; margin: 0 auto;">
-        <div style="background: #0A0A0A; padding: 20px 24px; margin-bottom: 0;">
-          <p style="font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.4); margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.1em;">AM Collective Capital</p>
-          <h1 style="font-family: Georgia, serif; color: #fff; font-size: 20px; margin: 0; font-weight: bold;">${escapeHtml(data.contractTitle)}</h1>
-          <p style="font-family: monospace; font-size: 11px; color: rgba(255,255,255,0.4); margin: 6px 0 0;">${escapeHtml(data.contractNumber)}</p>
-        </div>
-        <div style="border: 1px solid #0A0A0A; border-top: none; padding: 24px;">
-          <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
-            Hi ${escapeHtml(data.clientName)},
-          </p>
-          <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
-            Your contract is ready for review and signature. Please click the button below to read and sign the agreement.
-          </p>
-          ${valueStr ? `<p style="font-family: monospace; font-size: 12px; color: #0A0A0A; margin: 0 0 16px;">Contract value: <strong>${valueStr}</strong></p>` : ""}
-          ${expiresStr ? `<p style="font-family: monospace; font-size: 12px; color: #8B92A5; margin: 0 0 16px;">This link expires: ${expiresStr}</p>` : ""}
-          <p style="margin: 24px 0;">
-            <a href="${data.signingUrl}" style="display: inline-block; background: #0A0A0A; color: #fff; font-family: monospace; font-size: 12px; padding: 12px 24px; text-decoration: none; font-weight: bold;">
-              Review &amp; Sign Contract →
-            </a>
-          </p>
-          <p style="font-family: monospace; font-size: 11px; color: #8B92A5; margin: 0; line-height: 1.6;">
-            Or copy this link: ${data.signingUrl}
-          </p>
-        </div>
-        <p style="font-family: monospace; font-size: 10px; color: #8B92A5; margin: 16px 0 0; text-align: center;">
-          — AM Collective Capital · amcollectivecapital.com
-        </p>
-      </div>
+  const html = buildBaseHtml({
+    headline: data.contractTitle,
+    bodyHtml: `
+      <p style="font-family:monospace;font-size:12px;color:#666;margin-bottom:24px;">${data.contractNumber}</p>
+      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
+        Hi ${data.clientName},
+      </p>
+      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
+        Your contract is ready for review and signature.
+      </p>
+      ${totalStr ? `
+      <div style="border:2px solid #0A0A0A;padding:16px 20px;margin-bottom:24px;">
+        <p style="font-family:monospace;font-size:11px;color:#666;margin:0 0 4px 0;">CONTRACT VALUE</p>
+        <p style="font-family:monospace;font-size:24px;font-weight:bold;margin:0;">${totalStr}</p>
+      </div>` : ""}
+      ${data.expiresAt ? `<p style="font-family:monospace;font-size:12px;color:#666;margin-bottom:24px;">Expires: ${data.expiresAt instanceof Date ? data.expiresAt.toLocaleDateString() : data.expiresAt}</p>` : ""}
     `,
+    ctaText: "Review & Sign Contract",
+    ctaUrl: data.signingUrl,
+  });
+
+  return r.emails.send({
+    from: FROM_EMAIL,
+    to: data.clientEmail,
+    subject: `Contract Ready for Signature — ${data.contractNumber}`,
+    html,
   });
 }
 
-// ── Contract: Fully executed confirmation ───────────────────────────────────
+// ---------------------------------------------------------------------------
+// sendContractExecutedEmail — confirm fully executed contract
+// ---------------------------------------------------------------------------
 
-export function sendContractExecutedEmail(data: {
+export async function sendContractExecutedEmail(data: {
   clientName: string;
   clientEmail: string;
   contractTitle: string;
   contractNumber: string;
-  startDate?: string | null;
+  startDate: string | null;
 }) {
-  return send({
-    to: data.clientEmail,
-    subject: `${data.contractTitle} — fully executed`,
-    html: `
-      <div style="font-family: Georgia, serif; font-size: 14px; color: #0A0A0A; max-width: 540px; margin: 0 auto;">
-        <div style="background: #0A0A0A; padding: 20px 24px; margin-bottom: 0;">
-          <p style="font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.4); margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.1em;">AM Collective Capital</p>
-          <h1 style="font-family: Georgia, serif; color: #fff; font-size: 20px; margin: 0; font-weight: bold;">Contract Executed</h1>
-          <p style="font-family: monospace; font-size: 11px; color: rgba(255,255,255,0.4); margin: 6px 0 0;">${escapeHtml(data.contractNumber)}</p>
-        </div>
-        <div style="border: 1px solid #0A0A0A; border-top: none; padding: 24px;">
-          <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
-            Hi ${escapeHtml(data.clientName)},
-          </p>
-          <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
-            Great news — <strong>${escapeHtml(data.contractTitle)}</strong> has been countersigned and is now fully executed. Both parties are bound by its terms.
-          </p>
-          ${data.startDate ? `<p style="font-family: monospace; font-size: 12px; color: #0A0A0A; margin: 0 0 16px;">Effective date: <strong>${data.startDate}</strong></p>` : ""}
-          <p style="line-height: 1.7; color: #3D4556; margin: 0;">
-            We will retain a copy on file. If you need a copy or have any questions, reply directly to this email.
-          </p>
-        </div>
-        <p style="font-family: monospace; font-size: 10px; color: #8B92A5; margin: 16px 0 0; text-align: center;">
-          — AM Collective Capital · amcollectivecapital.com
-        </p>
-      </div>
+  const r = getResend();
+  if (!r) return null;
+
+  const html = buildBaseHtml({
+    headline: "Contract Fully Executed",
+    bodyHtml: `
+      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
+        Hi ${data.clientName},
+      </p>
+      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
+        Your contract <strong>${data.contractTitle}</strong> (${data.contractNumber}) has been fully executed by both parties.
+      </p>
+      ${data.startDate ? `<p style="font-size:15px;line-height:1.6;margin-bottom:24px;">Effective date: <strong>${data.startDate}</strong></p>` : ""}
+      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
+        We're excited to get started. Our team will be in touch shortly with next steps.
+      </p>
     `,
+    ctaText: "View Your Portal",
+    ctaUrl: APP_URL,
+  });
+
+  return r.emails.send({
+    from: FROM_EMAIL,
+    to: data.clientEmail,
+    subject: `Contract Executed — ${data.contractNumber}`,
+    html,
   });
 }
 
-// ── Client: Welcome to the portal ───────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// sendClientWelcomeEmail — welcome new client after lead conversion
+// ---------------------------------------------------------------------------
 
-export function sendClientWelcomeEmail(data: {
+export async function sendClientWelcomeEmail(data: {
   clientName: string;
   clientEmail: string;
   portalUrl: string;
 }) {
-  return send({
-    to: data.clientEmail,
-    subject: `Welcome to AM Collective — your client portal is ready`,
-    html: `
-      <div style="font-family: Georgia, serif; font-size: 14px; color: #0A0A0A; max-width: 540px; margin: 0 auto;">
-        <div style="background: #0A0A0A; padding: 20px 24px; margin-bottom: 0;">
-          <p style="font-family: monospace; font-size: 10px; color: rgba(255,255,255,0.4); margin: 0 0 4px; text-transform: uppercase; letter-spacing: 0.1em;">AM Collective Capital</p>
-          <h1 style="font-family: Georgia, serif; color: #fff; font-size: 20px; margin: 0; font-weight: bold;">Welcome, ${escapeHtml(data.clientName)}</h1>
-        </div>
-        <div style="border: 1px solid #0A0A0A; border-top: none; padding: 24px;">
-          <p style="line-height: 1.7; color: #3D4556; margin: 0 0 16px;">
-            Your AM Collective client portal is ready. You can use it to track project progress, view invoices, and stay in sync with our team.
-          </p>
-          <p style="margin: 24px 0;">
-            <a href="${data.portalUrl}" style="display: inline-block; background: #0A0A0A; color: #fff; font-family: monospace; font-size: 12px; padding: 12px 24px; text-decoration: none; font-weight: bold;">
-              Access Your Portal →
-            </a>
-          </p>
-          <p style="font-family: monospace; font-size: 11px; color: #8B92A5; margin: 0 0 16px; line-height: 1.6;">
-            Portal URL: ${data.portalUrl}
-          </p>
-          <p style="line-height: 1.7; color: #3D4556; margin: 0;">
-            You will receive a separate email from us to set up your account login. If you have any questions, reply directly to this email.
-          </p>
-        </div>
-        <p style="font-family: monospace; font-size: 10px; color: #8B92A5; margin: 16px 0 0; text-align: center;">
-          — AM Collective Capital · amcollectivecapital.com
-        </p>
-      </div>
+  const r = getResend();
+  if (!r) return null;
+
+  const html = buildBaseHtml({
+    headline: "Welcome to AM Collective",
+    bodyHtml: `
+      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
+        Hi ${data.clientName},
+      </p>
+      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
+        Welcome aboard! Your client portal is ready. You can use it to view project updates, invoices, contracts, and communicate with our team.
+      </p>
+      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
+        Click below to access your portal and set up your account.
+      </p>
     `,
+    ctaText: "Access Your Portal",
+    ctaUrl: data.portalUrl,
+  });
+
+  return r.emails.send({
+    from: FROM_EMAIL,
+    to: data.clientEmail,
+    subject: "Welcome to AM Collective — Your Portal is Ready",
+    html,
   });
 }
 
-// ── Client: Portal is live ──────────────────────────────────────────────────
+// ---------------------------------------------------------------------------
+// sendLowStockAlert — internal ops email
+// ---------------------------------------------------------------------------
 
-export function notifyClientPortalLive(data: {
-  contactName: string;
-  contactEmail: string;
-  companyName: string;
-  portalUrl: string;
-}) {
-  return send({
-    to: data.contactEmail,
-    subject: `${data.companyName} — your portal is live!`,
-    html: `
-      <div style="font-family: monospace; font-size: 14px; color: #0F1523; max-width: 500px;">
-        <h2 style="margin: 0 0 8px;">Your Portal is Live</h2>
-        <p style="color: #3D4556; line-height: 1.6;">
-          ${escapeHtml(data.contactName)}, your custom wholesale ordering portal for
-          <strong>${escapeHtml(data.companyName)}</strong> is now live at:
-        </p>
-        <p style="margin: 16px 0;">
-          <a href="https://${data.portalUrl}" style="color: #2A52BE; font-size: 16px; font-weight: bold;">
-            ${data.portalUrl}
-          </a>
-        </p>
-        <p style="color: #3D4556; line-height: 1.6;">
-          Your clients can now log in and place orders. Your admin panel is ready
-          for you to manage operations. If you need anything, just reply to this email.
-        </p>
-        <p style="color: #8B92A5; font-size: 12px; margin-top: 24px;">
-          — The Wholesail Team
-        </p>
-      </div>
-    `,
+export async function sendLowStockAlert(
+  items: {
+    name: string;
+    category: string;
+    quantityOnHand: number;
+    lowStockThreshold: number;
+  }[]
+) {
+  const r = getResend();
+  if (!r) return null;
+  const from = process.env.RESEND_FROM_EMAIL || "team@amcollectivecapital.com";
+  const to = process.env.OPS_NOTIFICATION_EMAIL || from;
+
+  const itemRowsHtml = items
+    .map(
+      (i, idx) => {
+        const bg = idx % 2 === 0 ? "#1A1A1A" : "#111111";
+        const stockColor = i.quantityOnHand === 0 ? "#EF4444" : "#F59E0B";
+        return `<tr style="background-color:${bg};">
+          <td style="padding:10px 14px;font-size:14px;color:#F9F7F4;border-bottom:1px solid #2A2A2A;">${i.name}</td>
+          <td style="padding:10px 14px;font-size:13px;color:#C8C0B4;border-bottom:1px solid #2A2A2A;">${i.category}</td>
+          <td style="padding:10px 14px;font-size:14px;color:${stockColor};font-weight:700;border-bottom:1px solid #2A2A2A;text-align:right;">${i.quantityOnHand}</td>
+          <td style="padding:10px 14px;font-size:14px;color:#C8C0B4;border-bottom:1px solid #2A2A2A;text-align:right;">${i.lowStockThreshold}</td>
+        </tr>`;
+      }
+    )
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/></head>
+<body style="margin:0;padding:0;background-color:#0A0A0A;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0A0A0A;padding:32px 16px;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#111111;border:1px solid #2A2A2A;">
+
+        <!-- HEADER -->
+        <tr><td style="background-color:#0A0A0A;padding:20px 28px;border-bottom:1px solid #2A2A2A;">
+          <p style="margin:0;color:#F9F7F4;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;">TBGC Ops &nbsp;&middot;&nbsp; Internal Alert</p>
+        </td></tr>
+
+        <!-- CONTENT -->
+        <tr><td style="padding:28px 28px 20px;">
+          <h1 style="margin:0 0 6px;color:#F9F7F4;font-family:Georgia,serif;font-size:22px;font-weight:700;">Low Stock Alert</h1>
+          <p style="margin:0 0 24px;font-size:14px;color:#C8C0B4;">${items.length} product${items.length !== 1 ? "s are" : " is"} at or below the restock threshold.</p>
+
+          <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #2A2A2A;">
+            <thead>
+              <tr style="background-color:#0A0A0A;">
+                <th style="padding:10px 14px;text-align:left;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#C8C0B4;font-weight:600;">Product</th>
+                <th style="padding:10px 14px;text-align:left;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#C8C0B4;font-weight:600;">Category</th>
+                <th style="padding:10px 14px;text-align:right;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#C8C0B4;font-weight:600;">On Hand</th>
+                <th style="padding:10px 14px;text-align:right;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#C8C0B4;font-weight:600;">Threshold</th>
+              </tr>
+            </thead>
+            <tbody>${itemRowsHtml}</tbody>
+          </table>
+        </td></tr>
+
+        <!-- FOOTER -->
+        <tr><td style="padding:16px 28px;border-top:1px solid #2A2A2A;">
+          <p style="margin:0;color:#C8C0B4;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">TBGC Ops &nbsp;&middot;&nbsp; truffleboys.com</p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  const textRows = items
+    .map((i) => `  ${i.name} (${i.category}) — On Hand: ${i.quantityOnHand} / Threshold: ${i.lowStockThreshold}`)
+    .join("\n");
+
+  return r.emails.send({
+    from,
+    to,
+    subject: `Low Stock Alert — ${items.length} item${items.length !== 1 ? "s" : ""} need restocking`,
+    html,
+    text: `Low Stock Alert\n\n${items.length} product${items.length !== 1 ? "s are" : " is"} at or below the restock threshold:\n\n${textRows}\n\n— TBGC Ops`,
   });
+}
+
+// ---------------------------------------------------------------------------
+// sendInternalOrderNotification
+// ---------------------------------------------------------------------------
+
+export async function sendInternalOrderNotification(data: OrderEmailData) {
+  const OPS_EMAIL = process.env.OPS_NOTIFICATION_EMAIL || FROM_EMAIL;
+  const adminUrl = `${APP_URL}/admin/orders${data.orderId ? `/${data.orderId}` : ""}`;
+
+  const itemRowsHtml = data.items
+    .map((item, i) => {
+      const bg = i % 2 === 0 ? "#F9F7F4" : "#FFFFFF";
+      return `<tr style="background-color:${bg};">
+        <td style="padding:8px 12px;font-size:13px;color:#0A0A0A;border-bottom:1px solid #E5E1DB;">${item.name}</td>
+        <td style="padding:8px 12px;font-size:13px;color:#0A0A0A;border-bottom:1px solid #E5E1DB;text-align:center;">${item.quantity}</td>
+        <td style="padding:8px 12px;font-size:13px;color:#0A0A0A;border-bottom:1px solid #E5E1DB;text-align:right;">$${item.total.toFixed(2)}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const bodyHtml = `
+    <p style="margin:0 0 20px;font-size:15px;color:#3D3833;line-height:1.6;">A new order has been placed and is waiting for review.</p>
+
+    <!-- Order meta -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F9F7F4;border:1px solid #E5E1DB;margin-bottom:20px;">
+      <tr><td style="padding:16px 20px;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="width:50%;padding:0 16px 0 0;">
+              <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#C8C0B4;font-weight:600;">Order</p>
+              <p style="margin:0;font-size:15px;font-weight:700;color:#0A0A0A;">${data.orderNumber}</p>
+            </td>
+            <td style="width:50%;">
+              <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#C8C0B4;font-weight:600;">Customer</p>
+              <p style="margin:0;font-size:15px;font-weight:700;color:#0A0A0A;">${data.customerName}</p>
+              <p style="margin:2px 0 0;font-size:12px;color:#C8C0B4;">${data.customerEmail}</p>
+            </td>
+          </tr>
+        </table>
+      </td></tr>
+    </table>
+
+    <!-- Items -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #E5E1DB;margin-bottom:16px;">
+      <thead>
+        <tr style="background-color:#0A0A0A;">
+          <th style="padding:8px 12px;text-align:left;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;font-weight:600;">Product</th>
+          <th style="padding:8px 12px;text-align:center;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;font-weight:600;">Qty</th>
+          <th style="padding:8px 12px;text-align:right;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;font-weight:600;">Total</th>
+        </tr>
+      </thead>
+      <tbody>${itemRowsHtml}</tbody>
+    </table>
+
+    <!-- Order total -->
+    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:4px;">
+      <tr>
+        <td style="padding:8px 0;font-size:15px;font-weight:700;color:#0A0A0A;">Order Total</td>
+        <td style="padding:8px 0;font-size:15px;font-weight:700;color:#0A0A0A;text-align:right;">$${data.total.toFixed(2)}</td>
+      </tr>
+    </table>
+  `;
+
+  const html = buildBaseHtml({
+    headline: `New Order: ${data.orderNumber}`,
+    bodyHtml,
+    ctaText: "Review in Admin →",
+    ctaUrl: adminUrl,
+  });
+
+  const text = `New order received!
+
+Order: ${data.orderNumber}
+Customer: ${data.customerName} (${data.customerEmail})
+Total: $${data.total.toFixed(2)}
+Items: ${data.items.length}
+
+View in admin: ${adminUrl}`;
+
+  try {
+    const r = getResend();
+    if (!r) return { success: false, error: "Email not configured" };
+    await r.emails.send({
+      from: FROM_EMAIL,
+      to: OPS_EMAIL,
+      subject: `New Order: ${data.orderNumber} — $${data.total.toFixed(2)}`,
+      html,
+      text,
+    });
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to send internal notification:", error);
+    return { success: false, error };
+  }
 }

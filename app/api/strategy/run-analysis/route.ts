@@ -7,8 +7,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { inngest } from "@/lib/inngest/client";
+import { aj } from "@/lib/middleware/arcjet";
 
 export async function POST(req: NextRequest) {
+  if (aj) {
+    const decision = await aj.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   const { error } = await requireAdmin();
   if (error) return error;
 

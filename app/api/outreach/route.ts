@@ -28,11 +28,12 @@ export async function GET() {
       eventCounts7d,
       dailyActivity,
     ] = await Promise.all([
-      // All campaigns
+      // All campaigns (capped)
       db
         .select()
         .from(schema.outreachCampaigns)
-        .orderBy(desc(schema.outreachCampaigns.updatedAt)),
+        .orderBy(desc(schema.outreachCampaigns.updatedAt))
+        .limit(100),
 
       // Recent 50 events
       db

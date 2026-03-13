@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { and, eq, desc, or, ilike } from "drizzle-orm";
@@ -11,6 +12,29 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { aj } from "@/lib/middleware/arcjet";
+
+const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "am_collective", "personal", "untagged"] as const;
+
+const leadSchema = z.object({
+  contactName: z.string().min(1, "Contact name is required").max(200).trim(),
+  companyName: z.string().max(200).optional().nullable(),
+  email: z.string().email().max(320).optional().nullable(),
+  phone: z.string().max(50).optional().nullable(),
+  linkedinUrl: z.string().url().max(500).optional().nullable(),
+  website: z.string().url().max(500).optional().nullable(),
+  stage: z.enum(["awareness", "interest", "consideration", "intent", "closed_won", "closed_lost", "nurture"]).optional(),
+  source: z.enum(["referral", "inbound", "outbound", "conference", "social", "university", "other"]).optional().nullable(),
+  assignedTo: z.string().max(255).optional().nullable(),
+  estimatedValue: z.number().min(0).max(100_000_000).optional().nullable(),
+  probability: z.number().min(0).max(100).optional().nullable(),
+  expectedCloseDate: z.string().optional().nullable(),
+  industry: z.string().max(200).optional().nullable(),
+  companySize: z.string().max(100).optional().nullable(),
+  notes: z.string().max(10000).optional().nullable(),
+  tags: z.unknown().optional().nullable(),
+  companyTag: z.enum(companyTags).optional(),
+  nextFollowUpAt: z.string().optional().nullable(),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -89,7 +113,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+
+    const parsed = leadSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const firstError = parsed.error.errors[0];
+      return NextResponse.json(
+        { error: "Validation failed", field: firstError?.path?.join("."), message: firstError?.message },
+        { status: 400 }
+      );
+    }
+
+    const body = parsed.data;
 
     const [lead] = await db
       .insert(schema.leads)
@@ -109,7 +149,7 @@ export async function POST(request: NextRequest) {
         industry: body.industry ?? null,
         companySize: body.companySize ?? null,
         notes: body.notes ?? null,
-        tags: body.tags ?? null,
+        tags: body.tags as typeof schema.leads.$inferInsert.tags ?? null,
         companyTag: body.companyTag ?? "am_collective",
         nextFollowUpAt: body.nextFollowUpAt
           ? new Date(body.nextFollowUpAt)

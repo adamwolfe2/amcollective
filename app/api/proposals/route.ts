@@ -53,7 +53,7 @@ export async function GET() {
         eq(schema.proposals.clientId, schema.clients.id)
       )
       .orderBy(desc(schema.proposals.createdAt))
-      .limit(500);
+      .limit(200);
 
     return NextResponse.json(rows);
   } catch (error) {

@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
@@ -14,6 +15,21 @@ import { generateContractNumber } from "@/lib/invoices/number";
 import { buildSectionsFromProposal, DEFAULT_CONTRACT_SECTIONS } from "@/lib/contracts/templates";
 import crypto from "crypto";
 import { aj } from "@/lib/middleware/arcjet";
+
+const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "am_collective", "personal", "untagged"] as const;
+
+const contractSchema = z.object({
+  clientId: z.string().uuid("Invalid client ID"),
+  proposalId: z.string().uuid().optional().nullable(),
+  companyTag: z.enum(companyTags).optional(),
+  title: z.string().min(1).max(500).trim().optional(),
+  sections: z.unknown().optional(),
+  terms: z.string().max(50000).optional().nullable(),
+  totalValue: z.number().min(0).max(100_000_000).optional().nullable(),
+  startDate: z.string().optional().nullable(),
+  endDate: z.string().optional().nullable(),
+  autoInvoiceOnSign: z.boolean().optional(),
+});
 
 export async function GET() {
   try {
@@ -54,7 +70,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
+    let rawBody: unknown;
+    try {
+      rawBody = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+
+    const parsed = contractSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      const firstError = parsed.error.errors[0];
+      return NextResponse.json(
+        { error: "Validation failed", field: firstError?.path?.join("."), message: firstError?.message },
+        { status: 400 }
+      );
+    }
+
+    const body = parsed.data;
     const contractNumber = await generateContractNumber();
     const token = crypto.randomUUID();
     const expiresAt = new Date(Date.now() + 30 * 86400000); // 30 days
@@ -82,7 +114,7 @@ export async function POST(request: NextRequest) {
         companyTag: body.companyTag ?? "am_collective",
         contractNumber,
         title: body.title ?? "Service Agreement",
-        sections: body.sections ?? sections,
+        sections: (body.sections ?? sections) as typeof schema.contracts.$inferInsert.sections,
         terms: body.terms ?? null,
         totalValue: body.totalValue ?? null,
         startDate: body.startDate ?? null,

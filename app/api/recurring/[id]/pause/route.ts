@@ -2,18 +2,26 @@
  * POST /api/recurring/[id]/pause — Pause recurring billing.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { aj } from "@/lib/middleware/arcjet";
 
 export async function POST(
-  _req: Request,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (aj) {
+    const decision = await aj.protect(_req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   try {
     const userId = await checkAdmin();
     if (!userId) {

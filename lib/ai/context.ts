@@ -121,23 +121,17 @@ export async function writeProactiveMessage(opts: {
   const titleKey = `[proactive:${trigger}] ${today}`;
 
   // Try to find today's proactive conversation for this user (reuse within same day)
-  // We use title matching to find the right one
   const existing = await db
-    .select({ id: schema.aiConversations.id })
+    .select({ id: schema.aiConversations.id, title: schema.aiConversations.title })
     .from(schema.aiConversations)
     .where(inArray(schema.aiConversations.userId, [userId]))
     .orderBy(desc(schema.aiConversations.updatedAt))
     .limit(5);
 
-  // Find today's proactive conversation by title
+  // Find today's proactive conversation by title (single query, no N+1)
   let convId: string | undefined;
   for (const conv of existing) {
-    const [full] = await db
-      .select({ title: schema.aiConversations.title })
-      .from(schema.aiConversations)
-      .where(inArray(schema.aiConversations.id, [conv.id]))
-      .limit(1);
-    if (full?.title === titleKey) {
+    if (conv.title === titleKey) {
       convId = conv.id;
       break;
     }
