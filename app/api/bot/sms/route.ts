@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
   // Resolve user
   const user = resolveUser(senderPhone);
   if (!user) {
-    console.log(`[bot/sms] Unknown sender: ${senderPhone}`);
+    console.warn(`[bot/sms] Unknown sender: ${senderPhone}`);
     return NextResponse.json({ ok: true }); // Silently ignore unknown senders
   }
 

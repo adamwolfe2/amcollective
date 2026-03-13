@@ -250,7 +250,7 @@ export async function POST(req: NextRequest) {
   // Resolve user
   const user = resolveUser(slackUserId);
   if (!user) {
-    console.log(`[bot/slack] Unknown Slack user: ${slackUserId}`);
+    console.warn(`[bot/slack] Unknown Slack user: ${slackUserId}`);
     return NextResponse.json({ ok: true });
   }
 
