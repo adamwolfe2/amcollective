@@ -347,7 +347,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         <header className="shrink-0 border-b border-[#0A0A0A]/10 px-4 md:px-6 py-3 flex items-center justify-between bg-[#F3F3EF]">
           <div className="flex items-center gap-3">
             <button
@@ -387,7 +387,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             />
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-safe bg-[#F3F3EF]">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-safe bg-[#F3F3EF] min-h-0">{children}</main>
       </div>
     </div>
   );
