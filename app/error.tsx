@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import Link from 'next/link'
 import { AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { captureError } from '@/lib/errors'
 
 export default function RootError({
   error,
@@ -13,9 +14,7 @@ export default function RootError({
   reset: () => void
 }) {
   useEffect(() => {
-    if (process.env.NODE_ENV === 'production') {
-      console.error('[root]', error.digest ?? error.message)
-    }
+    captureError(error, { tags: { route: 'root' } })
   }, [error])
 
   return (
