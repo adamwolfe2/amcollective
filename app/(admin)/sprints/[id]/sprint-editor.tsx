@@ -896,7 +896,7 @@ function SprintAIImport({
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#0A0A0A]/40 pt-16 px-4">
-          <div className="w-full max-w-2xl bg-white border border-[#0A0A0A]/20 max-h-[80vh] flex flex-col">
+          <div className="w-full max-w-[calc(100vw-2rem)] sm:max-w-2xl bg-white border border-[#0A0A0A]/20 max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#0A0A0A]/10 shrink-0">
               <div className="flex items-center gap-2">
                 <Sparkles size={14} className="text-[#0A0A0A]/50" />

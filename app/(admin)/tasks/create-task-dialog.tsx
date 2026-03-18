@@ -67,7 +67,7 @@ export function CreateTaskDialog({ teamMembers, projects }: Props) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A0A0A]/40">
-      <div className="bg-white border border-[#0A0A0A] p-6 w-full max-w-lg">
+      <div className="bg-white border border-[#0A0A0A] p-4 sm:p-6 w-full max-w-[calc(100vw-2rem)] sm:max-w-lg mx-4 sm:mx-0">
         <h2 className="text-lg font-bold font-serif mb-4">New Task</h2>
 
         <div className="space-y-3">

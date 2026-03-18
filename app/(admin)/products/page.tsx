@@ -4,6 +4,7 @@
  */
 
 import Link from "next/link";
+import Image from "next/image";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -16,6 +17,7 @@ import * as stripeConnector from "@/lib/connectors/stripe";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { statusBadge, statusText } from "@/lib/ui/status-colors";
 import type { StatusCategory } from "@/lib/ui/status-colors";
+import { getProductLogo } from "@/lib/ui/product-logos";
 
 const productStageCategory: Record<string, StatusCategory> = {
   idea: "neutral",
@@ -169,9 +171,19 @@ export default async function ProductsPage() {
               {/* Card header */}
               <div className="px-4 py-3 border-b border-[#0A0A0A]/5 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center justify-center w-6 h-6 bg-[#0A0A0A] font-mono text-[9px] font-bold text-white">
-                    {product.name.slice(0, 2).toUpperCase()}
-                  </span>
+                  {getProductLogo(product.slug) ? (
+                    <Image
+                      src={getProductLogo(product.slug)!}
+                      alt={product.name}
+                      width={24}
+                      height={24}
+                      className="w-6 h-6 object-contain rounded-sm"
+                    />
+                  ) : (
+                    <span className="inline-flex items-center justify-center w-6 h-6 bg-[#0A0A0A] font-mono text-[9px] font-bold text-white">
+                      {product.name.slice(0, 2).toUpperCase()}
+                    </span>
+                  )}
                   <span className="font-serif font-bold text-sm">{product.name}</span>
                 </div>
                 <StageBadge stage={product.stage} />

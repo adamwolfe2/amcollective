@@ -346,7 +346,7 @@ export function KanbanBoard({
 
       {/* Card Detail Sheet */}
       <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent className="w-[500px] sm:max-w-[500px] rounded-none border-l border-[#0A0A0A]/10 overflow-y-auto">
+        <SheetContent className="w-full sm:w-[500px] sm:max-w-[500px] rounded-none border-l border-[#0A0A0A]/10 overflow-y-auto">
           {selectedCard && (
             <>
               <SheetHeader>

@@ -38,6 +38,9 @@ import {
   Zap,
 } from "lucide-react";
 import { statusDot, statusText, statusBadge } from "@/lib/ui/status-colors";
+import { EngagementsAccordion } from "@/components/dashboard/EngagementsAccordion";
+import { ProductsAccordion } from "@/components/dashboard/ProductsAccordion";
+import { getProductLogo } from "@/lib/ui/product-logos";
 
 function greeting() {
   const h = new Date().getHours();
@@ -271,6 +274,327 @@ async function CashRunwaySection() {
   }
 }
 
+// ─── CRM Pipeline Data ──────────────────────────────────────────────────────
+
+const getCachedPipeline = unstable_cache(
+  async () => {
+    // Fetch all active leads
+    const allLeads = await db
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.isArchived, false))
+      .orderBy(desc(schema.leads.updatedAt));
+
+    // Fetch engagements + client MRR for won deals
+    const engagements = await db
+      .select({
+        clientName: schema.clients.companyName,
+        clientMrr: schema.clients.currentMrr,
+        engTitle: schema.engagements.title,
+        engStatus: schema.engagements.status,
+        engValue: schema.engagements.value,
+        engPeriod: schema.engagements.valuePeriod,
+      })
+      .from(schema.engagements)
+      .innerJoin(schema.clients, eq(schema.engagements.clientId, schema.clients.id));
+
+    // Build a map of client company name → engagement data
+    const engMap = new Map<string, {
+      engTitle: string | null;
+      engStatus: string | null;
+      engValue: number | null;
+      engPeriod: string | null;
+      clientMrr: number;
+    }>();
+    for (const e of engagements) {
+      if (e.clientName) {
+        engMap.set(e.clientName.toLowerCase(), {
+          engTitle: e.engTitle,
+          engStatus: e.engStatus,
+          engValue: e.engValue,
+          engPeriod: e.engPeriod,
+          clientMrr: e.clientMrr,
+        });
+      }
+    }
+
+    // Group by stage
+    const stageOrder = ["closed_won", "intent", "consideration", "interest", "nurture", "awareness"];
+    const groups: Record<string, typeof allLeads> = {};
+    for (const lead of allLeads) {
+      if (!groups[lead.stage]) groups[lead.stage] = [];
+      groups[lead.stage].push(lead);
+    }
+
+    return stageOrder
+      .filter((s) => groups[s] && groups[s].length > 0)
+      .map((stage) => {
+        const leads = groups[stage];
+        return {
+          stage,
+          label: stage,
+          count: leads.length,
+          totalValue: leads.reduce((s, l) => s + (l.estimatedValue ?? 0), 0),
+          leads: leads.map((l) => {
+            // Try to match engagement data
+            const companyKey = (l.companyName ?? "").toLowerCase();
+            const eng = engMap.get(companyKey) ||
+              // Try partial match
+              Array.from(engMap.entries()).find(([k]) => companyKey.includes(k) || k.includes(companyKey))?.[1];
+
+            return {
+              id: l.id,
+              companyName: l.companyName,
+              contactName: l.contactName,
+              stage: l.stage,
+              assignedTo: l.assignedTo,
+              estimatedValue: l.estimatedValue,
+              probability: l.probability,
+              notes: l.notes,
+              tags: l.tags,
+              nextFollowUpAt: l.nextFollowUpAt?.toISOString() ?? null,
+              lastContactedAt: l.lastContactedAt?.toISOString() ?? null,
+              engagementTitle: eng?.engTitle ?? null,
+              engagementStatus: eng?.engStatus ?? null,
+              engagementValue: eng?.engValue ?? null,
+              engagementPeriod: eng?.engPeriod ?? null,
+              clientMrr: eng?.clientMrr ?? null,
+            };
+          }),
+        };
+      });
+  },
+  ["dashboard-pipeline"],
+  { revalidate: 60 }
+);
+
+async function PipelineSection() {
+  try {
+    const groups = await getCachedPipeline();
+    return <EngagementsAccordion groups={groups} />;
+  } catch (err) {
+    console.error("[Dashboard] PipelineSection failed:", err);
+    return (
+      <div className="border border-[#0A0A0A]/10 bg-white p-6 text-center">
+        <p className="text-[#0A0A0A]/40 font-mono text-xs">Failed to load pipeline</p>
+      </div>
+    );
+  }
+}
+
+// ─── Platform Snapshots for Products Accordion ──────────────────────────────
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+const getCachedPlatformSnapshots = unstable_cache(
+  async () => {
+    const [wholesail, cursive, trackr, taskspace, tbgc, hook, sprintTasks] = await Promise.all([
+      getCachedWholesailSnapshot().catch(() => ({ success: false, data: null })),
+      getCachedCursiveSnapshot().catch(() => ({ success: false, data: null })),
+      getCachedTrackrSnapshot().catch(() => ({ success: false, data: null })),
+      getCachedTaskSpaceSnapshot().catch(() => ({ success: false, data: null })),
+      getCachedTBGCSnapshot().catch(() => ({ success: false, data: null })),
+      getCachedHookSnapshot().catch(() => ({ success: false, data: null })),
+      // Fetch all sprint tasks grouped by project section
+      db
+        .select({
+          taskId: schema.tasks.id,
+          taskTitle: schema.tasks.title,
+          taskStatus: schema.tasks.status,
+          taskPriority: schema.tasks.priority,
+          sectionProjectName: schema.sprintSections.projectName,
+          sprintTitle: schema.weeklySprints.title,
+        })
+        .from(schema.taskSprintAssignments)
+        .innerJoin(schema.tasks, eq(schema.taskSprintAssignments.taskId, schema.tasks.id))
+        .innerJoin(schema.sprintSections, eq(schema.taskSprintAssignments.sectionId, schema.sprintSections.id))
+        .innerJoin(schema.weeklySprints, eq(schema.taskSprintAssignments.sprintId, schema.weeklySprints.id))
+        .where(isNull(schema.taskSprintAssignments.removedAt))
+        .orderBy(desc(schema.weeklySprints.weekOf), asc(schema.taskSprintAssignments.sortOrder))
+        .limit(200)
+        .catch(() => []),
+    ]);
+
+    // Group tasks by project name (case-insensitive)
+    const tasksByProject = new Map<string, Array<{
+      id: string;
+      title: string;
+      status: string;
+      priority: string;
+      sprintTitle: string | null;
+    }>>();
+    for (const t of sprintTasks) {
+      const key = (t.sectionProjectName ?? "").toLowerCase();
+      if (!key) continue;
+      if (!tasksByProject.has(key)) tasksByProject.set(key, []);
+      tasksByProject.get(key)!.push({
+        id: t.taskId,
+        title: t.taskTitle,
+        status: t.taskStatus,
+        priority: t.taskPriority,
+        sprintTitle: t.sprintTitle,
+      });
+    }
+
+    type ProductAlert = { message: string; severity: "critical" | "warning" | "info" };
+    type Product = {
+      name: string;
+      tag: string;
+      slug: string;
+      href: string;
+      connected: boolean;
+      metrics: Array<{ label: string; value: string; alert?: boolean }>;
+      logoUrl?: string | null;
+      mrrDisplay?: string | null;
+      stageDisplay?: string | null;
+      alerts?: ProductAlert[];
+      tasks?: Array<{ id: string; title: string; status: string; priority: string; sprintTitle: string | null }>;
+    };
+
+    const products: Product[] = [];
+    const s = (v: any) => String(v ?? 0);
+    const fc = (c: number) => formatCurrency(c);
+
+    // ── Wholesail ──
+    const wd = wholesail.success ? (wholesail.data as any) : null;
+    const wAlerts: ProductAlert[] = [];
+    if (wd?.stuckProjects > 0) wAlerts.push({ message: `${wd.stuckProjects} stuck builds (>14d)`, severity: "critical" });
+    if (wd?.overdueProjects > 0) wAlerts.push({ message: `${wd.overdueProjects} overdue builds`, severity: "warning" });
+    if (wd?.intake?.pending > 0) wAlerts.push({ message: `${wd.intake.pending} pending intake submissions`, severity: "warning" });
+    products.push({
+      name: "Wholesail", tag: "W", slug: "wholesail", href: "/products/wholesail", logoUrl: getProductLogo("wholesail"),
+      connected: !!wd,
+      mrrDisplay: wd ? fc(wd.mrrFromRetainers) : null,
+      stageDisplay: "Launched",
+      alerts: wAlerts,
+      tasks: tasksByProject.get("wholesail") ?? [],
+      metrics: wd ? [
+        { label: "Active Builds", value: s(wd.activeBuilds) },
+        { label: "Live Clients", value: s(wd.liveClients) },
+        { label: "Pipeline", value: fc(wd.pipelineValue) },
+        { label: "MRR", value: fc(wd.mrrFromRetainers) },
+        { label: "Stuck >14d", value: s(wd.stuckProjects), alert: wd.stuckProjects > 0 },
+        { label: "Build Costs MTD", value: fc(wd.buildCostsMtdCents / 100) },
+      ] : [],
+    });
+
+    // ── Cursive ──
+    const cd = cursive.success ? (cursive.data as any) : null;
+    const cAlerts: ProductAlert[] = [];
+    if (cd?.pipeline?.at_risk > 0) cAlerts.push({ message: `${cd.pipeline.at_risk} at-risk workspaces`, severity: "warning" });
+    if (cd?.pixels?.trialsExpiringWeek > 0) cAlerts.push({ message: `${cd.pixels.trialsExpiringWeek} pixel trials expiring this week`, severity: "warning" });
+    if (cd?.affiliates?.pendingApplications > 0) cAlerts.push({ message: `${cd.affiliates.pendingApplications} pending affiliate applications`, severity: "info" });
+    products.push({
+      name: "Cursive", tag: "C", slug: "cursive", href: "/products/cursive", logoUrl: getProductLogo("cursive"),
+      connected: !!cd,
+      mrrDisplay: cd ? `${s(cd.totalWorkspaces)} ws` : null,
+      stageDisplay: "Launched",
+      alerts: cAlerts,
+      tasks: tasksByProject.get("cursive") ?? [],
+      metrics: cd ? [
+        { label: "Workspaces", value: s(cd.totalWorkspaces) },
+        { label: "Active", value: s(cd.pipeline?.active) },
+        { label: "Trial", value: s(cd.pipeline?.trial) },
+        { label: "Total Leads", value: s(cd.leads?.total) },
+        { label: "Pixels Installed", value: s(cd.pixels?.totalInstalls) },
+        { label: "Bookings This Wk", value: s(cd.bookings?.thisWeek) },
+      ] : [],
+    });
+
+    // ── Trackr ──
+    const td = trackr.success ? (trackr.data as any) : null;
+    const tAlerts: ProductAlert[] = [];
+    if (td?.auditPipelinePending > 0) tAlerts.push({ message: `${td.auditPipelinePending} audits pending`, severity: "warning" });
+    if (td?.pendingArchitectApplications > 0) tAlerts.push({ message: `${td.pendingArchitectApplications} architect applications pending`, severity: "info" });
+    products.push({
+      name: "Trackr", tag: "T", slug: "trackr", href: "/products/trackr", logoUrl: getProductLogo("trackr"),
+      connected: !!td,
+      mrrDisplay: td ? fc((td.mrrCents ?? 0) / 100) : null,
+      stageDisplay: "Launched",
+      alerts: tAlerts,
+      tasks: tasksByProject.get("trackr") ?? [],
+      metrics: td ? [
+        { label: "Workspaces", value: s(td.totalWorkspaces) },
+        { label: "Paying", value: s(td.activeSubscriptions) },
+        { label: "Trialing", value: s(td.trialingSubscriptions) },
+        { label: "MRR", value: fc((td.mrrCents ?? 0) / 100) },
+        { label: "Tools Researched", value: s(td.totalToolsResearched) },
+        { label: "API Cost MTD", value: fc(td.apiCostsMtdCents / 100) },
+      ] : [],
+    });
+
+    // ── TaskSpace ──
+    const tsd = taskspace.success ? (taskspace.data as any) : null;
+    const tsAlerts: ProductAlert[] = [];
+    if (tsd?.openEscalations > 0) tsAlerts.push({ message: `${tsd.openEscalations} open escalations`, severity: "critical" });
+    if (tsd?.eodRate7Day < 50) tsAlerts.push({ message: `EOD report rate at ${tsd.eodRate7Day}% (target: 80%+)`, severity: "warning" });
+    if (tsd?.rocksAtRisk > 0) tsAlerts.push({ message: `${tsd.rocksAtRisk} rocks at risk`, severity: "warning" });
+    products.push({
+      name: "TaskSpace", tag: "TS", slug: "taskspace", href: "/products/taskspace", logoUrl: getProductLogo("taskspace"),
+      connected: !!tsd,
+      mrrDisplay: tsd ? fc((tsd.mrrCents ?? 0) / 100) : null,
+      stageDisplay: "Launched",
+      alerts: tsAlerts,
+      tasks: tasksByProject.get("taskspace") ?? [],
+      metrics: tsd ? [
+        { label: "Orgs", value: s(tsd.totalOrgs) },
+        { label: "Members", value: s(tsd.totalMembers) },
+        { label: "Paying Orgs", value: s(tsd.payingOrgs) },
+        { label: "MRR", value: fc((tsd.mrrCents ?? 0) / 100) },
+        { label: "Active Tasks", value: s(tsd.activeTasks) },
+        { label: "EOD Rate 7d", value: `${tsd.eodRate7Day}%`, alert: tsd.eodRate7Day < 50 },
+      ] : [],
+    });
+
+    // ── TBGC ──
+    const tbgcd = tbgc.success ? (tbgc.data as any) : null;
+    products.push({
+      name: "TBGC", tag: "TB", slug: "tbgc", href: "/products/tbgc", logoUrl: getProductLogo("tbgc"),
+      connected: !!tbgcd,
+      mrrDisplay: tbgcd && tbgcd.mrrCents > 0 ? fc(tbgcd.mrrCents / 100) : "Pre-rev",
+      stageDisplay: tbgcd?.stage ?? "Building",
+      alerts: [],
+      tasks: tasksByProject.get("tbgc") ?? [],
+      metrics: tbgcd ? [
+        { label: "Stage", value: s(tbgcd.stage) },
+        { label: "MRR", value: (tbgcd.mrrCents ?? 0) > 0 ? fc(tbgcd.mrrCents / 100) : "Pre-revenue" },
+        { label: "Subscriptions", value: s(tbgcd.activeSubscriptions) },
+      ] : [],
+    });
+
+    // ── Hook ──
+    const hd = hook.success ? (hook.data as any) : null;
+    products.push({
+      name: "Hook", tag: "H", slug: "hook", href: "/products/hook", logoUrl: getProductLogo("hook"),
+      connected: !!hd,
+      mrrDisplay: hd && hd.mrrCents > 0 ? fc(hd.mrrCents / 100) : "Pre-rev",
+      stageDisplay: hd?.stage ?? "Beta",
+      alerts: [],
+      tasks: tasksByProject.get("hook") ?? [],
+      metrics: hd ? [
+        { label: "Stage", value: s(hd.stage) },
+        { label: "MRR", value: (hd.mrrCents ?? 0) > 0 ? fc(hd.mrrCents / 100) : "Pre-revenue" },
+        { label: "Paying", value: s(hd.activeSubscriptions) },
+        { label: "Trialing", value: s(hd.trialingSubscriptions) },
+      ] : [],
+    });
+
+    return products;
+  },
+  ["dashboard-platform-snapshots-v2"],
+  { revalidate: 300 }
+);
+/* eslint-enable @typescript-eslint/no-explicit-any */
+
+async function PlatformSnapshotsSection() {
+  try {
+    const products = await getCachedPlatformSnapshots();
+    return <ProductsAccordion products={products} />;
+  } catch (err) {
+    console.error("[Dashboard] PlatformSnapshotsSection failed:", err);
+    return null;
+  }
+}
+
 // ─── Metrics Strip ──────────────────────────────────────────────────────────
 
 async function MetricsStrip() {
@@ -425,7 +749,7 @@ function PlatformUnavailable() {
 
 // ─── Wholesail Platform Card ─────────────────────────────────────────────────
 
-async function WholesailCard() {
+async function _WholesailCard() {
   try {
     const result = await getCachedWholesailSnapshot();
     const d = result.success ? result.data : null;
@@ -482,7 +806,7 @@ async function WholesailCard() {
 
 // ─── Cursive Platform Card ────────────────────────────────────────────────────
 
-async function CursiveCard() {
+async function _CursiveCard() {
   try {
     const result = await getCachedCursiveSnapshot();
     const d = result.success ? result.data : null;
@@ -549,7 +873,7 @@ async function CursiveCard() {
 
 // ─── Trackr Platform Card ─────────────────────────────────────────────────────
 
-async function TrackrCard() {
+async function _TrackrCard() {
   try {
     const result = await getCachedTrackrSnapshot();
     const d = result.success ? result.data : null;
@@ -616,7 +940,7 @@ async function TrackrCard() {
 
 // ─── TaskSpace Platform Card ──────────────────────────────────────────────────
 
-async function TaskSpaceCard() {
+async function _TaskSpaceCard() {
   try {
     const result = await getCachedTaskSpaceSnapshot();
     const d = result.success ? result.data : null;
@@ -689,7 +1013,7 @@ async function TaskSpaceCard() {
 
 // ─── TBGC Platform Card ────────────────────────────────────────────────────────
 
-async function TBGCCard() {
+async function _TBGCCard() {
   try {
     const result = await getCachedTBGCSnapshot();
     const d = result.success ? result.data : null;
@@ -742,7 +1066,7 @@ async function TBGCCard() {
 
 // ─── Hook Platform Card ────────────────────────────────────────────────────────
 
-async function HookCard() {
+async function _HookCard() {
   try {
     const result = await getCachedHookSnapshot();
     const d = result.success ? result.data : null;
@@ -1093,6 +1417,17 @@ function PlatformCardSkeleton() {
   );
 }
 
+function PipelineSkeleton() {
+  return (
+    <div className="space-y-2">
+      <div className="h-4 w-40 bg-[#0A0A0A]/5 animate-pulse" />
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-12 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
+      ))}
+    </div>
+  );
+}
+
 function ActionsPanelSkeleton() {
   return (
     <div className="space-y-4">
@@ -1112,7 +1447,7 @@ export default async function DashboardPage() {
 
   return (
     // pb-24 keeps content above the floating chat bar
-    <div className="flex flex-col h-[calc(100vh-7rem)] pb-20">
+    <div className="flex flex-col lg:h-[calc(100vh-7rem)] pb-20">
       {/* Header + Metrics */}
       <div className="shrink-0 space-y-3 mb-4">
         <div className="flex items-center justify-between">
@@ -1136,40 +1471,28 @@ export default async function DashboardPage() {
         </Suspense>
       </div>
 
-      {/* Main: Portfolio Grid + Side Panel */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">
-        {/* Portfolio Grid */}
-        <div className="lg:col-span-8 overflow-y-auto min-h-0">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Suspense fallback={<PlatformCardSkeleton />}>
-              <WholesailCard />
-            </Suspense>
-            <Suspense fallback={<PlatformCardSkeleton />}>
-              <CursiveCard />
-            </Suspense>
-            <Suspense fallback={<PlatformCardSkeleton />}>
-              <TrackrCard />
-            </Suspense>
-            <Suspense fallback={<PlatformCardSkeleton />}>
-              <TaskSpaceCard />
-            </Suspense>
-            <Suspense fallback={<PlatformCardSkeleton />}>
-              <TBGCCard />
-            </Suspense>
-            <Suspense fallback={<PlatformCardSkeleton />}>
-              <HookCard />
-            </Suspense>
-            {/* Cash Runway — spans full width of portfolio grid */}
-            <div className="col-span-full">
-              <Suspense fallback={<div className="h-24 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />}>
-                <CashRunwaySection />
-              </Suspense>
-            </div>
-          </div>
+      {/* Main: Pipeline + Products + Side Panel */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 min-h-0">
+        {/* Left column — Pipeline & Engagements + Products */}
+        <div className="lg:col-span-8 lg:overflow-y-auto min-h-0 space-y-3 sm:space-y-4">
+          {/* Pipeline & Engagements */}
+          <Suspense fallback={<PipelineSkeleton />}>
+            <PipelineSection />
+          </Suspense>
+
+          {/* Products — collapsible platform snapshots */}
+          <Suspense fallback={<PlatformCardSkeleton />}>
+            <PlatformSnapshotsSection />
+          </Suspense>
+
+          {/* Cash Runway */}
+          <Suspense fallback={<div className="h-24 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />}>
+            <CashRunwaySection />
+          </Suspense>
         </div>
 
         {/* Side Panel — sprint, actions, quick access, activity */}
-        <div className="lg:col-span-4 overflow-y-auto min-h-0">
+        <div className="lg:col-span-4 lg:overflow-y-auto min-h-0">
           <Suspense fallback={<ActionsPanelSkeleton />}>
             <ActionsPanel />
           </Suspense>
@@ -1209,7 +1532,7 @@ function MetricPill({
       <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40">
         {label}
       </span>
-      <span className="font-mono text-lg font-bold block leading-tight">{value}</span>
+      <span className="font-mono text-base sm:text-lg font-bold block leading-tight truncate">{value}</span>
       {sub && (
         <span className="font-mono text-[9px] text-[#0A0A0A]/40 block mt-0.5">
           {sub}

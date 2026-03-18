@@ -124,7 +124,7 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
           Create Invoice
         </Button>
       </DialogTrigger>
-      <DialogContent className="border-[#0A0A0A] rounded-none bg-[#F3F3EF] max-w-lg w-full max-h-[85vh] overflow-y-auto">
+      <DialogContent className="border-[#0A0A0A] rounded-none bg-[#F3F3EF] max-w-[calc(100vw-2rem)] sm:max-w-lg w-full max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-serif text-lg">
             Create Invoice

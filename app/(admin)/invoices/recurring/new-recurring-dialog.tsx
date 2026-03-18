@@ -104,7 +104,7 @@ export function NewRecurringDialog({
         className="fixed inset-0 bg-[#0A0A0A]/40 z-40"
         onClick={() => setOpen(false)}
       />
-      <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-[#F3F3EF] border-l border-[#0A0A0A] z-50 overflow-y-auto">
+      <div className="fixed inset-0 sm:inset-y-0 sm:left-auto sm:right-0 w-full sm:max-w-lg bg-[#F3F3EF] sm:border-l border-[#0A0A0A] z-50 overflow-y-auto">
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div className="flex items-center justify-between mb-2">
             <h2 className="text-lg font-bold font-serif">

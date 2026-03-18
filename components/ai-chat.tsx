@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback, useLayoutEffect } from "react";
+import { useState, useEffect, useRef, useCallback, useLayoutEffect, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import ReactMarkdown from "react-markdown";
@@ -18,6 +18,8 @@ import {
   Search,
   History,
   Download,
+  Brain,
+  Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -84,6 +86,70 @@ function ToolCallDisplay({ part }: { part: ToolPartProps }) {
           </pre>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Thinking Indicator ─────────────────────────────────────────────────────
+
+function ThinkingIndicator({ status, messages }: { status: string; messages: UIMessage[] }) {
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef(Date.now());
+
+  useEffect(() => {
+    startRef.current = Date.now();
+    setElapsed(0);
+    const interval = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Check if the last message is an assistant message with active tool calls
+  const lastMsg = messages[messages.length - 1];
+  const activeToolCalls = lastMsg?.role === "assistant"
+    ? lastMsg.parts.filter(
+        (p) => p.type.startsWith("tool-") && (p as unknown as ToolPartProps).state !== "output-available"
+      )
+    : [];
+  const hasToolCalls = activeToolCalls.length > 0;
+
+  // Determine label
+  let label = "Thinking...";
+  if (status === "streaming" && hasToolCalls) {
+    label = "Executing tools...";
+  } else if (status === "streaming") {
+    label = "Generating response...";
+  }
+
+  return (
+    <div className="flex justify-start">
+      <div className="px-4 py-3 bg-white border border-[#0A0A0A]/10 space-y-2 min-w-[200px]">
+        <div className="flex items-center gap-2">
+          {hasToolCalls ? (
+            <Wrench className="w-3.5 h-3.5 text-[#0A0A0A]/60 animate-pulse" />
+          ) : (
+            <Brain className="w-3.5 h-3.5 text-[#0A0A0A]/60 animate-pulse" />
+          )}
+          <span className="text-xs font-mono text-[#0A0A0A]/70">{label}</span>
+          {elapsed > 0 && (
+            <span className="text-[10px] font-mono text-[#0A0A0A]/40 ml-auto flex items-center gap-1">
+              <Clock className="w-2.5 h-2.5" />
+              {elapsed}s
+            </span>
+          )}
+        </div>
+        {hasToolCalls && activeToolCalls.map((part, i) => {
+          const tp = part as unknown as ToolPartProps;
+          const name = tp.type.replace(/^tool-/, "").replace(/_/g, " ");
+          return (
+            <div key={i} className="flex items-center gap-2 text-[10px] font-mono text-[#0A0A0A]/50 pl-5">
+              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+              <span>{name}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -210,12 +276,51 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
+  // Use a ref so the custom fetch always reads the latest conversationId
+  const convIdRef = useRef<string | null>(null);
+  convIdRef.current = activeConvId;
+
+  // Custom fetch that captures X-Conversation-Id from the response
+  const customFetch = useCallback(
+    async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      // Inject the latest conversationId into the body
+      if (init?.body && typeof init.body === "string") {
+        try {
+          const parsed = JSON.parse(init.body);
+          parsed.conversationId = convIdRef.current;
+          init = { ...init, body: JSON.stringify(parsed) };
+        } catch {
+          // Not JSON, pass through
+        }
+      }
+
+      const response = await globalThis.fetch(input, init);
+
+      // Capture the conversation ID from the response header
+      const newConvId = response.headers.get("X-Conversation-Id");
+      if (newConvId && newConvId !== convIdRef.current) {
+        convIdRef.current = newConvId;
+        setActiveConvId(newConvId);
+      }
+
+      return response;
+    },
+    []
+  );
+
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: "/api/ai/chat",
+        body: { conversationId: activeConvId },
+        fetch: customFetch,
+      }),
+    [activeConvId, customFetch]
+  );
+
   const { messages, setMessages, sendMessage, status, stop } = useChat({
     id: activeConvId ?? undefined,
-    transport: new DefaultChatTransport({
-      api: "/api/ai/chat",
-      body: { conversationId: activeConvId },
-    }),
+    transport,
     onError: (err) => {
       console.error("[AI Chat]", err);
     },
@@ -354,11 +459,12 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
 
       // Chat mode — streaming
       sendMessage({ text: text.trim() });
-      if (!activeConvId) {
-        setTimeout(() => loadConversations(), 2000);
+      // Refresh conversation list after a short delay (server creates conv on first message)
+      if (!convIdRef.current) {
+        setTimeout(() => loadConversations(), 3000);
       }
     },
-    [mode, sendMessage, activeConvId, setMessages, loadConversations]
+    [mode, sendMessage, setMessages, loadConversations]
   );
 
   const handleKeyDown = useCallback(
@@ -472,32 +578,18 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
               ))
             )}
 
-            {(isStreaming || isSubmitting || researchLoading) &&
-              !messages.some(
-                (m) =>
-                  m.role === "assistant" &&
-                  m.parts.some(
-                    (p) =>
-                      p.type === "text" &&
-                      p.text &&
-                      m === messages[messages.length - 1]
-                  )
-              ) && (
-                <div className="flex justify-start">
-                  <div className="px-4 py-3 bg-white border border-[#0A0A0A]/10">
-                    <div className="flex gap-1">
-                      <span className="w-2 h-2 bg-[#0A0A0A]/40 animate-pulse" />
-                      <span
-                        className="w-2 h-2 bg-[#0A0A0A]/40 animate-pulse"
-                        style={{ animationDelay: "0.15s" }}
-                      />
-                      <span
-                        className="w-2 h-2 bg-[#0A0A0A]/40 animate-pulse"
-                        style={{ animationDelay: "0.3s" }}
-                      />
-                    </div>
-                  </div>
-                </div>
+            {(isSubmitting || isStreaming || researchLoading) &&
+              (() => {
+                const lastMsg = messages[messages.length - 1];
+                const hasAssistantText =
+                  lastMsg?.role === "assistant" &&
+                  lastMsg.parts.some(
+                    (p) => p.type === "text" && (p as { text?: string }).text
+                  );
+                // Show thinking indicator when no final text yet
+                return !hasAssistantText;
+              })() && (
+                <ThinkingIndicator status={status} messages={messages} />
               )}
           </div>
 
@@ -710,32 +802,17 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
           messages.map((msg) => <MessageBubble key={msg.id} message={msg} />)
         )}
 
-        {(isStreaming || isSubmitting || researchLoading) &&
-          !messages.some(
-            (m) =>
-              m.role === "assistant" &&
-              m.parts.some(
-                (p) =>
-                  p.type === "text" &&
-                  p.text &&
-                  m === messages[messages.length - 1]
-              )
-          ) && (
-            <div className="flex justify-start">
-              <div className="px-4 py-3 bg-white border border-[#0A0A0A]/10">
-                <div className="flex gap-1">
-                  <span className="w-2 h-2 bg-[#0A0A0A]/40 animate-pulse" />
-                  <span
-                    className="w-2 h-2 bg-[#0A0A0A]/40 animate-pulse"
-                    style={{ animationDelay: "0.15s" }}
-                  />
-                  <span
-                    className="w-2 h-2 bg-[#0A0A0A]/40 animate-pulse"
-                    style={{ animationDelay: "0.3s" }}
-                  />
-                </div>
-              </div>
-            </div>
+        {(isSubmitting || isStreaming || researchLoading) &&
+          (() => {
+            const lastMsg = messages[messages.length - 1];
+            const hasAssistantText =
+              lastMsg?.role === "assistant" &&
+              lastMsg.parts.some(
+                (p) => p.type === "text" && (p as { text?: string }).text
+              );
+            return !hasAssistantText;
+          })() && (
+            <ThinkingIndicator status={status} messages={messages} />
           )}
       </div>
 
