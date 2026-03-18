@@ -55,7 +55,7 @@ export function ProposalActions({
     <div className="flex items-center gap-1">
       {/* Preview link */}
       <a
-        href={`/proposals/${id}`}
+        href={`/p/${id}`}
         target="_blank"
         rel="noopener noreferrer"
         className="p-1.5 border border-[#0A0A0A]/20 hover:bg-[#0A0A0A]/5"

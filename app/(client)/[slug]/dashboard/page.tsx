@@ -266,7 +266,7 @@ export default async function ClientDashboardPage({
                   </p>
                 </div>
                 <Link
-                  href={`/proposals/${p.id}`}
+                  href={`/p/${p.id}`}
                   className="inline-flex items-center gap-2 border border-[#0A0A0A] bg-[#0A0A0A] text-white px-3 py-1.5 font-mono text-[11px] hover:bg-[#0A0A0A]/90 transition-colors shrink-0"
                 >
                   <ExternalLink className="h-3 w-3" />

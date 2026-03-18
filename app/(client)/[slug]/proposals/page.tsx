@@ -130,7 +130,7 @@ export default async function ClientProposalsPage({
                 {/* Actions */}
                 {isActionable && (
                   <Link
-                    href={`/proposals/${proposal.id}`}
+                    href={`/p/${proposal.id}`}
                     className="inline-flex items-center gap-2 border border-[#0A0A0A] bg-[#0A0A0A] text-white px-4 py-2 font-mono text-xs hover:bg-[#0A0A0A]/90 transition-colors"
                   >
                     <ExternalLink className="h-3 w-3" />

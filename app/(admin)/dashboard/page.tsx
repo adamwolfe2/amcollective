@@ -12,12 +12,6 @@ import { eq, and, sql, desc, gte, count, asc, isNull, lte, not, inArray, isNotNu
 import * as vercelConnector from "@/lib/connectors/vercel";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as mercuryConnector from "@/lib/connectors/mercury";
-import * as wholesailConnector from "@/lib/connectors/wholesail";
-import * as cursiveConnector from "@/lib/connectors/cursive";
-import * as trackrConnector from "@/lib/connectors/trackr";
-import * as taskspaceConnector from "@/lib/connectors/taskspace";
-import * as tbgcConnector from "@/lib/connectors/tbgc";
-import * as hookConnector from "@/lib/connectors/hook";
 import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { FloatingChatBar } from "@/components/floating-chat-bar";
 import { SprintWidgetClient } from "@/components/sprint-widget-client";
@@ -37,26 +31,17 @@ import {
   FileCheck,
   Zap,
 } from "lucide-react";
-import { statusDot, statusText, statusBadge } from "@/lib/ui/status-colors";
+import { statusDot } from "@/lib/ui/status-colors";
 import { EngagementsAccordion } from "@/components/dashboard/EngagementsAccordion";
 import { ProductsAccordion } from "@/components/dashboard/ProductsAccordion";
-import { getProductLogo } from "@/lib/ui/product-logos";
-
-function greeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
-}
-
-function formatCurrency(amount: number) {
-  return amount.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  });
-}
+import { greeting, formatCurrency } from "@/lib/ui/format";
+import { getCachedPlatformSnapshots } from "@/lib/dashboard/platform-snapshots";
+import {
+  MetricsStripSkeleton,
+  PlatformCardSkeleton,
+  PipelineSkeleton,
+  ActionsPanelSkeleton,
+} from "@/components/dashboard/DashboardSkeletons";
 
 // ─── Cached data fetchers ───────────────────────────────────────────────────
 
@@ -91,6 +76,18 @@ const getCachedStaleClients = unstable_cache(
   },
   ["dashboard-stale-clients"],
   { revalidate: 300 }
+);
+
+const getCachedMercuryAccounts = unstable_cache(
+  () => mercuryConnector.getAccounts(),
+  ["dashboard-mercury-accounts"],
+  { revalidate: 300 }
+);
+
+const getCachedVercelDeployments = unstable_cache(
+  () => vercelConnector.getRecentDeployments(5),
+  ["dashboard-vercel-deployments"],
+  { revalidate: 120 }
 );
 
 // ─── Sprint Widget ───────────────────────────────────────────────────────────
@@ -190,56 +187,6 @@ async function SprintWidget() {
   }
 }
 
-// ─── Cached platform connector snapshots ────────────────────────────────────
-
-const getCachedMercuryAccounts = unstable_cache(
-  () => mercuryConnector.getAccounts(),
-  ["dashboard-mercury-accounts"],
-  { revalidate: 300 }
-);
-
-const getCachedVercelDeployments = unstable_cache(
-  () => vercelConnector.getRecentDeployments(5),
-  ["dashboard-vercel-deployments"],
-  { revalidate: 120 }
-);
-
-const getCachedWholesailSnapshot = unstable_cache(
-  () => wholesailConnector.getSnapshot(),
-  ["dashboard-wholesail-snapshot"],
-  { revalidate: 300 }
-);
-
-const getCachedCursiveSnapshot = unstable_cache(
-  () => cursiveConnector.getSnapshot(),
-  ["dashboard-cursive-snapshot"],
-  { revalidate: 300 }
-);
-
-const getCachedTrackrSnapshot = unstable_cache(
-  () => trackrConnector.getSnapshot(),
-  ["dashboard-trackr-snapshot"],
-  { revalidate: 300 }
-);
-
-const getCachedTaskSpaceSnapshot = unstable_cache(
-  () => taskspaceConnector.getSnapshot(),
-  ["dashboard-taskspace-snapshot"],
-  { revalidate: 300 }
-);
-
-const getCachedTBGCSnapshot = unstable_cache(
-  () => tbgcConnector.getSnapshot(),
-  ["dashboard-tbgc-snapshot"],
-  { revalidate: 300 }
-);
-
-const getCachedHookSnapshot = unstable_cache(
-  () => hookConnector.getSnapshot(),
-  ["dashboard-hook-snapshot"],
-  { revalidate: 300 }
-);
-
 // ─── Cash Runway ─────────────────────────────────────────────────────────────
 
 const getCachedRunwaySnapshots = unstable_cache(
@@ -248,7 +195,7 @@ const getCachedRunwaySnapshots = unstable_cache(
       .select()
       .from(schema.cashSnapshots)
       .orderBy(asc(schema.cashSnapshots.recordedAt))
-      .limit(30); // ~1 month of daily snapshots
+      .limit(30);
 
     return rows.map((r) => ({
       recordedAt: r.recordedAt.toISOString(),
@@ -258,7 +205,7 @@ const getCachedRunwaySnapshots = unstable_cache(
     }));
   },
   ["dashboard-runway-snapshots"],
-  { revalidate: 3600 } // 1 hour
+  { revalidate: 3600 }
 );
 
 async function CashRunwaySection() {
@@ -278,14 +225,12 @@ async function CashRunwaySection() {
 
 const getCachedPipeline = unstable_cache(
   async () => {
-    // Fetch all active leads
     const allLeads = await db
       .select()
       .from(schema.leads)
       .where(eq(schema.leads.isArchived, false))
       .orderBy(desc(schema.leads.updatedAt));
 
-    // Fetch engagements + client MRR for won deals
     const engagements = await db
       .select({
         clientName: schema.clients.companyName,
@@ -298,7 +243,6 @@ const getCachedPipeline = unstable_cache(
       .from(schema.engagements)
       .innerJoin(schema.clients, eq(schema.engagements.clientId, schema.clients.id));
 
-    // Build a map of client company name → engagement data
     const engMap = new Map<string, {
       engTitle: string | null;
       engStatus: string | null;
@@ -318,7 +262,6 @@ const getCachedPipeline = unstable_cache(
       }
     }
 
-    // Group by stage
     const stageOrder = ["closed_won", "intent", "consideration", "interest", "nurture", "awareness"];
     const groups: Record<string, typeof allLeads> = {};
     for (const lead of allLeads) {
@@ -336,10 +279,8 @@ const getCachedPipeline = unstable_cache(
           count: leads.length,
           totalValue: leads.reduce((s, l) => s + (l.estimatedValue ?? 0), 0),
           leads: leads.map((l) => {
-            // Try to match engagement data
             const companyKey = (l.companyName ?? "").toLowerCase();
             const eng = engMap.get(companyKey) ||
-              // Try partial match
               Array.from(engMap.entries()).find(([k]) => companyKey.includes(k) || k.includes(companyKey))?.[1];
 
             return {
@@ -382,233 +323,7 @@ async function PipelineSection() {
   }
 }
 
-// ─── Platform Snapshots for Products Accordion ──────────────────────────────
-
-/* eslint-disable @typescript-eslint/no-explicit-any */
-const getCachedPlatformSnapshots = unstable_cache(
-  async () => {
-    const [wholesail, cursive, trackr, taskspace, tbgc, hook, sprintTasks] = await Promise.all([
-      getCachedWholesailSnapshot().catch(() => ({ success: false, data: null })),
-      getCachedCursiveSnapshot().catch(() => ({ success: false, data: null })),
-      getCachedTrackrSnapshot().catch(() => ({ success: false, data: null })),
-      getCachedTaskSpaceSnapshot().catch(() => ({ success: false, data: null })),
-      getCachedTBGCSnapshot().catch(() => ({ success: false, data: null })),
-      getCachedHookSnapshot().catch(() => ({ success: false, data: null })),
-      // Fetch all sprint tasks grouped by project section
-      db
-        .select({
-          taskId: schema.tasks.id,
-          taskTitle: schema.tasks.title,
-          taskStatus: schema.tasks.status,
-          taskPriority: schema.tasks.priority,
-          sectionProjectName: schema.sprintSections.projectName,
-          sprintTitle: schema.weeklySprints.title,
-        })
-        .from(schema.taskSprintAssignments)
-        .innerJoin(schema.tasks, eq(schema.taskSprintAssignments.taskId, schema.tasks.id))
-        .innerJoin(schema.sprintSections, eq(schema.taskSprintAssignments.sectionId, schema.sprintSections.id))
-        .innerJoin(schema.weeklySprints, eq(schema.taskSprintAssignments.sprintId, schema.weeklySprints.id))
-        .where(isNull(schema.taskSprintAssignments.removedAt))
-        .orderBy(desc(schema.weeklySprints.weekOf), asc(schema.taskSprintAssignments.sortOrder))
-        .limit(200)
-        .catch(() => []),
-    ]);
-
-    // Group tasks by project name (case-insensitive)
-    const tasksByProject = new Map<string, Array<{
-      id: string;
-      title: string;
-      status: string;
-      priority: string;
-      sprintTitle: string | null;
-    }>>();
-    for (const t of sprintTasks) {
-      const key = (t.sectionProjectName ?? "").toLowerCase();
-      if (!key) continue;
-      if (!tasksByProject.has(key)) tasksByProject.set(key, []);
-      tasksByProject.get(key)!.push({
-        id: t.taskId,
-        title: t.taskTitle,
-        status: t.taskStatus,
-        priority: t.taskPriority,
-        sprintTitle: t.sprintTitle,
-      });
-    }
-
-    type ProductAlert = { message: string; severity: "critical" | "warning" | "info" };
-    type Product = {
-      name: string;
-      tag: string;
-      slug: string;
-      href: string;
-      connected: boolean;
-      metrics: Array<{ label: string; value: string; alert?: boolean }>;
-      logoUrl?: string | null;
-      mrrDisplay?: string | null;
-      stageDisplay?: string | null;
-      alerts?: ProductAlert[];
-      tasks?: Array<{ id: string; title: string; status: string; priority: string; sprintTitle: string | null }>;
-    };
-
-    const products: Product[] = [];
-    const s = (v: string | number | null | undefined) => String(v ?? 0);
-    const fc = (c: number) => formatCurrency(c);
-
-    // ── Wholesail ──
-    // TODO: type this properly — define WholesailSnapshot interface from connector response shape
-    const wd = wholesail.success ? (wholesail.data as any) : null;
-    const wAlerts: ProductAlert[] = [];
-    if (wd?.stuckProjects > 0) wAlerts.push({ message: `${wd.stuckProjects} stuck builds (>14d)`, severity: "critical" });
-    if (wd?.overdueProjects > 0) wAlerts.push({ message: `${wd.overdueProjects} overdue builds`, severity: "warning" });
-    if (wd?.intake?.pending > 0) wAlerts.push({ message: `${wd.intake.pending} pending intake submissions`, severity: "warning" });
-    products.push({
-      name: "Wholesail", tag: "W", slug: "wholesail", href: "/products/wholesail", logoUrl: getProductLogo("wholesail"),
-      connected: !!wd,
-      mrrDisplay: wd ? fc(wd.mrrFromRetainers) : null,
-      stageDisplay: "Launched",
-      alerts: wAlerts,
-      tasks: tasksByProject.get("wholesail") ?? [],
-      metrics: wd ? [
-        { label: "Active Builds", value: s(wd.activeBuilds) },
-        { label: "Live Clients", value: s(wd.liveClients) },
-        { label: "Pipeline", value: fc(wd.pipelineValue) },
-        { label: "MRR", value: fc(wd.mrrFromRetainers) },
-        { label: "Stuck >14d", value: s(wd.stuckProjects), alert: wd.stuckProjects > 0 },
-        { label: "Build Costs MTD", value: fc(wd.buildCostsMtdCents / 100) },
-      ] : [],
-    });
-
-    // ── Cursive ──
-    // TODO: type this properly — define CursiveSnapshot interface from connector response shape
-    const cd = cursive.success ? (cursive.data as any) : null;
-    const cAlerts: ProductAlert[] = [];
-    if (cd?.pipeline?.at_risk > 0) cAlerts.push({ message: `${cd.pipeline.at_risk} at-risk workspaces`, severity: "warning" });
-    if (cd?.pixels?.trialsExpiringWeek > 0) cAlerts.push({ message: `${cd.pixels.trialsExpiringWeek} pixel trials expiring this week`, severity: "warning" });
-    if (cd?.affiliates?.pendingApplications > 0) cAlerts.push({ message: `${cd.affiliates.pendingApplications} pending affiliate applications`, severity: "info" });
-    products.push({
-      name: "Cursive", tag: "C", slug: "cursive", href: "/products/cursive", logoUrl: getProductLogo("cursive"),
-      connected: !!cd,
-      mrrDisplay: cd ? `${s(cd.totalWorkspaces)} ws` : null,
-      stageDisplay: "Launched",
-      alerts: cAlerts,
-      tasks: tasksByProject.get("cursive") ?? [],
-      metrics: cd ? [
-        { label: "Workspaces", value: s(cd.totalWorkspaces) },
-        { label: "Active", value: s(cd.pipeline?.active) },
-        { label: "Trial", value: s(cd.pipeline?.trial) },
-        { label: "Total Leads", value: s(cd.leads?.total) },
-        { label: "Pixels Installed", value: s(cd.pixels?.totalInstalls) },
-        { label: "Bookings This Wk", value: s(cd.bookings?.thisWeek) },
-      ] : [],
-    });
-
-    // ── Trackr ──
-    // TODO: type this properly — define TrackrSnapshot interface from connector response shape
-    const td = trackr.success ? (trackr.data as any) : null;
-    const tAlerts: ProductAlert[] = [];
-    if (td?.auditPipelinePending > 0) tAlerts.push({ message: `${td.auditPipelinePending} audits pending`, severity: "warning" });
-    if (td?.pendingArchitectApplications > 0) tAlerts.push({ message: `${td.pendingArchitectApplications} architect applications pending`, severity: "info" });
-    products.push({
-      name: "Trackr", tag: "T", slug: "trackr", href: "/products/trackr", logoUrl: getProductLogo("trackr"),
-      connected: !!td,
-      mrrDisplay: td ? fc((td.mrrCents ?? 0) / 100) : null,
-      stageDisplay: "Launched",
-      alerts: tAlerts,
-      tasks: tasksByProject.get("trackr") ?? [],
-      metrics: td ? [
-        { label: "Workspaces", value: s(td.totalWorkspaces) },
-        { label: "Paying", value: s(td.activeSubscriptions) },
-        { label: "Trialing", value: s(td.trialingSubscriptions) },
-        { label: "MRR", value: fc((td.mrrCents ?? 0) / 100) },
-        { label: "Tools Researched", value: s(td.totalToolsResearched) },
-        { label: "API Cost MTD", value: fc(td.apiCostsMtdCents / 100) },
-      ] : [],
-    });
-
-    // ── TaskSpace ──
-    // TODO: type this properly — define TaskSpaceSnapshot interface from connector response shape
-    const tsd = taskspace.success ? (taskspace.data as any) : null;
-    const tsAlerts: ProductAlert[] = [];
-    if (tsd?.openEscalations > 0) tsAlerts.push({ message: `${tsd.openEscalations} open escalations`, severity: "critical" });
-    if (tsd?.eodRate7Day < 50) tsAlerts.push({ message: `EOD report rate at ${tsd.eodRate7Day}% (target: 80%+)`, severity: "warning" });
-    if (tsd?.rocksAtRisk > 0) tsAlerts.push({ message: `${tsd.rocksAtRisk} rocks at risk`, severity: "warning" });
-    products.push({
-      name: "TaskSpace", tag: "TS", slug: "taskspace", href: "/products/taskspace", logoUrl: getProductLogo("taskspace"),
-      connected: !!tsd,
-      mrrDisplay: tsd ? fc((tsd.mrrCents ?? 0) / 100) : null,
-      stageDisplay: "Launched",
-      alerts: tsAlerts,
-      tasks: tasksByProject.get("taskspace") ?? [],
-      metrics: tsd ? [
-        { label: "Orgs", value: s(tsd.totalOrgs) },
-        { label: "Members", value: s(tsd.totalMembers) },
-        { label: "Paying Orgs", value: s(tsd.payingOrgs) },
-        { label: "MRR", value: fc((tsd.mrrCents ?? 0) / 100) },
-        { label: "Active Tasks", value: s(tsd.activeTasks) },
-        { label: "EOD Rate 7d", value: `${tsd.eodRate7Day}%`, alert: tsd.eodRate7Day < 50 },
-      ] : [],
-    });
-
-    // ── TBGC ──
-    // TODO: type this properly — define TBGCSnapshot interface from connector response shape
-    const tbgcd = tbgc.success ? (tbgc.data as any) : null;
-    products.push({
-      name: "TBGC", tag: "TB", slug: "tbgc", href: "/products/tbgc", logoUrl: getProductLogo("tbgc"),
-      connected: !!tbgcd,
-      mrrDisplay: tbgcd && tbgcd.mrrCents > 0 ? fc(tbgcd.mrrCents / 100) : "Pre-rev",
-      stageDisplay: tbgcd?.stage ?? "Building",
-      alerts: [],
-      tasks: tasksByProject.get("tbgc") ?? [],
-      metrics: tbgcd ? [
-        { label: "Stage", value: s(tbgcd.stage) },
-        { label: "MRR", value: (tbgcd.mrrCents ?? 0) > 0 ? fc(tbgcd.mrrCents / 100) : "Pre-revenue" },
-        { label: "Subscriptions", value: s(tbgcd.activeSubscriptions) },
-      ] : [],
-    });
-
-    // ── Hook ──
-    // TODO: type this properly — define HookSnapshot interface from connector response shape
-    const hd = hook.success ? (hook.data as any) : null;
-    products.push({
-      name: "Hook", tag: "H", slug: "hook", href: "/products/hook", logoUrl: getProductLogo("hook"),
-      connected: !!hd,
-      mrrDisplay: hd && hd.mrrCents > 0 ? fc(hd.mrrCents / 100) : "Pre-rev",
-      stageDisplay: hd?.stage ?? "Beta",
-      alerts: [],
-      tasks: tasksByProject.get("hook") ?? [],
-      metrics: hd ? [
-        { label: "Stage", value: s(hd.stage) },
-        { label: "MRR", value: (hd.mrrCents ?? 0) > 0 ? fc(hd.mrrCents / 100) : "Pre-revenue" },
-        { label: "Paying", value: s(hd.activeSubscriptions) },
-        { label: "Trialing", value: s(hd.trialingSubscriptions) },
-      ] : [],
-    });
-
-    // ── MyVSL ──
-    // No dedicated connector yet — show Stripe MRR when available
-    const myvslStripeMrr = await stripeConnector.getMRRByCompany().then(
-      (r) => r.success ? (r.data?.find((c) => c.companyTag === "myvsl")?.mrr ?? 0) : 0
-    ).catch(() => 0);
-    products.push({
-      name: "MyVSL", tag: "MV", slug: "myvsl", href: "/products/myvsl", logoUrl: getProductLogo("myvsl"),
-      connected: true,
-      mrrDisplay: myvslStripeMrr > 0 ? fc(myvslStripeMrr / 100) : "Pre-rev",
-      stageDisplay: "Launched",
-      alerts: [],
-      tasks: tasksByProject.get("myvsl") ?? tasksByProject.get("flowline") ?? [],
-      metrics: [
-        { label: "Stage", value: "Launched" },
-        { label: "MRR", value: myvslStripeMrr > 0 ? fc(myvslStripeMrr / 100) : "Pre-revenue" },
-        { label: "Goal", value: "$5,000/mo" },
-      ],
-    });
-
-    return products;
-  },
-  ["dashboard-platform-snapshots-v2"],
-  { revalidate: 300 }
-);
-/* eslint-enable @typescript-eslint/no-explicit-any */
+// ─── Platform Snapshots ──────────────────────────────────────────────────────
 
 async function PlatformSnapshotsSection() {
   try {
@@ -703,446 +418,6 @@ async function MetricsStrip() {
   }
 }
 
-// ─── Platform Card Shared ────────────────────────────────────────────────────
-
-function PlatformCardHeader({
-  label,
-  tag,
-  internalHref,
-}: {
-  label: string;
-  tag: string;
-  internalHref: string;
-}) {
-  return (
-    <div className="px-4 py-2.5 border-b border-[#0A0A0A]/5 flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <span className="inline-flex items-center justify-center w-5 h-5 bg-[#0A0A0A] font-mono text-[9px] font-bold text-white">
-          {tag}
-        </span>
-        <span className="font-serif font-bold text-sm text-[#0A0A0A]">{label}</span>
-      </div>
-      <Link
-        href={internalHref}
-        className="font-mono text-[9px] text-[#0A0A0A]/40 hover:text-[#0A0A0A]/70 transition-colors"
-      >
-        details →
-      </Link>
-    </div>
-  );
-}
-
-function CardStat({
-  label,
-  value,
-  sub,
-  alert,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  alert?: boolean;
-}) {
-  return (
-    <div>
-      <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block">
-        {label}
-      </span>
-      <div className="flex items-baseline gap-1">
-        <span
-          className={`font-mono font-bold text-base leading-tight ${
-            alert ? statusText.negative : "text-[#0A0A0A]"
-          }`}
-        >
-          {value}
-        </span>
-        {sub && (
-          <span className="font-mono text-[9px] text-[#0A0A0A]/40">{sub}</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PlatformUnavailable() {
-  return (
-    <div className="p-4 flex items-center justify-center h-20">
-      <p className="font-mono text-[10px] text-[#0A0A0A]/25">Not connected</p>
-    </div>
-  );
-}
-
-// ─── Wholesail Platform Card ─────────────────────────────────────────────────
-
-async function _WholesailCard() {
-  try {
-    const result = await getCachedWholesailSnapshot();
-    const d = result.success ? result.data : null;
-
-    return (
-      <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
-        <PlatformCardHeader label="Wholesail" tag="W" internalHref="/projects?platform=wholesail" />
-        {d ? (
-          <div className="p-4 space-y-3 flex-1">
-            {/* Build pipeline */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-              <CardStat label="Builds" value={String(d.activeBuilds)} sub="active" />
-              <CardStat label="Live" value={String(d.liveClients)} sub="clients" />
-              <CardStat label="Total" value={String(Object.values(d.buildsByStatus).reduce((s, n) => s + n, 0))} sub="all time" />
-              <CardStat label="Stuck" value={String(d.stuckProjects)} sub=">14d" alert={d.stuckProjects > 0} />
-            </div>
-            {/* Revenue */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <CardStat label="Pipeline" value={formatCurrency(d.pipelineValue)} />
-              <CardStat label="MRR" value={formatCurrency(d.mrrFromRetainers)} sub="retainers" />
-              <CardStat label="Overdue" value={String(d.overdueProjects)} sub="builds" alert={d.overdueProjects > 0} />
-            </div>
-            {/* Intake funnel */}
-            <div>
-              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Intake funnel</span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <CardStat label="Pending" value={String(d.intake.pending)} alert={d.intake.pending > 0} />
-                <CardStat label="Reviewed" value={String(d.intake.reviewed)} />
-                <CardStat label="Converted" value={String(d.intake.converted)} />
-                <CardStat label="Total" value={String(d.intake.total)} />
-              </div>
-            </div>
-            {/* Costs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <CardStat label="Build Costs MTD" value={formatCurrency(d.buildCostsMtdCents / 100)} />
-              <CardStat label="Build Costs All-Time" value={formatCurrency(d.buildCostsAllTimeCents / 100)} />
-            </div>
-          </div>
-        ) : (
-          <PlatformUnavailable />
-        )}
-      </div>
-    );
-  } catch (err) {
-    console.error("[Dashboard] WholesailCard failed:", err);
-    return (
-      <div className="border border-[#0A0A0A]/10 bg-white">
-        <PlatformCardHeader label="Wholesail" tag="W" internalHref="/projects" />
-        <PlatformUnavailable />
-      </div>
-    );
-  }
-}
-
-// ─── Cursive Platform Card ────────────────────────────────────────────────────
-
-async function _CursiveCard() {
-  try {
-    const result = await getCachedCursiveSnapshot();
-    const d = result.success ? result.data : null;
-
-    return (
-      <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
-        <PlatformCardHeader label="Cursive" tag="C" internalHref="/leads?platform=cursive" />
-        {d ? (
-          <div className="p-4 space-y-3 flex-1">
-            {/* Workspace pipeline */}
-            <div>
-              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Workspace pipeline</span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <CardStat label="Total" value={String(d.totalWorkspaces)} />
-                <CardStat label="Active" value={String(d.pipeline.active)} />
-                <CardStat label="Trial" value={String(d.pipeline.trial)} />
-                <CardStat label="New" value={String(d.pipeline.new)} sub="unstarted" />
-              </div>
-            </div>
-            {/* Leads */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <CardStat label="Total Leads" value={String(d.leads.total)} />
-              <CardStat label="New Leads" value={String(d.leads.createdThisWeek)} sub="this wk" />
-              <CardStat label="At-Risk" value={String(d.pipeline.at_risk)} sub="workspaces" alert={d.pipeline.at_risk > 0} />
-            </div>
-            {/* Bookings */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <CardStat label="Bookings Today" value={String(d.bookings.today)} />
-              <CardStat label="This Week" value={String(d.bookings.thisWeek)} />
-              <CardStat label="This Month" value={String(d.bookings.thisMonth)} />
-            </div>
-            {/* Pixels */}
-            <div>
-              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Pixels</span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <CardStat label="Installed" value={String(d.pixels.totalInstalls)} />
-                <CardStat label="Active Trial" value={String(d.pixels.activeTrials)} />
-                <CardStat label="Expiring" value={String(d.pixels.trialsExpiringWeek)} sub="7d" alert={d.pixels.trialsExpiringWeek > 0} />
-                <CardStat label="Expired" value={String(d.pixels.trialsExpired)} />
-              </div>
-            </div>
-            {/* Affiliates */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <CardStat label="Affiliates" value={String(d.affiliates.activeAffiliates)} sub="active" />
-              <CardStat label="Applications" value={String(d.affiliates.pendingApplications)} sub="pending" alert={d.affiliates.pendingApplications > 0} />
-              <CardStat label="Commissions" value={formatCurrency(d.affiliates.pendingCommissionsCents / 100)} sub="pending" />
-            </div>
-          </div>
-        ) : (
-          <PlatformUnavailable />
-        )}
-      </div>
-    );
-  } catch (err) {
-    console.error("[Dashboard] CursiveCard failed:", err);
-    return (
-      <div className="border border-[#0A0A0A]/10 bg-white">
-        <PlatformCardHeader label="Cursive" tag="C" internalHref="/leads" />
-        <PlatformUnavailable />
-      </div>
-    );
-  }
-}
-
-// ─── Trackr Platform Card ─────────────────────────────────────────────────────
-
-async function _TrackrCard() {
-  try {
-    const result = await getCachedTrackrSnapshot();
-    const d = result.success ? result.data : null;
-
-    return (
-      <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
-        <PlatformCardHeader label="Trackr" tag="T" internalHref="/analytics?platform=trackr" />
-        {d ? (
-          <div className="p-4 space-y-3 flex-1">
-            {/* Users */}
-            <div>
-              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Users</span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <CardStat label="Workspaces" value={String(d.totalWorkspaces)} />
-                <CardStat label="New" value={String(d.newWorkspacesWeek)} sub="this wk" />
-                <CardStat label="Paying" value={String(d.activeSubscriptions)} />
-                <CardStat label="Trialing" value={String(d.trialingSubscriptions)} />
-              </div>
-            </div>
-            {/* Revenue — plan breakdown */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <CardStat label="MRR" value={formatCurrency(d.mrrCents / 100)} />
-              <CardStat label="Free" value={String(d.planBreakdown.free ?? 0)} sub="workspaces" />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <CardStat label="Team" value={String(d.planBreakdown.team ?? 0)} sub="plan" />
-              <CardStat label="Startup" value={String(d.planBreakdown.startup ?? 0)} sub="plan" />
-              <CardStat label="Enterprise" value={String(d.planBreakdown.enterprise ?? 0)} sub="plan" />
-            </div>
-            {/* Product */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <CardStat label="Tools Researched" value={String(d.totalToolsResearched)} />
-              <CardStat label="Audits Pending" value={String(d.auditPipelinePending)} alert={d.auditPipelinePending > 0} />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <CardStat label="API Cost MTD" value={formatCurrency(d.apiCostsMtdCents / 100)} />
-              <CardStat label="API Cost Today" value={formatCurrency(d.apiCostsTodayCents / 100)} />
-            </div>
-            {/* Architect program */}
-            <div>
-              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Architect program</span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <CardStat label="Active" value={String(d.activeArchitects)} />
-                <CardStat label="Applications" value={String(d.pendingArchitectApplications)} sub="pending" alert={d.pendingArchitectApplications > 0} />
-                <CardStat label="Commissions" value={formatCurrency(d.pendingCommissionsCents / 100)} sub="pending" />
-              </div>
-            </div>
-          </div>
-        ) : (
-          <PlatformUnavailable />
-        )}
-      </div>
-    );
-  } catch (err) {
-    console.error("[Dashboard] TrackrCard failed:", err);
-    return (
-      <div className="border border-[#0A0A0A]/10 bg-white">
-        <PlatformCardHeader label="Trackr" tag="T" internalHref="/analytics" />
-        <PlatformUnavailable />
-      </div>
-    );
-  }
-}
-
-// ─── TaskSpace Platform Card ──────────────────────────────────────────────────
-
-async function _TaskSpaceCard() {
-  try {
-    const result = await getCachedTaskSpaceSnapshot();
-    const d = result.success ? result.data : null;
-
-    return (
-      <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
-        <PlatformCardHeader label="TaskSpace" tag="TS" internalHref="/team?platform=taskspace" />
-        {d ? (
-          <div className="p-4 space-y-3 flex-1">
-            {/* Orgs & users */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <CardStat label="Orgs" value={String(d.totalOrgs)} />
-              <CardStat label="Members" value={String(d.totalMembers)} />
-              <CardStat label="Paying Orgs" value={String(d.payingOrgs)} />
-            </div>
-            {/* Revenue */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <CardStat label="MRR" value={formatCurrency(d.mrrCents / 100)} />
-              <CardStat label="Team Plan" value={String(d.planBreakdown.team)} />
-              <CardStat label="Business Plan" value={String(d.planBreakdown.business)} />
-            </div>
-            {/* EOD activity */}
-            <div>
-              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">EOD Reports</span>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <CardStat label="Today" value={String(d.eodsToday)} />
-                <CardStat label="7-Day Rate" value={`${d.eodRate7Day}%`} alert={d.eodRate7Day < 50} />
-                <CardStat label="Escalations" value={String(d.openEscalations)} sub="open" alert={d.openEscalations > 0} />
-              </div>
-            </div>
-            {/* Tasks */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <CardStat label="Active Tasks" value={String(d.activeTasks)} />
-              <CardStat label="Completed" value={String(d.completedTasksThisWeek)} sub="this wk" />
-            </div>
-            {/* Rocks */}
-            <div>
-              <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1.5">Rocks (quarterly goals)</span>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                <CardStat label="On-Track" value={String(d.rocksOnTrack)} />
-                <CardStat label="At-Risk" value={String(d.rocksAtRisk)} alert={d.rocksAtRisk > 0} />
-                <CardStat label="Blocked" value={String(d.rocksBlocked)} alert={d.rocksBlocked > 0} />
-                <CardStat label="Done" value={String(d.rocksCompleted)} />
-              </div>
-              {d.rocksOnTrack + d.rocksAtRisk + d.rocksBlocked + d.rocksCompleted > 0 && (
-                <div className="flex gap-0.5 h-1 mt-2">
-                  {d.rocksOnTrack > 0 && <div className={`h-full ${statusDot.positive}`} style={{ flex: d.rocksOnTrack }} title={`On-track: ${d.rocksOnTrack}`} />}
-                  {d.rocksAtRisk > 0 && <div className={`h-full ${statusDot.warning}`} style={{ flex: d.rocksAtRisk }} title={`At-risk: ${d.rocksAtRisk}`} />}
-                  {d.rocksBlocked > 0 && <div className={`h-full ${statusDot.negative}`} style={{ flex: d.rocksBlocked }} title={`Blocked: ${d.rocksBlocked}`} />}
-                  {d.rocksCompleted > 0 && <div className={`h-full ${statusDot.neutral}`} style={{ flex: d.rocksCompleted }} title={`Completed: ${d.rocksCompleted}`} />}
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <PlatformUnavailable />
-        )}
-      </div>
-    );
-  } catch (err) {
-    console.error("[Dashboard] TaskSpaceCard failed:", err);
-    return (
-      <div className="border border-[#0A0A0A]/10 bg-white">
-        <PlatformCardHeader label="TaskSpace" tag="TS" internalHref="/team" />
-        <PlatformUnavailable />
-      </div>
-    );
-  }
-}
-
-// ─── TBGC Platform Card ────────────────────────────────────────────────────────
-
-async function _TBGCCard() {
-  try {
-    const result = await getCachedTBGCSnapshot();
-    const d = result.success ? result.data : null;
-
-    return (
-      <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
-        <PlatformCardHeader label="TBGC" tag="TB" internalHref="/products/tbgc" />
-        {d ? (
-          <div className="p-4 space-y-3 flex-1">
-            {/* Stage badge */}
-            <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${statusBadge.warning}`}>
-                {d.stage}
-              </span>
-              <span className="font-mono text-[9px] text-[#0A0A0A]/40">Custom B2B wholesale portal</span>
-            </div>
-            {/* Revenue */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <CardStat
-                label="MRR"
-                value={d.mrrCents > 0 ? formatCurrency(d.mrrCents / 100) : "Pre-revenue"}
-              />
-              <CardStat label="Subscriptions" value={String(d.activeSubscriptions)} sub="active" />
-            </div>
-            {/* Notes */}
-            {d.notes.length > 0 && (
-              <div>
-                <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1">Status</span>
-                {d.notes.map((note, i) => (
-                  <p key={i} className="font-serif text-[11px] text-[#0A0A0A]/60">{note}</p>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <PlatformUnavailable />
-        )}
-      </div>
-    );
-  } catch (err) {
-    console.error("[Dashboard] TBGCCard failed:", err);
-    return (
-      <div className="border border-[#0A0A0A]/10 bg-white">
-        <PlatformCardHeader label="TBGC" tag="TB" internalHref="/products/tbgc" />
-        <PlatformUnavailable />
-      </div>
-    );
-  }
-}
-
-// ─── Hook Platform Card ────────────────────────────────────────────────────────
-
-async function _HookCard() {
-  try {
-    const result = await getCachedHookSnapshot();
-    const d = result.success ? result.data : null;
-
-    return (
-      <div className="border border-[#0A0A0A]/10 bg-white flex flex-col">
-        <PlatformCardHeader label="Hook" tag="H" internalHref="/products/hook" />
-        {d ? (
-          <div className="p-4 space-y-3 flex-1">
-            {/* Stage badge */}
-            <div className="flex items-center gap-2">
-              <span className={`inline-flex items-center px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${statusBadge.info}`}>
-                {d.stage}
-              </span>
-              <span className="font-mono text-[9px] text-[#0A0A0A]/40">AI viral content platform</span>
-            </div>
-            {/* Revenue */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-              <CardStat
-                label="MRR"
-                value={d.mrrCents > 0 ? formatCurrency(d.mrrCents / 100) : "Pre-revenue"}
-              />
-              <CardStat label="Paying" value={String(d.activeSubscriptions)} sub="users" />
-              <CardStat label="Trialing" value={String(d.trialingSubscriptions)} sub="users" />
-            </div>
-            {/* Notes */}
-            {d.notes.length > 0 && (
-              <div>
-                <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block mb-1">Status</span>
-                {d.notes.map((note, i) => (
-                  <p key={i} className="font-serif text-[11px] text-[#0A0A0A]/60">{note}</p>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <PlatformUnavailable />
-        )}
-      </div>
-    );
-  } catch (err) {
-    console.error("[Dashboard] HookCard failed:", err);
-    return (
-      <div className="border border-[#0A0A0A]/10 bg-white">
-        <PlatformCardHeader label="Hook" tag="H" internalHref="/products/hook" />
-        <PlatformUnavailable />
-      </div>
-    );
-  }
-}
-
 // ─── Actions Panel ──────────────────────────────────────────────────────────
 
 async function ActionsPanel() {
@@ -1168,7 +443,6 @@ async function ActionsPanel() {
         getCachedStaleClients(),
         getCachedVercelDeployments(),
         getRecentActivity(10),
-        // Unsigned contracts that were sent to clients
         db
           .select({
             id: schema.contracts.id,
@@ -1182,7 +456,6 @@ async function ActionsPanel() {
           .where(inArray(schema.contracts.status, ["sent", "viewed"]))
           .orderBy(schema.contracts.sentAt)
           .limit(5),
-        // Leads with missed follow-ups
         db
           .select({
             id: schema.leads.id,
@@ -1283,13 +556,9 @@ async function ActionsPanel() {
 
     return (
       <div className="space-y-4">
-        {/* Today's Priorities */}
         <PrioritiesWidget />
-
-        {/* Sprint Widget */}
         <SprintWidget />
 
-        {/* Action Required */}
         {actionItems.length > 0 && (
           <div>
             <h3 className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-2">
@@ -1325,7 +594,6 @@ async function ActionsPanel() {
           </div>
         )}
 
-        {/* Quick Access */}
         <div>
           <h3 className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-2">
             Quick Access
@@ -1345,7 +613,6 @@ async function ActionsPanel() {
           </div>
         </div>
 
-        {/* Recent Activity */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <h3 className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
@@ -1405,64 +672,6 @@ async function ActionsPanel() {
   }
 }
 
-// ─── Loading Skeletons ──────────────────────────────────────────────────────
-
-function MetricsStripSkeleton() {
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div
-          key={i}
-          className="h-16 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10"
-        />
-      ))}
-    </div>
-  );
-}
-
-function PlatformCardSkeleton() {
-  return (
-    <div className="border border-[#0A0A0A]/10 bg-white">
-      <div className="px-4 py-2.5 border-b border-[#0A0A0A]/5">
-        <div className="h-4 w-24 bg-[#0A0A0A]/5 animate-pulse" />
-      </div>
-      <div className="p-4 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-10 bg-[#0A0A0A]/5 animate-pulse" />
-          ))}
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {Array.from({ length: 2 }).map((_, i) => (
-            <div key={i} className="h-10 bg-[#0A0A0A]/5 animate-pulse" />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function PipelineSkeleton() {
-  return (
-    <div className="space-y-2">
-      <div className="h-4 w-40 bg-[#0A0A0A]/5 animate-pulse" />
-      {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="h-12 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
-      ))}
-    </div>
-  );
-}
-
-function ActionsPanelSkeleton() {
-  return (
-    <div className="space-y-4">
-      <div className="h-32 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
-      <div className="h-48 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
-      <div className="h-40 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />
-    </div>
-  );
-}
-
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 export default async function DashboardPage() {
@@ -1471,7 +680,6 @@ export default async function DashboardPage() {
   const firstName = user?.firstName ?? "there";
 
   return (
-    // pb-24 keeps content above the floating chat bar
     <div className="flex flex-col lg:h-[calc(100vh-7rem)] pb-20">
       {/* Header + Metrics */}
       <div className="shrink-0 space-y-3 mb-4">
@@ -1498,25 +706,20 @@ export default async function DashboardPage() {
 
       {/* Main: Pipeline + Products + Side Panel */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 min-h-0">
-        {/* Left column — Pipeline & Engagements + Products */}
         <div className="lg:col-span-8 lg:overflow-y-auto min-h-0 space-y-3 sm:space-y-4">
-          {/* Products */}
           <Suspense fallback={<PlatformCardSkeleton />}>
             <PlatformSnapshotsSection />
           </Suspense>
 
-          {/* Pipeline & Engagements */}
           <Suspense fallback={<PipelineSkeleton />}>
             <PipelineSection />
           </Suspense>
 
-          {/* Cash Runway */}
           <Suspense fallback={<div className="h-24 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />}>
             <CashRunwaySection />
           </Suspense>
         </div>
 
-        {/* Side Panel — sprint, actions, quick access, activity */}
         <div className="lg:col-span-4 lg:overflow-y-auto min-h-0">
           <Suspense fallback={<ActionsPanelSkeleton />}>
             <ActionsPanel />
@@ -1524,7 +727,6 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Floating Chat Bar */}
       <FloatingChatBar />
     </div>
   );

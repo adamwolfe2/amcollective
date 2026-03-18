@@ -42,7 +42,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/inngest",       // Inngest serve endpoint — authenticated via INNGEST_SIGNING_KEY, not Clerk
   "/api/contact",
   "/contracts/sign/(.*)",
-  "/proposals/(.*)",
+  "/p/(.*)",
   "/surveys/(.*)",
   "/s/(.*)", // public sprint share links
   "/api/bot/sms(.*)",   // Bloo.io inbound webhook (verified by HMAC)

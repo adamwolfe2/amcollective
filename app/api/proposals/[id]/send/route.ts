@@ -75,7 +75,7 @@ export async function POST(
         process.env.RESEND_FROM_EMAIL ||
         "AM Collective <team@amcollectivecapital.com>";
 
-      const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://amcollective.vercel.app"}/proposals/${id}`;
+      const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://amcollective.vercel.app"}/p/${id}`;
 
       await resend.emails.send({
         from,

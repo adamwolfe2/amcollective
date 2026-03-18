@@ -445,7 +445,7 @@ export async function handler(
         total: `$${(totalCents / 100).toLocaleString()}`,
         status: "draft",
         validUntil: validUntilDate.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-        portalUrl: `/proposals/${proposal.id}`,
+        portalUrl: `/p/${proposal.id}`,
       });
     }
 
