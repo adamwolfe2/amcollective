@@ -1475,14 +1475,14 @@ export default async function DashboardPage() {
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 min-h-0">
         {/* Left column — Pipeline & Engagements + Products */}
         <div className="lg:col-span-8 lg:overflow-y-auto min-h-0 space-y-3 sm:space-y-4">
+          {/* Products */}
+          <Suspense fallback={<PlatformCardSkeleton />}>
+            <PlatformSnapshotsSection />
+          </Suspense>
+
           {/* Pipeline & Engagements */}
           <Suspense fallback={<PipelineSkeleton />}>
             <PipelineSection />
-          </Suspense>
-
-          {/* Products — collapsible platform snapshots */}
-          <Suspense fallback={<PlatformCardSkeleton />}>
-            <PlatformSnapshotsSection />
           </Suspense>
 
           {/* Cash Runway */}
