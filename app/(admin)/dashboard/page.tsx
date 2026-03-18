@@ -578,6 +578,25 @@ const getCachedPlatformSnapshots = unstable_cache(
       ] : [],
     });
 
+    // ── MyVSL ──
+    // No dedicated connector yet — show Stripe MRR when available
+    const myvslStripeMrr = await stripeConnector.getMRRByCompany().then(
+      (r) => r.success ? (r.data?.find((c: any) => c.companyTag === "myvsl")?.mrr ?? 0) : 0
+    ).catch(() => 0);
+    products.push({
+      name: "MyVSL", tag: "MV", slug: "myvsl", href: "/products/myvsl", logoUrl: getProductLogo("myvsl"),
+      connected: true,
+      mrrDisplay: myvslStripeMrr > 0 ? fc(myvslStripeMrr / 100) : "Pre-rev",
+      stageDisplay: "Launched",
+      alerts: [],
+      tasks: tasksByProject.get("myvsl") ?? tasksByProject.get("flowline") ?? [],
+      metrics: [
+        { label: "Stage", value: "Launched" },
+        { label: "MRR", value: myvslStripeMrr > 0 ? fc(myvslStripeMrr / 100) : "Pre-revenue" },
+        { label: "Goal", value: "$5,000/mo" },
+      ],
+    });
+
     return products;
   },
   ["dashboard-platform-snapshots-v2"],

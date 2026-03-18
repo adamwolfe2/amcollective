@@ -9,6 +9,7 @@ export const productLogos: Record<string, string> = {
   tbgc: "/logos/tbgc.svg",
   cursive: "/logos/cursive.png",
   hook: "/logos/hook.png",
+  myvsl: "/logos/myvsl.png",
 };
 
 /**

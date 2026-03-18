@@ -113,6 +113,8 @@ export default async function ProductsPage() {
       mrrCents = tbgcResult.success && tbgcResult.data ? tbgcResult.data.mrrCents : getStripeMrr("tbgc");
     } else if (p.slug === "hook") {
       mrrCents = hookResult.success && hookResult.data ? hookResult.data.mrrCents : getStripeMrr("hook");
+    } else if (p.slug === "myvsl") {
+      mrrCents = getStripeMrr("myvsl");
     }
 
     const daysLive = p.launchDate
