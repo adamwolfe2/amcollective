@@ -25,7 +25,7 @@ export function FloatingChatBar() {
     /* Sidebar is w-60 on md+ — offset left so bar centers in the content area */
     <div className="fixed bottom-6 left-0 md:left-60 right-0 flex justify-center px-6 pointer-events-none z-40">
       <div className="pointer-events-auto w-full max-w-2xl">
-        <div className="flex items-center gap-2 bg-white border border-[#0A0A0A]/15 rounded-full shadow-lg shadow-black/8 px-4 py-2.5">
+        <div className="flex items-center gap-2 bg-white border border-[#0A0A0A]/15 rounded-sm px-4 py-2.5">
           <Sparkles className="w-4 h-4 text-[#0A0A0A]/25 shrink-0" />
           <input
             ref={inputRef}
@@ -41,7 +41,7 @@ export function FloatingChatBar() {
             onClick={submit}
             disabled={submitting}
             aria-label="Ask AM Agent"
-            className="w-7 h-7 flex items-center justify-center bg-[#0A0A0A] rounded-full hover:bg-[#0A0A0A]/80 transition-colors shrink-0 disabled:opacity-50"
+            className="w-7 h-7 flex items-center justify-center bg-[#0A0A0A] rounded-sm hover:bg-[#0A0A0A]/80 transition-colors shrink-0 disabled:opacity-50"
           >
             <Send className="w-3 h-3 text-white" />
           </button>

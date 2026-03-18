@@ -12,7 +12,7 @@ export async function getRecentActivity(limit = 10) {
     .limit(limit);
 }
 
-export async function getEntityActivity(entityType: string, entityId: string) {
+export async function getEntityActivity(_entityType: string, entityId: string) {
   return db
     .select()
     .from(auditLogs)

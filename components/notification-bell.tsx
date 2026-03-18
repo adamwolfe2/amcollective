@@ -112,7 +112,7 @@ export function NotificationBell() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-[min(calc(100vw-1rem),20rem)] sm:w-80 border border-[#0A0A0A]/10 bg-white shadow-lg z-50">
+        <div className="absolute right-0 top-full mt-2 w-[min(calc(100vw-1rem),20rem)] sm:w-80 border border-[#0A0A0A]/10 bg-white z-50">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#0A0A0A]/10">
             <h3 className="font-serif font-bold text-sm text-[#0A0A0A]">
@@ -198,7 +198,7 @@ export function NotificationBell() {
                       )}
                       <button
                         onClick={() => deleteNotification(n.id)}
-                        className="p-1 text-[#0A0A0A]/30 hover:text-red-600"
+                        className="p-1 text-[#0A0A0A]/30 hover:text-[#0A0A0A]"
                         title="Delete"
                       >
                         <Trash2 className="h-3 w-3" />

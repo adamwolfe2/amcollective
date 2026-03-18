@@ -51,12 +51,6 @@ export function MentionInput({
     setOpen(false);
   }
 
-  function _handleClear() {
-    onChange("");
-    onSelect(null);
-    inputRef.current?.focus();
-  }
-
   function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (!open) {
       if (e.key === "ArrowDown" || e.key === "Enter") setOpen(true);

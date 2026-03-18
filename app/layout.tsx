@@ -59,7 +59,7 @@ const clerkAppearance = {
   elements: {
     rootBox: "w-full",
     cardBox: "shadow-none",
-    card: "border border-[#E2DDD6] rounded-none shadow-[0_4px_24px_rgba(15,21,35,0.08)]",
+    card: "border border-[#E2DDD6] rounded-none",
     headerTitle: "font-serif font-semibold text-[#0F1523]",
     headerSubtitle:
       "font-mono text-[#8B92A5] text-xs uppercase tracking-wider",

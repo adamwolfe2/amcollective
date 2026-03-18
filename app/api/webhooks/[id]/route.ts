@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+
+const webhookUpdateSchema = z.object({
+  endpointUrl: z.string().url().max(1000),
+  events: z.array(z.string().max(200)).max(50),
+  isActive: z.boolean(),
+  projectId: z.string().uuid().nullable(),
+}).partial().refine(data => Object.keys(data).length > 0, "At least one field required");
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -45,13 +53,21 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const { endpointUrl, events, isActive, projectId } = body;
 
+    const parsed = webhookUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
     const updates: Partial<typeof schema.webhookRegistrations.$inferInsert> = {};
-    if (endpointUrl !== undefined) updates.endpointUrl = endpointUrl;
-    if (events !== undefined) updates.events = events;
-    if (isActive !== undefined) updates.isActive = isActive;
-    if (projectId !== undefined) updates.projectId = projectId;
+    if (data.endpointUrl !== undefined) updates.endpointUrl = data.endpointUrl;
+    if (data.events !== undefined) updates.events = data.events;
+    if (data.isActive !== undefined) updates.isActive = data.isActive;
+    if (data.projectId !== undefined) updates.projectId = data.projectId;
 
     const [updated] = await db
       .update(schema.webhookRegistrations)

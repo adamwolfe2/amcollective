@@ -37,7 +37,7 @@ export default function SignInPage() {
       <SignIn
         appearance={{
           elements: {
-            card: "border border-[#E2DDD6] rounded-none shadow-[0_4px_24px_rgba(15,21,35,0.08)]",
+            card: "border border-[#E2DDD6] rounded-none",
             formButtonPrimary:
               "bg-[#2A52BE] hover:bg-[#1B3A6B] font-mono text-sm uppercase tracking-wider rounded-none",
             formFieldInput:

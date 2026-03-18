@@ -60,7 +60,7 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
   }
 
   // No embedding provider configured
-  console.log("[embeddings] No embedding provider configured, skipping");
+  console.warn("[embeddings] No embedding provider configured, skipping");
   return null;
 }
 

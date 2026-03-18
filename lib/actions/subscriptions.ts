@@ -45,7 +45,7 @@ export async function createSubscription(
       .values({
         name: input.name,
         vendor: input.vendor,
-        companyTag: input.companyTag as "trackr" | "wholesail" | "taskspace" | "cursive" | "tbgc" | "hook" | "am_collective" | "personal" | "untagged",
+        companyTag: input.companyTag as "trackr" | "wholesail" | "taskspace" | "cursive" | "tbgc" | "hook" | "myvsl" | "am_collective" | "personal" | "untagged",
         projectId: input.projectId || null,
         amount: Math.round(input.amountDollars * 100),
         billingCycle: input.billingCycle,
@@ -80,7 +80,7 @@ export async function updateSubscription(
       .set({
         name: input.name,
         vendor: input.vendor,
-        companyTag: input.companyTag as "trackr" | "wholesail" | "taskspace" | "cursive" | "tbgc" | "hook" | "am_collective" | "personal" | "untagged",
+        companyTag: input.companyTag as "trackr" | "wholesail" | "taskspace" | "cursive" | "tbgc" | "hook" | "myvsl" | "am_collective" | "personal" | "untagged",
         projectId: input.projectId || null,
         amount: Math.round(input.amountDollars * 100),
         billingCycle: input.billingCycle,

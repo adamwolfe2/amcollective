@@ -13,7 +13,7 @@ import { sql } from "drizzle-orm";
 
 export async function enableExtensions() {
   await db.execute(sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
-  console.log("[db] pg_trgm extension enabled");
+  console.warn("[db] pg_trgm extension enabled");
 }
 
 // Allow running as script

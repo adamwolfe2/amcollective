@@ -25,6 +25,7 @@ export const companyTagEnum = pgEnum("company_tag", [
   "cursive",
   "tbgc",
   "hook",
+  "myvsl",
   "am_collective",
   "personal",
   "untagged",

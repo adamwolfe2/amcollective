@@ -5,12 +5,35 @@
  */
 
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+
+const lineItemSchema = z.object({
+  description: z.string().min(1).max(500),
+  quantity: z.number().min(0),
+  unitPrice: z.number().int().min(0),
+});
+
+const proposalUpdateSchema = z.object({
+  title: z.string().min(1).max(500).trim(),
+  summary: z.string().max(50000).nullable(),
+  scope: z.array(z.object({ title: z.string().max(500), content: z.string().max(50000) })).nullable(),
+  deliverables: z.array(z.string().max(1000)).nullable(),
+  timeline: z.string().max(10000).nullable(),
+  lineItems: z.array(lineItemSchema).nullable(),
+  subtotal: z.number().int().min(0),
+  taxRate: z.number().int().min(0).max(10000),
+  taxAmount: z.number().int().min(0),
+  total: z.number().int().min(0),
+  paymentTerms: z.string().max(500).nullable(),
+  validUntil: z.string().nullable(),
+  internalNotes: z.string().max(10000).nullable(),
+}).partial().refine(data => Object.keys(data).length > 0, "At least one field required");
 
 export async function GET(
   _req: Request,
@@ -69,27 +92,37 @@ export async function PATCH(
     const { id } = await params;
     const body = await req.json();
 
+    const parsed = proposalUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
+
     const [updated] = await db
       .update(schema.proposals)
       .set({
-        ...(body.title !== undefined && { title: body.title }),
-        ...(body.summary !== undefined && { summary: body.summary }),
-        ...(body.scope !== undefined && { scope: body.scope }),
-        ...(body.deliverables !== undefined && {
-          deliverables: body.deliverables,
+        ...(data.title !== undefined && { title: data.title }),
+        ...(data.summary !== undefined && { summary: data.summary }),
+        ...(data.scope !== undefined && { scope: data.scope }),
+        ...(data.deliverables !== undefined && {
+          deliverables: data.deliverables,
         }),
-        ...(body.timeline !== undefined && { timeline: body.timeline }),
-        ...(body.lineItems !== undefined && { lineItems: body.lineItems }),
-        ...(body.subtotal !== undefined && { subtotal: body.subtotal }),
-        ...(body.taxRate !== undefined && { taxRate: body.taxRate }),
-        ...(body.taxAmount !== undefined && { taxAmount: body.taxAmount }),
-        ...(body.total !== undefined && { total: body.total }),
-        ...(body.paymentTerms !== undefined && {
-          paymentTerms: body.paymentTerms,
+        ...(data.timeline !== undefined && { timeline: data.timeline }),
+        ...(data.lineItems !== undefined && { lineItems: data.lineItems }),
+        ...(data.subtotal !== undefined && { subtotal: data.subtotal }),
+        ...(data.taxRate !== undefined && { taxRate: data.taxRate }),
+        ...(data.taxAmount !== undefined && { taxAmount: data.taxAmount }),
+        ...(data.total !== undefined && { total: data.total }),
+        ...(data.paymentTerms !== undefined && {
+          paymentTerms: data.paymentTerms,
         }),
-        ...(body.validUntil !== undefined && { validUntil: body.validUntil }),
-        ...(body.internalNotes !== undefined && {
-          internalNotes: body.internalNotes,
+        ...(data.validUntil !== undefined && { validUntil: data.validUntil }),
+        ...(data.internalNotes !== undefined && {
+          internalNotes: data.internalNotes,
         }),
       })
       .where(eq(schema.proposals.id, id))
@@ -105,7 +138,7 @@ export async function PATCH(
       action: "update",
       entityType: "proposal",
       entityId: id,
-      metadata: { fields: Object.keys(body) },
+      metadata: { fields: Object.keys(data) },
     });
 
     return NextResponse.json(updated);

@@ -178,9 +178,9 @@ function typeIcon(type: PriorityItem["type"]) {
 
 function urgencyDot(urgency: PriorityUrgency) {
   switch (urgency) {
-    case "critical": return "bg-red-500";
-    case "high": return "bg-amber-500";
-    case "normal": return "bg-emerald-500";
+    case "critical": return "bg-[#0A0A0A]";
+    case "high": return "bg-[#0A0A0A]/40";
+    case "normal": return "bg-[#0A0A0A]/15";
   }
 }
 
@@ -201,7 +201,7 @@ export async function PrioritiesWidget() {
           Today&apos;s Priorities
         </h3>
         {items.length === 0 && (
-          <span className="font-mono text-[9px] text-emerald-600">All clear</span>
+          <span className="font-mono text-[9px] text-[#0A0A0A]/40">All clear</span>
         )}
       </div>
 

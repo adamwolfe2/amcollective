@@ -181,7 +181,7 @@ export function SprintWidgetClient({
                     <p className="font-serif text-[11px] italic font-medium text-[#0A0A0A] truncate">
                       {section.projectName}
                     </p>
-                    {allDone && <Check size={9} className="text-emerald-500 shrink-0" />}
+                    {allDone && <Check size={9} className="text-[#0A0A0A] shrink-0" />}
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {secTotal > 0 && (

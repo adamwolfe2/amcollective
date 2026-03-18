@@ -279,7 +279,6 @@ export async function gatherStrategyData(): Promise<StrategyEngineData> {
   };
 
   const products: ProductMetrics[] = [];
-  const _nowMs = now.getTime();
 
   // Trackr
   if (trackrResult.success && trackrResult.data) {

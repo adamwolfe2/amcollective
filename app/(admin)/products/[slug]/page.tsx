@@ -120,7 +120,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
     })
       .from(schema.subscriptionCosts)
       .where(and(
-        eq(schema.subscriptionCosts.companyTag, slug as "trackr" | "wholesail" | "taskspace" | "cursive" | "tbgc" | "hook" | "am_collective" | "personal" | "untagged"),
+        eq(schema.subscriptionCosts.companyTag, slug as "trackr" | "wholesail" | "taskspace" | "cursive" | "tbgc" | "hook" | "myvsl" | "am_collective" | "personal" | "untagged"),
         eq(schema.subscriptionCosts.isActive, true)
       ))
       .orderBy(desc(schema.subscriptionCosts.amount)),

@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -14,6 +15,21 @@ import { createAuditLog } from "@/lib/db/repositories/audit";
 import { sendContractEmail, sendContractExecutedEmail } from "@/lib/email/notifications";
 import { after } from "next/server";
 import { aj } from "@/lib/middleware/arcjet";
+
+const contractUpdateSchema = z.object({
+  status: z.enum(["draft", "sent", "signed", "active", "terminated", "expired"]),
+  title: z.string().min(1).max(500).trim(),
+  sections: z.array(z.object({
+    heading: z.string().max(500),
+    body: z.string().max(50000),
+  })),
+  terms: z.string().max(50000).nullable(),
+  totalValue: z.number().int().min(0),
+  startDate: z.string().nullable(),
+  endDate: z.string().nullable(),
+  autoInvoiceOnSign: z.boolean(),
+  action: z.enum(["send", "countersign", "terminate"]),
+}).partial().refine(data => Object.keys(data).length > 0, "At least one field required");
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -69,38 +85,47 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
     const { id } = await ctx.params;
     const body = await request.json();
 
+    const parsed = contractUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
     const updates: Record<string, unknown> = {};
 
-    if (body.status !== undefined) updates.status = body.status;
-    if (body.title !== undefined) updates.title = body.title;
-    if (body.sections !== undefined) updates.sections = body.sections;
-    if (body.terms !== undefined) updates.terms = body.terms;
-    if (body.totalValue !== undefined) updates.totalValue = body.totalValue;
-    if (body.startDate !== undefined) updates.startDate = body.startDate;
-    if (body.endDate !== undefined) updates.endDate = body.endDate;
-    if (body.autoInvoiceOnSign !== undefined)
-      updates.autoInvoiceOnSign = body.autoInvoiceOnSign;
+    if (data.status !== undefined) updates.status = data.status;
+    if (data.title !== undefined) updates.title = data.title;
+    if (data.sections !== undefined) updates.sections = data.sections;
+    if (data.terms !== undefined) updates.terms = data.terms;
+    if (data.totalValue !== undefined) updates.totalValue = data.totalValue;
+    if (data.startDate !== undefined) updates.startDate = data.startDate;
+    if (data.endDate !== undefined) updates.endDate = data.endDate;
+    if (data.autoInvoiceOnSign !== undefined)
+      updates.autoInvoiceOnSign = data.autoInvoiceOnSign;
 
     // Handle send action
-    if (body.action === "send") {
+    if (data.action === "send") {
       updates.status = "sent";
       updates.sentAt = new Date();
     }
 
     // Handle countersign action
-    if (body.action === "countersign") {
+    if (data.action === "countersign") {
       updates.status = "active";
       updates.countersignedAt = new Date();
     }
 
     // Handle terminate action
-    if (body.action === "terminate") {
+    if (data.action === "terminate") {
       updates.status = "terminated";
     }
 
     // Fetch client email before update (needed for send/countersign emails)
-    const needsEmail = body.action === "send" || body.status === "sent";
-    const needsCountersignEmail = body.action === "countersign";
+    const needsEmail = data.action === "send" || data.status === "sent";
+    const needsCountersignEmail = data.action === "countersign";
     let clientRow: { clientName: string | null; clientEmail: string | null } | null = null;
     if (needsEmail || needsCountersignEmail) {
       const [found] = await db
@@ -166,10 +191,10 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
     await createAuditLog({
       actorId: userId,
       actorType: "user",
-      action: `contract.${body.action ?? "updated"}`,
+      action: `contract.${data.action ?? "updated"}`,
       entityType: "contract",
       entityId: id,
-      metadata: body,
+      metadata: data,
     });
 
     return NextResponse.json(updated);

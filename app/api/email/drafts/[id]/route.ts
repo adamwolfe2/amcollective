@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+
+const emailDraftUpdateSchema = z.object({
+  to: z.string().email().max(320),
+  cc: z.string().max(2000).nullable(),
+  subject: z.string().min(1).max(500),
+  body: z.string().max(100000),
+  plainText: z.string().max(100000).nullable(),
+  status: z.enum(["draft", "scheduled", "sent"]),
+}).partial().refine(data => Object.keys(data).length > 0, "At least one field required");
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -57,13 +67,22 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: "Cannot edit a sent email" }, { status: 400 });
     }
 
+    const parsed = emailDraftUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
     const updates: Record<string, unknown> = {};
-    if (body.to !== undefined) updates.to = body.to;
-    if (body.cc !== undefined) updates.cc = body.cc || null;
-    if (body.subject !== undefined) updates.subject = body.subject;
-    if (body.body !== undefined) updates.body = body.body;
-    if (body.plainText !== undefined) updates.plainText = body.plainText || null;
-    if (body.status !== undefined) updates.status = body.status;
+    if (data.to !== undefined) updates.to = data.to;
+    if (data.cc !== undefined) updates.cc = data.cc || null;
+    if (data.subject !== undefined) updates.subject = data.subject;
+    if (data.body !== undefined) updates.body = data.body;
+    if (data.plainText !== undefined) updates.plainText = data.plainText || null;
+    if (data.status !== undefined) updates.status = data.status;
 
     const [updated] = await db
       .update(schema.emailDrafts)

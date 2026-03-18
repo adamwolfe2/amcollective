@@ -5,12 +5,20 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+
+const knowledgeUpdateSchema = z.object({
+  title: z.string().min(1).max(500).trim(),
+  content: z.string().max(100000).nullable(),
+  docType: z.enum(["contract", "proposal", "note", "sop", "invoice", "brief", "other"]),
+  tags: z.array(z.string().max(100)).max(50),
+}).partial().refine(data => Object.keys(data).length > 0, "At least one field required");
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -58,10 +66,19 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
     const { id } = await ctx.params;
     const body = await request.json();
 
+    const parsed = knowledgeUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
     const updates: Record<string, unknown> = {};
-    if (body.title !== undefined) updates.title = body.title;
-    if (body.content !== undefined) updates.content = body.content;
-    if (body.docType !== undefined) updates.docType = body.docType;
+    if (data.title !== undefined) updates.title = data.title;
+    if (data.content !== undefined) updates.content = data.content;
+    if (data.docType !== undefined) updates.docType = data.docType;
 
     const [updated] = await db
       .update(schema.documents)
@@ -74,14 +91,14 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
     }
 
     // Replace tags if provided
-    if (body.tags !== undefined) {
+    if (data.tags !== undefined) {
       await db
         .delete(schema.documentTags)
         .where(eq(schema.documentTags.documentId, id));
 
-      if (body.tags.length > 0) {
+      if (data.tags.length > 0) {
         await db.insert(schema.documentTags).values(
-          body.tags.map((tag: string) => ({
+          data.tags.map((tag: string) => ({
             documentId: id,
             tag,
           }))
@@ -95,7 +112,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
       action: "knowledge.updated",
       entityType: "document",
       entityId: id,
-      metadata: body,
+      metadata: data,
     });
 
     return NextResponse.json(updated);

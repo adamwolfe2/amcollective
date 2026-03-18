@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -74,7 +74,6 @@ export function KanbanBoard({
   initialCards,
   teamMembers,
 }: KanbanBoardProps) {
-  const _router = useRouter();
   const [columns, _setColumns] = useState(initialColumns);
   const [cards, setCards] = useState(initialCards);
   const [selectedCard, setSelectedCard] = useState<KanbanCard | null>(null);

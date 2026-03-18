@@ -13,7 +13,7 @@ import { eq, desc } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { aj } from "@/lib/middleware/arcjet";
 
-const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "am_collective", "personal", "untagged"] as const;
+const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
 
 const recurringSchema = z.object({
   clientId: z.string().uuid("Invalid client ID"),

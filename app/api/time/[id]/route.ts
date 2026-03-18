@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
@@ -6,6 +7,20 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { aj } from "@/lib/middleware/arcjet";
+
+const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
+
+const timeEntryUpdateSchema = z.object({
+  clientId: z.string().uuid(),
+  projectId: z.string().uuid().nullable(),
+  teamMemberId: z.string().uuid().nullable(),
+  date: z.string(),
+  hours: z.number().min(0).max(24),
+  description: z.string().max(5000).nullable(),
+  billable: z.boolean(),
+  hourlyRate: z.number().int().min(0),
+  companyTag: z.enum(companyTags),
+}).partial().refine(data => Object.keys(data).length > 0, "At least one field required");
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -73,16 +88,25 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
       );
     }
 
+    const parsed = timeEntryUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
     const updates: Record<string, unknown> = {};
-    if (body.clientId !== undefined) updates.clientId = body.clientId;
-    if (body.projectId !== undefined) updates.projectId = body.projectId || null;
-    if (body.teamMemberId !== undefined) updates.teamMemberId = body.teamMemberId || null;
-    if (body.date !== undefined) updates.date = new Date(body.date);
-    if (body.hours !== undefined) updates.hours = String(body.hours);
-    if (body.description !== undefined) updates.description = body.description || null;
-    if (body.billable !== undefined) updates.billable = body.billable;
-    if (body.hourlyRate !== undefined) updates.hourlyRate = body.hourlyRate;
-    if (body.companyTag !== undefined) updates.companyTag = body.companyTag;
+    if (data.clientId !== undefined) updates.clientId = data.clientId;
+    if (data.projectId !== undefined) updates.projectId = data.projectId || null;
+    if (data.teamMemberId !== undefined) updates.teamMemberId = data.teamMemberId || null;
+    if (data.date !== undefined) updates.date = new Date(data.date);
+    if (data.hours !== undefined) updates.hours = String(data.hours);
+    if (data.description !== undefined) updates.description = data.description || null;
+    if (data.billable !== undefined) updates.billable = data.billable;
+    if (data.hourlyRate !== undefined) updates.hourlyRate = data.hourlyRate;
+    if (data.companyTag !== undefined) updates.companyTag = data.companyTag;
 
     const [updated] = await db
       .update(schema.timeEntries)

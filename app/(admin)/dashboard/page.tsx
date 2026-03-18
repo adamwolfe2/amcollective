@@ -451,10 +451,11 @@ const getCachedPlatformSnapshots = unstable_cache(
     };
 
     const products: Product[] = [];
-    const s = (v: any) => String(v ?? 0);
+    const s = (v: string | number | null | undefined) => String(v ?? 0);
     const fc = (c: number) => formatCurrency(c);
 
     // ── Wholesail ──
+    // TODO: type this properly — define WholesailSnapshot interface from connector response shape
     const wd = wholesail.success ? (wholesail.data as any) : null;
     const wAlerts: ProductAlert[] = [];
     if (wd?.stuckProjects > 0) wAlerts.push({ message: `${wd.stuckProjects} stuck builds (>14d)`, severity: "critical" });
@@ -478,6 +479,7 @@ const getCachedPlatformSnapshots = unstable_cache(
     });
 
     // ── Cursive ──
+    // TODO: type this properly — define CursiveSnapshot interface from connector response shape
     const cd = cursive.success ? (cursive.data as any) : null;
     const cAlerts: ProductAlert[] = [];
     if (cd?.pipeline?.at_risk > 0) cAlerts.push({ message: `${cd.pipeline.at_risk} at-risk workspaces`, severity: "warning" });
@@ -501,6 +503,7 @@ const getCachedPlatformSnapshots = unstable_cache(
     });
 
     // ── Trackr ──
+    // TODO: type this properly — define TrackrSnapshot interface from connector response shape
     const td = trackr.success ? (trackr.data as any) : null;
     const tAlerts: ProductAlert[] = [];
     if (td?.auditPipelinePending > 0) tAlerts.push({ message: `${td.auditPipelinePending} audits pending`, severity: "warning" });
@@ -523,6 +526,7 @@ const getCachedPlatformSnapshots = unstable_cache(
     });
 
     // ── TaskSpace ──
+    // TODO: type this properly — define TaskSpaceSnapshot interface from connector response shape
     const tsd = taskspace.success ? (taskspace.data as any) : null;
     const tsAlerts: ProductAlert[] = [];
     if (tsd?.openEscalations > 0) tsAlerts.push({ message: `${tsd.openEscalations} open escalations`, severity: "critical" });
@@ -546,6 +550,7 @@ const getCachedPlatformSnapshots = unstable_cache(
     });
 
     // ── TBGC ──
+    // TODO: type this properly — define TBGCSnapshot interface from connector response shape
     const tbgcd = tbgc.success ? (tbgc.data as any) : null;
     products.push({
       name: "TBGC", tag: "TB", slug: "tbgc", href: "/products/tbgc", logoUrl: getProductLogo("tbgc"),
@@ -562,6 +567,7 @@ const getCachedPlatformSnapshots = unstable_cache(
     });
 
     // ── Hook ──
+    // TODO: type this properly — define HookSnapshot interface from connector response shape
     const hd = hook.success ? (hook.data as any) : null;
     products.push({
       name: "Hook", tag: "H", slug: "hook", href: "/products/hook", logoUrl: getProductLogo("hook"),
@@ -581,7 +587,7 @@ const getCachedPlatformSnapshots = unstable_cache(
     // ── MyVSL ──
     // No dedicated connector yet — show Stripe MRR when available
     const myvslStripeMrr = await stripeConnector.getMRRByCompany().then(
-      (r) => r.success ? (r.data?.find((c: any) => c.companyTag === "myvsl")?.mrr ?? 0) : 0
+      (r) => r.success ? (r.data?.find((c) => c.companyTag === "myvsl")?.mrr ?? 0) : 0
     ).catch(() => 0);
     products.push({
       name: "MyVSL", tag: "MV", slug: "myvsl", href: "/products/myvsl", logoUrl: getProductLogo("myvsl"),

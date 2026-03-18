@@ -170,7 +170,7 @@ const TOOL_MODULES: Array<{ keywords: string[]; toolNames: string[] }> = [
 
 // Build name→definition lookup (computed once, used across requests)
 let _toolsMap: Map<string, Anthropic.Tool> | null = null;
-function getToolsMap(): Map<string, Anthropic.Tool> {
+function _getToolsMap(): Map<string, Anthropic.Tool> {
   if (!_toolsMap) {
     _toolsMap = new Map();
     for (const t of [...TOOL_DEFINITIONS, ...CEO_TOOL_DEFINITIONS]) {
@@ -186,7 +186,6 @@ function getToolsMap(): Map<string, Anthropic.Tool> {
  */
 function selectToolsForQuery(message: string): Anthropic.Tool[] {
   const lower = message.toLowerCase();
-  const _map = getToolsMap();
   const selected = new Set<string>(CORE_TOOL_NAMES);
 
   for (const mod of TOOL_MODULES) {

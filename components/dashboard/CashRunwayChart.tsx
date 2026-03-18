@@ -58,7 +58,7 @@ export function CashRunwayChart({ snapshots }: Props) {
           <span
             className={`font-mono text-[10px] font-bold ${
               (snapshots[snapshots.length - 1]?.runwayMonths ?? 0) < dangerThreshold
-                ? "text-red-600"
+                ? "text-[#0A0A0A]/70"
                 : "text-[#0A0A0A]"
             }`}
           >

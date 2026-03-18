@@ -184,7 +184,7 @@ function MessageBubble({ message }: { message: UIMessage }) {
                   prose-headings:font-serif prose-headings:tracking-tight
                   prose-code:bg-[#F3F3EF] prose-code:px-1 prose-code:py-0.5
                   prose-pre:bg-[#0A0A0A] prose-pre:text-white
-                  prose-a:text-blue-700 prose-a:no-underline hover:prose-a:underline
+                  prose-a:text-[#0A0A0A] prose-a:underline prose-a:underline-offset-2 hover:prose-a:no-underline
                   prose-table:border-collapse prose-td:border prose-td:border-[#0A0A0A]/10 prose-td:px-2 prose-td:py-1
                   prose-th:border prose-th:border-[#0A0A0A]/10 prose-th:px-2 prose-th:py-1 prose-th:bg-[#F3F3EF]"
               >
@@ -639,7 +639,7 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
               {isStreaming ? (
                 <button
                   onClick={stop}
-                  className="px-4 py-3 text-sm font-mono border border-red-500 text-red-500 hover:bg-red-50 transition-colors"
+                  className="px-4 py-3 text-sm font-mono border border-[#0A0A0A]/30 text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/5 transition-colors"
                 >
                   <Square className="w-4 h-4" />
                 </button>
@@ -862,7 +862,7 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
           {isStreaming ? (
             <button
               onClick={stop}
-              className="px-3 py-2.5 text-sm font-mono border border-red-500 text-red-500 hover:bg-red-50 transition-colors"
+              className="px-3 py-2.5 text-sm font-mono border border-[#0A0A0A]/30 text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/5 transition-colors"
             >
               <Square className="w-4 h-4" />
             </button>

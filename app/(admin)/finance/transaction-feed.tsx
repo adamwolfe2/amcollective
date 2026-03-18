@@ -18,6 +18,7 @@ const COMPANY_TAGS = [
   "cursive",
   "tbgc",
   "hook",
+  "myvsl",
   "am_collective",
   "personal",
   "untagged",
