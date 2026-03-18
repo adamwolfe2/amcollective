@@ -15,30 +15,35 @@ export async function GET() {
   const { userId, error } = await requireAdmin();
   if (error) return error;
 
-  if (!isComposioConfigured()) {
-    return NextResponse.json({
-      configured: false,
-      connected: false,
-    });
-  }
+  try {
+    if (!isComposioConfigured()) {
+      return NextResponse.json({
+        configured: false,
+        connected: false,
+      });
+    }
 
-  const [account] = await db
-    .select()
-    .from(schema.connectedAccounts)
-    .where(
-      and(
-        eq(schema.connectedAccounts.userId, userId),
-        eq(schema.connectedAccounts.provider, "gmail"),
-        eq(schema.connectedAccounts.status, "active")
+    const [account] = await db
+      .select()
+      .from(schema.connectedAccounts)
+      .where(
+        and(
+          eq(schema.connectedAccounts.userId, userId),
+          eq(schema.connectedAccounts.provider, "gmail"),
+          eq(schema.connectedAccounts.status, "active")
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  return NextResponse.json({
-    configured: true,
-    connected: !!account,
-    email: account?.email ?? null,
-    lastSyncAt: account?.lastSyncAt ?? null,
-    accountId: account?.id ?? null,
-  });
+    return NextResponse.json({
+      configured: true,
+      connected: !!account,
+      email: account?.email ?? null,
+      lastSyncAt: account?.lastSyncAt ?? null,
+      accountId: account?.id ?? null,
+    });
+  } catch (error) {
+    console.error("[gmail-status]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

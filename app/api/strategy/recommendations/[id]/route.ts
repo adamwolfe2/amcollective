@@ -19,21 +19,26 @@ export async function PATCH(
   const { error } = await requireAdmin();
   if (error) return error;
 
-  const { id } = await params;
-  const body = await req.json() as { status: Status; note?: string };
+  try {
+    const { id } = await params;
+    const body = await req.json() as { status: Status; note?: string };
 
-  if (!["active", "in_progress", "done", "dismissed"].includes(body.status)) {
-    return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    if (!["active", "in_progress", "done", "dismissed"].includes(body.status)) {
+      return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    }
+
+    await db
+      .update(strategyRecommendations)
+      .set({
+        status: body.status,
+        actedOnAt: body.status === "done" ? new Date() : undefined,
+        actedOnNote: body.note ?? undefined,
+      })
+      .where(eq(strategyRecommendations.id, id));
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("[strategy-recommendations-patch]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  await db
-    .update(strategyRecommendations)
-    .set({
-      status: body.status,
-      actedOnAt: body.status === "done" ? new Date() : undefined,
-      actedOnNote: body.note ?? undefined,
-    })
-    .where(eq(strategyRecommendations.id, id));
-
-  return NextResponse.json({ ok: true });
 }

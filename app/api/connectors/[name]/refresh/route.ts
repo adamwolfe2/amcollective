@@ -31,22 +31,27 @@ export async function POST(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { name } = await params;
-  const keys = CONNECTOR_KEYS[name];
+  try {
+    const { name } = await params;
+    const keys = CONNECTOR_KEYS[name];
 
-  if (!keys) {
-    return NextResponse.json(
-      { error: `Unknown connector: ${name}` },
-      { status: 400 }
-    );
+    if (!keys) {
+      return NextResponse.json(
+        { error: `Unknown connector: ${name}` },
+        { status: 400 }
+      );
+    }
+
+    // Invalidate all cache keys for this connector
+    await Promise.all(keys.map((key) => invalidateCache(key)));
+
+    return NextResponse.json({
+      connector: name,
+      invalidated: keys,
+      refreshedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("[connector-refresh]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  // Invalidate all cache keys for this connector
-  await Promise.all(keys.map((key) => invalidateCache(key)));
-
-  return NextResponse.json({
-    connector: name,
-    invalidated: keys,
-    refreshedAt: new Date().toISOString(),
-  });
 }

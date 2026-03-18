@@ -15,41 +15,46 @@ export async function DELETE() {
   const { userId, error } = await requireAdmin();
   if (error) return error;
 
-  const [account] = await db
-    .select()
-    .from(schema.connectedAccounts)
-    .where(
-      and(
-        eq(schema.connectedAccounts.userId, userId),
-        eq(schema.connectedAccounts.provider, "gmail"),
-        eq(schema.connectedAccounts.status, "active")
+  try {
+    const [account] = await db
+      .select()
+      .from(schema.connectedAccounts)
+      .where(
+        and(
+          eq(schema.connectedAccounts.userId, userId),
+          eq(schema.connectedAccounts.provider, "gmail"),
+          eq(schema.connectedAccounts.status, "active")
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  if (!account) {
-    return NextResponse.json(
-      { error: "No active Gmail connection found" },
-      { status: 404 }
-    );
+    if (!account) {
+      return NextResponse.json(
+        { error: "No active Gmail connection found" },
+        { status: 404 }
+      );
+    }
+
+    await db
+      .update(schema.connectedAccounts)
+      .set({
+        status: "disconnected",
+        lastSyncAt: null,
+      })
+      .where(eq(schema.connectedAccounts.id, account.id));
+
+    await createAuditLog({
+      actorId: userId,
+      actorType: "user",
+      action: "disconnect_gmail",
+      entityType: "connected_account",
+      entityId: account.id,
+      metadata: { email: account.email },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[gmail-disconnect]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  await db
-    .update(schema.connectedAccounts)
-    .set({
-      status: "disconnected",
-      lastSyncAt: null,
-    })
-    .where(eq(schema.connectedAccounts.id, account.id));
-
-  await createAuditLog({
-    actorId: userId,
-    actorType: "user",
-    action: "disconnect_gmail",
-    entityType: "connected_account",
-    entityId: account.id,
-    metadata: { email: account.email },
-  });
-
-  return NextResponse.json({ success: true });
 }

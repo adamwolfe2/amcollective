@@ -56,71 +56,76 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const [data, cashResult, unresolvedAlerts] = await Promise.all([
-    gatherBriefingData(),
-    mercuryConnector.getTotalCash(),
-    getAlerts({ isResolved: false, limit: 100 }),
-  ]);
+  try {
+    const [data, cashResult, unresolvedAlerts] = await Promise.all([
+      gatherBriefingData(),
+      mercuryConnector.getTotalCash(),
+      getAlerts({ isResolved: false, limit: 100 }),
+    ]);
 
-  const cash = cashResult.success ? (cashResult.data ?? 0) : 0;
+    const cash = cashResult.success ? (cashResult.data ?? 0) : 0;
 
-  // Split alerts by severity
-  const criticalAlerts = unresolvedAlerts.filter((r) => r.alert.severity === "critical").length;
-  const warningAlerts = unresolvedAlerts.filter((r) => r.alert.severity === "warning").length;
+    // Split alerts by severity
+    const criticalAlerts = unresolvedAlerts.filter((r) => r.alert.severity === "critical").length;
+    const warningAlerts = unresolvedAlerts.filter((r) => r.alert.severity === "warning").length;
 
-  // Anomaly detection (Phase 3 — requires 7+ data_complete snapshots)
-  const anomalyResult = await detectAnomalies(data.mrr, data.overdueInvoices).catch(() => ({
-    hasAnomalies: false,
-    anomalies: [] as string[],
-    baselineDataPoints: 0,
-  }));
+    // Anomaly detection (Phase 3 — requires 7+ data_complete snapshots)
+    const anomalyResult = await detectAnomalies(data.mrr, data.overdueInvoices).catch(() => ({
+      hasAnomalies: false,
+      anomalies: [] as string[],
+      baselineDataPoints: 0,
+    }));
 
-  // MRR delta calculation
-  const mrrDollars = data.mrr !== null ? data.mrr / 100 : null;
-  const mrrPriorDollars = data.mrrPrior !== null ? data.mrrPrior / 100 : null;
-  const mrrDeltaPct =
-    data.mrr !== null && data.mrrPrior !== null && data.mrrPrior > 0
-      ? Math.round(((data.mrr - data.mrrPrior) / data.mrrPrior) * 100)
-      : null;
+    // MRR delta calculation
+    const mrrDollars = data.mrr !== null ? data.mrr / 100 : null;
+    const mrrPriorDollars = data.mrrPrior !== null ? data.mrrPrior / 100 : null;
+    const mrrDeltaPct =
+      data.mrr !== null && data.mrrPrior !== null && data.mrrPrior > 0
+        ? Math.round(((data.mrr - data.mrrPrior) / data.mrrPrior) * 100)
+        : null;
 
-  const snapshot = {
-    // Revenue
-    mrr: mrrDollars !== null ? Math.round(mrrDollars) : null,
-    mrrPriorDollars: mrrPriorDollars !== null ? Math.round(mrrPriorDollars) : null,
-    mrrDeltaDays: data.mrrDeltaDays,
-    mrrDeltaPct,
+    const snapshot = {
+      // Revenue
+      mrr: mrrDollars !== null ? Math.round(mrrDollars) : null,
+      mrrPriorDollars: mrrPriorDollars !== null ? Math.round(mrrPriorDollars) : null,
+      mrrDeltaDays: data.mrrDeltaDays,
+      mrrDeltaPct,
 
-    // Cash
-    cash: Math.round(cash),
+      // Cash
+      cash: Math.round(cash),
 
-    // Alerts (split by severity so heartbeat can decide urgency)
-    unresolvedAlerts: data.unresolvedAlerts,
-    criticalAlerts,
-    warningAlerts,
+      // Alerts (split by severity so heartbeat can decide urgency)
+      unresolvedAlerts: data.unresolvedAlerts,
+      criticalAlerts,
+      warningAlerts,
 
-    // Operations
-    failedDeploys: data.failedDeploys,
-    unreadMessages: data.unreadMessages,
+      // Operations
+      failedDeploys: data.failedDeploys,
+      unreadMessages: data.unreadMessages,
 
-    // Accountability
-    atRiskRocks: data.atRiskRocks,
-    overdueInvoices: data.overdueInvoices,
-    overdueAmountDollars: Math.round(data.overdueAmount / 100),
-    overdueFollowUps: data.overdueFollowUps.length,
-    overdueFollowUpDetails: data.overdueFollowUps.slice(0, 3).map((l) => ({
-      name: l.contactName,
-      company: l.companyName ?? null,
-      stage: l.stage,
-    })),
+      // Accountability
+      atRiskRocks: data.atRiskRocks,
+      overdueInvoices: data.overdueInvoices,
+      overdueAmountDollars: Math.round(data.overdueAmount / 100),
+      overdueFollowUps: data.overdueFollowUps.length,
+      overdueFollowUpDetails: data.overdueFollowUps.slice(0, 3).map((l) => ({
+        name: l.contactName,
+        company: l.companyName ?? null,
+        stage: l.stage,
+      })),
 
-    // Anomaly detection
-    anomaliesDetected: anomalyResult.hasAnomalies,
-    anomalies: anomalyResult.anomalies,
+      // Anomaly detection
+      anomaliesDetected: anomalyResult.hasAnomalies,
+      anomalies: anomalyResult.anomalies,
 
-    // Meta
-    timestamp: new Date().toISOString(),
-    dataComplete: data.mrr !== null && data.mrr > 0 && cashResult.success,
-  };
+      // Meta
+      timestamp: new Date().toISOString(),
+      dataComplete: data.mrr !== null && data.mrr > 0 && cashResult.success,
+    };
 
-  return NextResponse.json(snapshot);
+    return NextResponse.json(snapshot);
+  } catch (error) {
+    console.error("[bot-claw-status]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

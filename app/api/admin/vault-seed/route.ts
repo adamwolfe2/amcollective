@@ -109,51 +109,56 @@ export async function POST() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Fetch existing labels to skip duplicates
-  const existing = await db
-    .select({ label: schema.credentials.label })
-    .from(schema.credentials);
-  const existingLabels = new Set(existing.map((r) => r.label.toLowerCase()));
+  try {
+    // Fetch existing labels to skip duplicates
+    const existing = await db
+      .select({ label: schema.credentials.label })
+      .from(schema.credentials);
+    const existingLabels = new Set(existing.map((r) => r.label.toLowerCase()));
 
-  let seeded = 0;
-  let skipped = 0;
-  const skippedMissing: string[] = [];
+    let seeded = 0;
+    let skipped = 0;
+    const skippedMissing: string[] = [];
 
-  for (const entry of SEED_ENTRIES) {
-    const value = process.env[entry.envVar];
+    for (const entry of SEED_ENTRIES) {
+      const value = process.env[entry.envVar];
 
-    // Skip if no value in env
-    if (!value) {
-      skippedMissing.push(entry.label);
-      skipped++;
-      continue;
+      // Skip if no value in env
+      if (!value) {
+        skippedMissing.push(entry.label);
+        skipped++;
+        continue;
+      }
+
+      // Skip if label already in vault
+      if (existingLabels.has(entry.label.toLowerCase())) {
+        skipped++;
+        continue;
+      }
+
+      await db.insert(schema.credentials).values({
+        label: entry.label,
+        service: entry.service,
+        username: entry.envVar, // store the env var name as the "username" for reference
+        passwordEncrypted: encryptPassword(value),
+        url: "url" in entry ? (entry.url as string) : null,
+        notes: "notes" in entry ? (entry.notes as string) : null,
+        clientId: null,
+        projectId: null,
+        createdBy: userId,
+      });
+
+      seeded++;
     }
 
-    // Skip if label already in vault
-    if (existingLabels.has(entry.label.toLowerCase())) {
-      skipped++;
-      continue;
-    }
-
-    await db.insert(schema.credentials).values({
-      label: entry.label,
-      service: entry.service,
-      username: entry.envVar, // store the env var name as the "username" for reference
-      passwordEncrypted: encryptPassword(value),
-      url: "url" in entry ? (entry.url as string) : null,
-      notes: "notes" in entry ? (entry.notes as string) : null,
-      clientId: null,
-      projectId: null,
-      createdBy: userId,
+    return NextResponse.json({
+      success: true,
+      seeded,
+      skipped,
+      message: `Seeded ${seeded} credentials into vault. Skipped ${skipped}.`,
     });
-
-    seeded++;
+  } catch (error) {
+    console.error("[admin-vault-seed]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
-
-  return NextResponse.json({
-    success: true,
-    seeded,
-    skipped,
-    message: `Seeded ${seeded} credentials into vault. Skipped ${skipped}.`,
-  });
 }

@@ -13,10 +13,15 @@ export async function POST() {
   const { userId, error } = await requireAdmin();
   if (error) return error;
 
-  await inngest.send({
-    name: "gmail/sync.requested",
-    data: { userId },
-  });
+  try {
+    await inngest.send({
+      name: "gmail/sync.requested",
+      data: { userId },
+    });
 
-  return NextResponse.json({ success: true, message: "Gmail sync triggered" });
+    return NextResponse.json({ success: true, message: "Gmail sync triggered" });
+  } catch (error) {
+    console.error("[gmail-sync]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }

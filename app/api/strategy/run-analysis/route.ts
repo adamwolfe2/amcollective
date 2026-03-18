@@ -20,12 +20,17 @@ export async function POST(req: NextRequest) {
   const { error } = await requireAdmin();
   if (error) return error;
 
-  const body = await req.json().catch(() => ({})) as { useOpus?: boolean };
+  try {
+    const body = await req.json().catch(() => ({})) as { useOpus?: boolean };
 
-  await inngest.send({
-    name: "strategy/run-analysis",
-    data: { useOpus: body.useOpus ?? false },
-  });
+    await inngest.send({
+      name: "strategy/run-analysis",
+      data: { useOpus: body.useOpus ?? false },
+    });
 
-  return NextResponse.json({ ok: true, message: "Strategy analysis triggered. Results will appear in ~30 seconds." });
+    return NextResponse.json({ ok: true, message: "Strategy analysis triggered. Results will appear in ~30 seconds." });
+  } catch (error) {
+    console.error("[strategy-run-analysis]", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
