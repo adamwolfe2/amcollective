@@ -320,7 +320,7 @@ export default async function FinancePage({
               <span className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
                 Monthly Revenue (MRR)
               </span>
-              <div className="font-mono text-xl font-bold text-emerald-600 mt-1">
+              <div className="font-mono text-xl font-bold text-[#0A0A0A] mt-1">
                 {formatCurrency(metrics.mrr)}
               </div>
             </div>
@@ -328,7 +328,7 @@ export default async function FinancePage({
               <span className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
                 Monthly Burn (SaaS)
               </span>
-              <div className="font-mono text-xl font-bold text-red-600 mt-1">
+              <div className="font-mono text-xl font-bold text-[#0A0A0A]/70 mt-1">
                 {formatCurrency(costData.totalMonthlyBurn)}
               </div>
             </div>
@@ -339,8 +339,8 @@ export default async function FinancePage({
               <div
                 className={`font-mono text-lg font-bold mt-1 ${
                   metrics.mrr - costData.totalMonthlyBurn >= 0
-                    ? "text-emerald-600"
-                    : "text-red-600"
+                    ? "text-[#0A0A0A]"
+                    : "text-[#0A0A0A]/70"
                 }`}
               >
                 {formatCurrency(metrics.mrr - costData.totalMonthlyBurn)}

@@ -12,17 +12,17 @@ const CATEGORY_ICONS: Record<string, typeof AlertTriangle> = {
 };
 
 const CATEGORY_STYLES: Record<string, string> = {
-  revenue: "border-green-800 bg-green-50 text-green-800",
-  operations: "border-blue-700 bg-blue-50 text-blue-700",
-  clients: "border-purple-700 bg-purple-50 text-purple-700",
+  revenue: "border-[#0A0A0A] bg-[#0A0A0A] text-white",
+  operations: "border-[#0A0A0A]/25 bg-[#0A0A0A]/5 text-[#0A0A0A]/60",
+  clients: "border-[#0A0A0A]/30 bg-transparent text-[#0A0A0A]/70",
   growth: "border-[#0A0A0A] bg-[#0A0A0A]/5 text-[#0A0A0A]",
-  risk: "border-red-700 bg-red-50 text-red-700",
+  risk: "border-[#0A0A0A]/20 bg-[#0A0A0A]/8 text-[#0A0A0A]/70",
 };
 
 const PRIORITY_STYLES: Record<number, string> = {
   0: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5",
-  1: "border-blue-700/30 bg-blue-50",
-  2: "border-red-700/30 bg-red-50",
+  1: "border-[#0A0A0A]/25 bg-[#0A0A0A]/5",
+  2: "border-[#0A0A0A]/30 bg-[#0A0A0A]/8",
 };
 
 export default async function IntelligencePage() {
@@ -115,7 +115,7 @@ export default async function IntelligencePage() {
                             {insight.category}
                           </span>
                           {insight.priority >= 2 && (
-                            <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono border border-red-700 bg-red-50 text-red-700">
+                            <span className="inline-flex items-center px-1.5 py-0.5 text-[10px] font-mono bg-[#0A0A0A] text-white border border-[#0A0A0A]">
                               urgent
                             </span>
                           )}

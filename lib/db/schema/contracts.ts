@@ -51,7 +51,7 @@ export const contracts = pgTable(
     clientId: uuid("client_id")
       .notNull()
       .references(() => clients.id, { onDelete: "cascade" }),
-    proposalId: uuid("proposal_id").references(() => proposals.id),
+    proposalId: uuid("proposal_id").references(() => proposals.id, { onDelete: "set null" }),
     companyTag: companyTagEnum("company_tag")
       .notNull()
       .default("am_collective"),
@@ -87,7 +87,7 @@ export const contracts = pgTable(
     pdfUrl: text("pdf_url"),
 
     // Linked invoice
-    invoiceId: uuid("invoice_id").references(() => invoices.id),
+    invoiceId: uuid("invoice_id").references(() => invoices.id, { onDelete: "set null" }),
     autoInvoiceOnSign: boolean("auto_invoice_on_sign").default(true),
 
     expiresAt: timestamp("expires_at", { mode: "date" }),

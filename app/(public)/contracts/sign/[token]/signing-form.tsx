@@ -121,7 +121,7 @@ export function ContractSigningForm({ token }: { token: string }) {
   if (signed) {
     return (
       <div className="text-center py-8">
-        <h3 className="font-serif text-lg font-bold text-green-800 mb-2">
+        <h3 className="font-serif text-lg font-bold text-[#0A0A0A] mb-2">
           Contract Signed Successfully
         </h3>
         <p className="font-serif text-sm text-[#0A0A0A]/50">
@@ -202,7 +202,7 @@ export function ContractSigningForm({ token }: { token: string }) {
       </label>
 
       {error && (
-        <p className="font-mono text-sm text-red-700">{error}</p>
+        <p className="font-mono text-sm text-[#0A0A0A]/70">{error}</p>
       )}
 
       <button

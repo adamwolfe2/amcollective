@@ -108,7 +108,7 @@ export function MentionInput({
       {open && (
         <ul
           ref={listRef}
-          className="absolute z-50 top-full left-0 mt-1 w-full min-w-[220px] bg-white border border-[#0A0A0A]/15 shadow-lg max-h-52 overflow-y-auto"
+          className="absolute z-50 top-full left-0 mt-1 w-full min-w-[220px] bg-white border border-[#0A0A0A]/15 border border-[#0A0A0A]/20 max-h-52 overflow-y-auto"
         >
           {filtered.length === 0 ? (
             <li className="px-3 py-2 font-mono text-xs text-[#0A0A0A]/30 italic">

@@ -49,7 +49,7 @@ export function ContractActions({
         <button
           onClick={() => handleAction("send")}
           disabled={loading}
-          className="w-full px-4 py-2 bg-blue-700 text-white font-mono text-sm hover:bg-blue-800 transition-colors disabled:opacity-50"
+          className="w-full px-4 py-2 bg-[#0A0A0A] text-white font-mono text-sm hover:bg-[#0A0A0A]/80 transition-colors disabled:opacity-50"
         >
           {loading ? "Sending..." : "Send for Signature"}
         </button>
@@ -59,7 +59,7 @@ export function ContractActions({
         <button
           onClick={() => handleAction("countersign")}
           disabled={loading}
-          className="w-full px-4 py-2 bg-green-700 text-white font-mono text-sm hover:bg-green-800 transition-colors disabled:opacity-50"
+          className="w-full px-4 py-2 bg-[#0A0A0A] text-white font-mono text-sm hover:bg-[#0A0A0A]/80 transition-colors disabled:opacity-50"
         >
           {loading ? "Processing..." : "Countersign (Activate)"}
         </button>
@@ -77,7 +77,7 @@ export function ContractActions({
             }
           }}
           disabled={loading}
-          className="w-full px-4 py-2 border border-red-700 text-red-700 font-mono text-sm hover:bg-red-50 transition-colors disabled:opacity-50"
+          className="w-full px-4 py-2 border border-[#0A0A0A]/30 text-[#0A0A0A]/70 font-mono text-sm hover:bg-[#0A0A0A]/5 transition-colors disabled:opacity-50"
         >
           Terminate Contract
         </button>
@@ -96,7 +96,7 @@ export function ContractActions({
       )}
 
       {status === "active" && (
-        <p className="font-mono text-[10px] text-green-700">
+        <p className="font-mono text-[10px] text-[#0A0A0A]">
           This contract is fully executed and active.
         </p>
       )}

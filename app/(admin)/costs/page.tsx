@@ -397,7 +397,7 @@ export default async function CostsPage() {
           <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
             MRR
           </p>
-          <p className="font-mono text-2xl font-bold text-emerald-600 mt-1">
+          <p className="font-mono text-2xl font-bold text-[#0A0A0A] mt-1">
             {formatCurrency(metrics.mrr)}
           </p>
           <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-1">
@@ -409,7 +409,7 @@ export default async function CostsPage() {
           <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40">
             Monthly Burn
           </p>
-          <p className="font-mono text-2xl font-bold text-red-600 mt-1">
+          <p className="font-mono text-2xl font-bold text-[#0A0A0A]/70 mt-1">
             {formatCents(metrics.totalMonthlyBurn)}
           </p>
           <p className="font-mono text-[10px] text-[#0A0A0A]/30 mt-1">
@@ -424,7 +424,7 @@ export default async function CostsPage() {
           </p>
           <p
             className={`font-mono text-2xl font-bold mt-1 ${
-              netPositive ? "text-emerald-600" : "text-red-600"
+              netPositive ? "text-[#0A0A0A]" : "text-[#0A0A0A]/70"
             }`}
           >
             {netPositive ? "+" : ""}
@@ -468,8 +468,8 @@ export default async function CostsPage() {
           <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
             Upcoming Charges — Next 14 Days
           </h2>
-          <div className="border border-amber-200 bg-amber-50">
-            <div className="divide-y divide-amber-100">
+          <div className="border border-[#0A0A0A]/20 bg-[#0A0A0A]/5">
+            <div className="divide-y divide-[#0A0A0A]/10">
               {upcomingCharges.map((charge) => {
                 const daysOut = charge.nextRenewal
                   ? Math.ceil(
@@ -491,7 +491,7 @@ export default async function CostsPage() {
                         <p className="font-serif text-sm font-medium text-[#0A0A0A]">
                           {charge.name}
                         </p>
-                        <p className="font-mono text-[10px] text-amber-700">
+                        <p className="font-mono text-[10px] text-[#0A0A0A]/60">
                           {charge.vendor} ·{" "}
                           {charge.companyTag.replace(/_/g, " ")} ·{" "}
                           {charge.billingCycle}
@@ -499,7 +499,7 @@ export default async function CostsPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-6">
-                      <span className="font-mono text-xs text-amber-700 font-medium">
+                      <span className="font-mono text-xs text-[#0A0A0A]/60 font-medium">
                         {daysOut !== null
                           ? daysOut === 0
                             ? "Today"
@@ -699,10 +699,10 @@ export default async function CostsPage() {
                       <span
                         className={`font-mono text-sm font-bold ${
                           c.marginPct >= 80
-                            ? "text-emerald-600"
+                            ? "text-[#0A0A0A]"
                             : c.marginPct >= 50
-                              ? "text-amber-600"
-                              : "text-red-600"
+                              ? "text-[#0A0A0A]/60"
+                              : "text-[#0A0A0A]/70"
                         }`}
                       >
                         {c.marginPct}%

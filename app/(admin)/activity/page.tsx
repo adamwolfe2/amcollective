@@ -5,11 +5,11 @@ import { LiveActivityFeed } from "./live-activity-feed";
 import { OnlineUsers } from "./online-users";
 
 const ACTION_COLORS: Record<string, string> = {
-  create: "bg-emerald-500 text-white border-transparent",
-  update: "bg-blue-500 text-white border-transparent",
-  delete: "bg-red-500 text-white border-transparent",
-  send_message: "bg-purple-500 text-white border-transparent",
-  resolve: "bg-gray-500 text-white border-transparent",
+  create: "bg-[#0A0A0A] text-white border-transparent",
+  update: "bg-[#0A0A0A]/60 text-white border-transparent",
+  delete: "bg-[#0A0A0A]/40 text-white border-transparent",
+  send_message: "bg-[#0A0A0A]/50 text-white border-transparent",
+  resolve: "bg-[#0A0A0A]/30 text-white border-transparent",
 };
 
 export default async function ActivityPage() {

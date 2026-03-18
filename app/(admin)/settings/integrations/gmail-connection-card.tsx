@@ -98,14 +98,14 @@ export function GmailConnectionCard({
           <button
             onClick={handleDisconnect}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-red-200 text-red-600 font-mono text-[10px] uppercase tracking-wider hover:bg-red-50 transition-colors disabled:opacity-50"
+            className="flex items-center gap-1.5 px-3 py-1.5 border border-[#0A0A0A]/20 text-[#0A0A0A]/70 font-mono text-[10px] uppercase tracking-wider hover:bg-[#0A0A0A]/5 transition-colors disabled:opacity-50"
           >
             <Unplug className="h-3 w-3" />
             {loading ? "..." : "Disconnect"}
           </button>
         </div>
         {error && (
-          <p className="font-mono text-[10px] text-red-600 mt-2">{error}</p>
+          <p className="font-mono text-[10px] text-[#0A0A0A]/70 mt-2">{error}</p>
         )}
       </div>
     );
@@ -132,7 +132,7 @@ export function GmailConnectionCard({
         </button>
       </div>
       {error && (
-        <p className="font-mono text-[10px] text-red-600 mt-2">{error}</p>
+        <p className="font-mono text-[10px] text-[#0A0A0A]/70 mt-2">{error}</p>
       )}
     </div>
   );

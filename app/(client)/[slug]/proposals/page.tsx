@@ -139,14 +139,14 @@ export default async function ClientProposalsPage({
                 )}
 
                 {proposal.status === "approved" && proposal.approvedAt && (
-                  <p className="font-mono text-xs text-green-700">
+                  <p className="font-mono text-xs text-[#0A0A0A]">
                     Approved on{" "}
                     {format(new Date(proposal.approvedAt), "MMM d, yyyy")}
                   </p>
                 )}
 
                 {proposal.status === "rejected" && (
-                  <p className="font-mono text-xs text-red-700">
+                  <p className="font-mono text-xs text-[#0A0A0A]/70">
                     Declined
                     {proposal.rejectedAt &&
                       ` on ${format(
@@ -172,10 +172,10 @@ export default async function ClientProposalsPage({
 
 function ProposalStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    sent: "bg-transparent text-blue-700 border-blue-400",
-    viewed: "bg-transparent text-amber-700 border-amber-400",
-    approved: "bg-transparent text-green-700 border-green-400",
-    rejected: "bg-transparent text-red-700 border-red-400",
+    sent: "bg-[#0A0A0A]/5 text-[#0A0A0A]/60 border-[#0A0A0A]/25",
+    viewed: "bg-transparent text-[#0A0A0A]/70 border-[#0A0A0A]/30",
+    approved: "bg-[#0A0A0A] text-white border-[#0A0A0A]",
+    rejected: "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border-[#0A0A0A]/20",
     expired: "bg-transparent text-[#0A0A0A]/40 border-[#0A0A0A]/15",
   };
 

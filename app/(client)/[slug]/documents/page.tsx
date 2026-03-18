@@ -16,12 +16,12 @@ function formatFileSize(bytes: number | null): string {
 }
 
 const DOC_TYPE_STYLES: Record<string, string> = {
-  contract: "bg-blue-500/10 text-blue-700 border-blue-300",
-  proposal: "bg-purple-500/10 text-purple-700 border-purple-300",
+  contract: "bg-[#0A0A0A] text-white border-[#0A0A0A]",
+  proposal: "bg-[#0A0A0A]/5 text-[#0A0A0A]/60 border-[#0A0A0A]/25",
   note: "bg-[#0A0A0A]/5 text-[#0A0A0A]/60 border-[#0A0A0A]/10",
-  sop: "bg-amber-500/10 text-amber-700 border-amber-300",
-  invoice: "bg-green-500/10 text-green-700 border-green-300",
-  brief: "bg-cyan-500/10 text-cyan-700 border-cyan-300",
+  sop: "bg-transparent text-[#0A0A0A]/70 border-[#0A0A0A]/30",
+  invoice: "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border-[#0A0A0A]/20",
+  brief: "bg-transparent text-[#0A0A0A]/50 border-[#0A0A0A]/15",
   other: "bg-[#0A0A0A]/5 text-[#0A0A0A]/40 border-[#0A0A0A]/10",
 };
 

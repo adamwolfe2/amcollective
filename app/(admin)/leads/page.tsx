@@ -9,6 +9,7 @@ import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import { LeadActions } from "./lead-actions";
 import { NewLeadForm } from "./new-lead-form";
+import { statusBadge, statusText, leadStageCategory } from "@/lib/ui/status-colors";
 
 const STAGE_LABELS: Record<string, string> = {
   awareness: "Awareness",
@@ -20,15 +21,9 @@ const STAGE_LABELS: Record<string, string> = {
   nurture: "Nurture",
 };
 
-const STAGE_COLORS: Record<string, string> = {
-  awareness: "bg-gray-100 text-gray-700",
-  interest: "bg-blue-100 text-blue-700",
-  consideration: "bg-purple-100 text-purple-700",
-  intent: "bg-amber-100 text-amber-700",
-  closed_won: "bg-green-100 text-green-700",
-  closed_lost: "bg-red-100 text-red-700",
-  nurture: "bg-cyan-100 text-cyan-700",
-};
+const STAGE_COLORS: Record<string, string> = Object.fromEntries(
+  Object.entries(leadStageCategory).map(([k, v]) => [k, statusBadge[v]])
+);
 
 function fmtDollars(cents: number | null) {
   if (!cents) return "--";
@@ -129,7 +124,7 @@ export default async function LeadsPage() {
           <p className="font-mono text-[10px] uppercase text-[#0A0A0A]/50">
             Won This Month
           </p>
-          <p className="font-serif text-xl font-bold text-green-700 mt-1">
+          <p className={`font-serif text-xl font-bold ${statusText.positive} mt-1`}>
             {wonThisMonth.length} / {fmtDollars(wonValue)}
           </p>
         </div>
@@ -138,7 +133,7 @@ export default async function LeadsPage() {
             Overdue Follow-ups
           </p>
           <p
-            className={`font-serif text-xl font-bold mt-1 ${overdueFollowUps.length > 0 ? "text-red-600" : "text-[#0A0A0A]"}`}
+            className={`font-serif text-xl font-bold mt-1 ${overdueFollowUps.length > 0 ? statusText.negative : "text-[#0A0A0A]"}`}
           >
             {overdueFollowUps.length}
           </p>
@@ -194,7 +189,7 @@ export default async function LeadsPage() {
                             {lead.contactName}
                           </p>
                           {isOverdue && (
-                            <AlertCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                            <AlertCircle className={`h-3.5 w-3.5 ${statusText.negative} shrink-0`} />
                           )}
                         </div>
                         {lead.companyName && (
@@ -296,7 +291,7 @@ export default async function LeadsPage() {
                   <td className="px-4 py-3">
                     {lead.nextFollowUpAt ? (
                       <span
-                        className={`font-mono text-xs ${isOverdue ? "text-red-600 font-medium" : "text-[#0A0A0A]/50"}`}
+                        className={`font-mono text-xs ${isOverdue ? `${statusText.negative} font-medium` : "text-[#0A0A0A]/50"}`}
                       >
                         {lead.nextFollowUpAt.toLocaleDateString("en-US", {
                           month: "short",

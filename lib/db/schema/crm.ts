@@ -140,6 +140,8 @@ export const engagements = pgTable(
     index("engagements_project_id_idx").on(table.projectId),
     index("engagements_status_idx").on(table.status),
     index("engagements_created_at_idx").on(table.createdAt),
+    index("engagements_start_date_idx").on(table.startDate),
+    index("engagements_end_date_idx").on(table.endDate),
   ]
 );
 

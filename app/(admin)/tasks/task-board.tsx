@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { CreateTaskDialog } from "./create-task-dialog";
+import { statusBadge, statusText, taskPriorityCategory } from "@/lib/ui/status-colors";
 
 type Task = {
   task: {
@@ -37,12 +38,9 @@ const COLUMNS = [
   { key: "done", label: "Done" },
 ] as const;
 
-const PRIORITY_STYLES: Record<string, string> = {
-  urgent: "border-red-700 bg-red-50 text-red-700",
-  high: "border-amber-700 bg-amber-50 text-amber-700",
-  medium: "border-blue-700 bg-blue-50 text-blue-700",
-  low: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/40",
-};
+const PRIORITY_STYLES: Record<string, string> = Object.fromEntries(
+  Object.entries(taskPriorityCategory).map(([k, v]) => [k, statusBadge[v]])
+);
 
 export function TaskBoard({ initialTasks, teamMembers, projects, stats }: Props) {
   const router = useRouter();
@@ -110,7 +108,7 @@ export function TaskBoard({ initialTasks, teamMembers, projects, stats }: Props)
           <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 mb-1">
             In Progress
           </p>
-          <p className="font-mono text-xl font-bold text-blue-700">
+          <p className={`font-mono text-xl font-bold ${statusText.info}`}>
             {stats.inProgress}
           </p>
         </div>
@@ -118,7 +116,7 @@ export function TaskBoard({ initialTasks, teamMembers, projects, stats }: Props)
           <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 mb-1">
             Completed
           </p>
-          <p className="font-mono text-xl font-bold text-green-800">
+          <p className={`font-mono text-xl font-bold ${statusText.positive}`}>
             {stats.done}
           </p>
         </div>
@@ -128,7 +126,7 @@ export function TaskBoard({ initialTasks, teamMembers, projects, stats }: Props)
           </p>
           <p
             className={`font-mono text-xl font-bold ${
-              stats.overdue > 0 ? "text-red-700" : "text-[#0A0A0A]"
+              stats.overdue > 0 ? statusText.negative : "text-[#0A0A0A]"
             }`}
           >
             {stats.overdue}
@@ -181,7 +179,7 @@ export function TaskBoard({ initialTasks, teamMembers, projects, stats }: Props)
                           </span>
                         )}
                         {isOverdue(t.task) && (
-                          <span className="font-mono text-[10px] text-red-600">
+                          <span className={`font-mono text-[10px] ${statusText.negative}`}>
                             overdue
                           </span>
                         )}
@@ -190,7 +188,7 @@ export function TaskBoard({ initialTasks, teamMembers, projects, stats }: Props)
                         <p
                           className={`font-mono text-[10px] mt-1 ${
                             isOverdue(t.task)
-                              ? "text-red-600"
+                              ? statusText.negative
                               : "text-[#0A0A0A]/30"
                           }`}
                         >
@@ -281,7 +279,7 @@ export function TaskBoard({ initialTasks, teamMembers, projects, stats }: Props)
                   <td
                     className={`px-4 py-2 font-mono text-xs ${
                       isOverdue(t.task)
-                        ? "text-red-600 font-bold"
+                        ? `${statusText.negative} font-bold`
                         : "text-[#0A0A0A]/40"
                     }`}
                   >

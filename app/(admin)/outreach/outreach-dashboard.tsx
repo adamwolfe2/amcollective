@@ -88,12 +88,12 @@ const EVENT_LABELS: Record<string, string> = {
 };
 
 const EVENT_COLORS: Record<string, string> = {
-  email_sent: "text-blue-600",
-  contact_first_emailed: "text-blue-600",
-  email_opened: "text-amber-600",
-  contact_replied: "text-emerald-600",
-  contact_interested: "text-emerald-700",
-  email_bounced: "text-red-600",
+  email_sent: "text-[#0A0A0A]/50",
+  contact_first_emailed: "text-[#0A0A0A]/50",
+  email_opened: "text-[#0A0A0A]/60",
+  contact_replied: "text-[#0A0A0A]",
+  contact_interested: "text-[#0A0A0A]",
+  email_bounced: "text-[#0A0A0A]/70",
   contact_unsubscribed: "text-[#0A0A0A]/40",
 };
 
@@ -251,7 +251,7 @@ export function OutreachDashboard() {
             >
               {t}
               {t === "inbox" && inbox && inbox.unreadCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-red-500 text-white font-mono text-[9px] w-4 h-4 flex items-center justify-center rounded-full">
+                <span className="absolute -top-1 -right-1 bg-[#0A0A0A] text-white font-mono text-[9px] w-4 h-4 flex items-center justify-center rounded-full">
                   {inbox.unreadCount > 9 ? "9+" : inbox.unreadCount}
                 </span>
               )}
@@ -336,13 +336,13 @@ export function OutreachDashboard() {
                         />
                       </div>
                       <div className="flex gap-3 shrink-0">
-                        <span className="font-mono text-[10px] text-blue-600">
+                        <span className="font-mono text-[10px] text-[#0A0A0A]/50">
                           {d.sent}s
                         </span>
-                        <span className="font-mono text-[10px] text-amber-600">
+                        <span className="font-mono text-[10px] text-[#0A0A0A]/60">
                           {d.opened}o
                         </span>
-                        <span className="font-mono text-[10px] text-emerald-600">
+                        <span className="font-mono text-[10px] text-[#0A0A0A]">
                           {d.replied}r
                         </span>
                       </div>
@@ -475,10 +475,10 @@ export function OutreachDashboard() {
                           ({rate}%)
                         </span>
                       </td>
-                      <td className="p-3 text-right font-mono text-sm text-emerald-600">
+                      <td className="p-3 text-right font-mono text-sm text-[#0A0A0A]">
                         {c.interested ?? 0}
                       </td>
-                      <td className="p-3 text-right font-mono text-sm text-red-600">
+                      <td className="p-3 text-right font-mono text-sm text-[#0A0A0A]/70">
                         {c.bounced ?? 0}
                       </td>
                       <td className="p-3 text-right font-mono text-xs text-[#0A0A0A]/50 capitalize hidden md:table-cell">
@@ -632,7 +632,7 @@ export function OutreachDashboard() {
                           </span>
                         )}
                         {reply.isInterested && (
-                          <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider bg-emerald-600 text-white px-1.5 py-0.5">
+                          <span className="shrink-0 font-mono text-[9px] uppercase tracking-wider bg-[#0A0A0A] text-white px-1.5 py-0.5">
                             Interested
                           </span>
                         )}
@@ -688,7 +688,7 @@ export function OutreachDashboard() {
                         <button
                           onClick={() => handleInboxAction(reply.externalId, "mark_interested")}
                           disabled={actingOn === reply.externalId}
-                          className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider border border-emerald-600 text-emerald-600 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                          className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider border border-[#0A0A0A] text-[#0A0A0A] hover:bg-[#0A0A0A]/5 transition-colors disabled:opacity-50"
                         >
                           Interested
                         </button>

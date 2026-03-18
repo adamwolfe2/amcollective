@@ -12,15 +12,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ProposalActions } from "./proposal-actions";
+import { statusBadge, proposalStatusCategory } from "@/lib/ui/status-colors";
 
-const STATUS_STYLES: Record<string, string> = {
-  draft: "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/50",
-  sent: "border-blue-700 bg-blue-50 text-blue-700",
-  viewed: "border-purple-700 bg-purple-50 text-purple-700",
-  approved: "border-green-800 bg-green-50 text-green-800",
-  rejected: "border-red-700 bg-red-50 text-red-700",
-  expired: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/30",
-};
+const STATUS_STYLES: Record<string, string> = Object.fromEntries(
+  Object.entries(proposalStatusCategory).map(([k, v]) => [k, statusBadge[v]])
+);
 
 function formatCents(cents: number): string {
   return `$${(cents / 100).toLocaleString("en-US", {

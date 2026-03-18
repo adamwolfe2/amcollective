@@ -171,7 +171,7 @@ export function CredentialForm({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A0A0A]/40">
       <div className="bg-[#F3F3EF] border-2 border-[#0A0A0A] w-full max-w-md p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="font-serif font-bold text-lg">
@@ -229,7 +229,7 @@ export function CredentialForm({
           </div>
 
           {error && (
-            <p className="font-mono text-[11px] text-red-600">{error}</p>
+            <p className="font-mono text-[11px] text-[#0A0A0A]/70">{error}</p>
           )}
 
           <div className="flex gap-2 pt-2">
@@ -271,7 +271,7 @@ export function DeleteButton({ id }: { id: string }) {
             })
           }
           disabled={isPending}
-          className="px-2 py-1 border border-red-500 text-red-600 font-mono text-[10px] uppercase tracking-wider hover:bg-red-50 disabled:opacity-40"
+          className="px-2 py-1 border border-[#0A0A0A]/30 text-[#0A0A0A]/70 font-mono text-[10px] uppercase tracking-wider hover:bg-[#0A0A0A]/5 disabled:opacity-40"
         >
           {isPending ? "..." : "Confirm"}
         </button>
@@ -288,7 +288,7 @@ export function DeleteButton({ id }: { id: string }) {
   return (
     <button
       onClick={() => setConfirm(true)}
-      className="p-1.5 border border-[#0A0A0A]/20 hover:border-red-400 hover:text-red-600 transition-colors"
+      className="p-1.5 border border-[#0A0A0A]/20 hover:border-[#0A0A0A]/40 hover:text-[#0A0A0A] transition-colors"
       title="Delete credential"
     >
       <Trash2 size={12} />
@@ -342,7 +342,7 @@ function AiParseModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A0A0A]/40">
       <div className="bg-[#F3F3EF] border-2 border-[#0A0A0A] w-full max-w-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -368,7 +368,7 @@ function AiParseModal({
         />
 
         {error && (
-          <p className="font-mono text-[11px] text-red-600 mb-3">{error}</p>
+          <p className="font-mono text-[11px] text-[#0A0A0A]/70 mb-3">{error}</p>
         )}
 
         <div className="flex gap-2">

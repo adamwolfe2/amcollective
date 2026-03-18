@@ -7,55 +7,64 @@ export default async function MarginsPage() {
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  // Get clients with invoice revenue
-  const clients = await db
-    .select({
-      clientId: schema.clients.id,
-      clientName: schema.clients.name,
-      companyName: schema.clients.companyName,
-      revenue: sql<number>`COALESCE(SUM(CASE WHEN ${schema.invoices.status} = 'paid' THEN ${schema.invoices.amount} ELSE 0 END), 0)`.as("revenue"),
-    })
-    .from(schema.clients)
-    .leftJoin(
-      schema.invoices,
-      and(
-        eq(schema.invoices.clientId, schema.clients.id),
-        gte(schema.invoices.createdAt, monthStart)
+  let margins: { clientId: string; clientName: string; companyName: string | null; revenue: number; costs: number; margin: number; marginPct: number }[] = [];
+  let totalRevenue = 0;
+  let totalCosts = 0;
+  let overallMargin = 0;
+
+  try {
+    // Get clients with invoice revenue
+    const clients = await db
+      .select({
+        clientId: schema.clients.id,
+        clientName: schema.clients.name,
+        companyName: schema.clients.companyName,
+        revenue: sql<number>`COALESCE(SUM(CASE WHEN ${schema.invoices.status} = 'paid' THEN ${schema.invoices.amount} ELSE 0 END), 0)`.as("revenue"),
+      })
+      .from(schema.clients)
+      .leftJoin(
+        schema.invoices,
+        and(
+          eq(schema.invoices.clientId, schema.clients.id),
+          gte(schema.invoices.createdAt, monthStart)
+        )
       )
-    )
-    .groupBy(schema.clients.id);
+      .groupBy(schema.clients.id);
 
-  // Get project costs per client
-  const clientCosts = await db
-    .select({
-      clientId: schema.clientProjects.clientId,
-      totalCost: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`.as("total_cost"),
-    })
-    .from(schema.clientProjects)
-    .leftJoin(
-      schema.toolCosts,
-      and(
-        eq(schema.toolCosts.projectId, schema.clientProjects.projectId),
-        gte(schema.toolCosts.createdAt, monthStart)
+    // Get project costs per client
+    const clientCosts = await db
+      .select({
+        clientId: schema.clientProjects.clientId,
+        totalCost: sql<number>`COALESCE(SUM(${schema.toolCosts.amount}), 0)`.as("total_cost"),
+      })
+      .from(schema.clientProjects)
+      .leftJoin(
+        schema.toolCosts,
+        and(
+          eq(schema.toolCosts.projectId, schema.clientProjects.projectId),
+          gte(schema.toolCosts.createdAt, monthStart)
+        )
       )
-    )
-    .groupBy(schema.clientProjects.clientId);
+      .groupBy(schema.clientProjects.clientId);
 
-  const costMap = new Map(clientCosts.map((c) => [c.clientId, c.totalCost]));
+    const costMap = new Map(clientCosts.map((c) => [c.clientId, c.totalCost]));
 
-  const margins = clients
-    .map((c) => {
-      const costs = costMap.get(c.clientId) ?? 0;
-      const revenue = c.revenue;
-      const margin = revenue - costs;
-      const marginPct = revenue > 0 ? Math.round(((margin / revenue) * 100) * 10) / 10 : 0;
-      return { ...c, costs, margin, marginPct };
-    })
-    .sort((a, b) => a.marginPct - b.marginPct);
+    margins = clients
+      .map((c) => {
+        const costs = costMap.get(c.clientId) ?? 0;
+        const revenue = c.revenue;
+        const margin = revenue - costs;
+        const marginPct = revenue > 0 ? Math.round(((margin / revenue) * 100) * 10) / 10 : 0;
+        return { ...c, costs, margin, marginPct };
+      })
+      .sort((a, b) => a.marginPct - b.marginPct);
 
-  const totalRevenue = margins.reduce((s, m) => s + m.revenue, 0);
-  const totalCosts = margins.reduce((s, m) => s + m.costs, 0);
-  const overallMargin = totalRevenue > 0 ? Math.round(((totalRevenue - totalCosts) / totalRevenue) * 1000) / 10 : 0;
+    totalRevenue = margins.reduce((s, m) => s + m.revenue, 0);
+    totalCosts = margins.reduce((s, m) => s + m.costs, 0);
+    overallMargin = totalRevenue > 0 ? Math.round(((totalRevenue - totalCosts) / totalRevenue) * 1000) / 10 : 0;
+  } catch (error) {
+    console.error("[margins] Failed to fetch margin data:", error);
+  }
 
   return (
     <div>
@@ -128,10 +137,10 @@ export default async function MarginsPage() {
                     <span
                       className={`font-mono text-sm font-bold ${
                         m.marginPct >= 80
-                          ? "text-emerald-600"
+                          ? "text-[#0A0A0A]"
                           : m.marginPct >= 50
-                            ? "text-amber-600"
-                            : "text-red-600"
+                            ? "text-[#0A0A0A]/60"
+                            : "text-[#0A0A0A]/70"
                       }`}
                     >
                       {m.marginPct}%

@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 import * as vercelConnector from "@/lib/connectors/vercel";
+import { getStatusBadge, statusBadge, statusText, type StatusCategory } from "@/lib/ui/status-colors";
 
 export default async function DomainsPage() {
   const [projects, vercelResult] = await Promise.all([
@@ -132,11 +133,11 @@ export default async function DomainsPage() {
                       </td>
                       <td className="px-5 py-3">
                         {linked ? (
-                          <span className="px-2 py-0.5 text-[10px] font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className={`px-2 py-0.5 text-[10px] font-mono ${statusBadge.positive}`}>
                             Linked
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 text-[10px] font-mono bg-[#0A0A0A]/5 text-[#0A0A0A]/40 border border-[#0A0A0A]/10">
+                          <span className={`px-2 py-0.5 text-[10px] font-mono ${statusBadge.neutral}`}>
                             Unlinked
                           </span>
                         )}
@@ -153,17 +154,17 @@ export default async function DomainsPage() {
   );
 }
 
-function StatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    active: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    paused: "bg-amber-50 text-amber-700 border-amber-200",
-    archived: "bg-[#0A0A0A]/5 text-[#0A0A0A]/40 border-[#0A0A0A]/10",
-  };
+const domainProjectStatusCategory: Record<string, StatusCategory> = {
+  active: "positive",
+  paused: "warning",
+  archived: "negative",
+};
 
+function StatusBadge({ status }: { status: string }) {
   return (
     <span
-      className={`px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider border ${
-        styles[status] || styles.archived
+      className={`px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider ${
+        getStatusBadge(status, domainProjectStatusCategory)
       }`}
     >
       {status}
@@ -201,7 +202,7 @@ function Row({
       ) : (
         <span
           className={`font-mono text-xs ${
-            highlight ? "text-red-600 font-bold" : "text-[#0A0A0A]"
+            highlight ? `${statusText.negative} font-bold` : "text-[#0A0A0A]"
           }`}
         >
           {value}

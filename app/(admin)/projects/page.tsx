@@ -23,18 +23,18 @@ import * as schema from "@/lib/db/schema";
 import { count } from "drizzle-orm";
 
 const statusStyles: Record<string, string> = {
-  active: "border-green-600 text-green-700 bg-green-50",
-  paused: "border-yellow-600 text-yellow-700 bg-yellow-50",
+  active: "border-[#0A0A0A] text-[#0A0A0A] bg-[#0A0A0A]/5",
+  paused: "border-[#0A0A0A]/30 text-[#0A0A0A]/60 bg-transparent",
   archived: "border-[#0A0A0A]/30 text-[#0A0A0A]/50 bg-[#0A0A0A]/5",
 };
 
 const deployStateColor: Record<string, string> = {
-  READY: "bg-emerald-500",
-  ERROR: "bg-red-500",
-  BUILDING: "bg-amber-500",
-  CANCELED: "bg-gray-400",
-  QUEUED: "bg-blue-400",
-  INITIALIZING: "bg-blue-400",
+  READY: "bg-[#0A0A0A]",
+  ERROR: "bg-[#0A0A0A]/40",
+  BUILDING: "bg-[#0A0A0A]/25",
+  CANCELED: "bg-[#0A0A0A]/15",
+  QUEUED: "bg-[#0A0A0A]/20",
+  INITIALIZING: "bg-[#0A0A0A]/20",
 };
 
 function formatCents(cents: number): string {
@@ -44,9 +44,9 @@ function formatCents(cents: number): string {
 
 function healthColor(score: number | null): string {
   if (score === null) return "border-[#0A0A0A]/30 text-[#0A0A0A]/50 bg-[#0A0A0A]/5";
-  if (score >= 80) return "border-green-600 text-green-700 bg-green-50";
-  if (score >= 50) return "border-amber-600 text-amber-700 bg-amber-50";
-  return "border-red-600 text-red-700 bg-red-50";
+  if (score >= 80) return "border-[#0A0A0A] text-[#0A0A0A] bg-[#0A0A0A]/5";
+  if (score >= 50) return "border-[#0A0A0A]/30 text-[#0A0A0A]/60 bg-transparent";
+  return "border-[#0A0A0A]/20 text-[#0A0A0A]/70 bg-[#0A0A0A]/8";
 }
 
 interface ProjectRow {
@@ -230,7 +230,7 @@ export default async function ProjectsPage() {
                         <span
                           className={`w-2 h-2 rounded-full shrink-0 ${
                             deployStateColor[row.lastDeployState] ??
-                            "bg-gray-400"
+                            "bg-[#0A0A0A]/25"
                           }`}
                         />
                         <span className="font-mono text-xs text-[#0A0A0A]/50">

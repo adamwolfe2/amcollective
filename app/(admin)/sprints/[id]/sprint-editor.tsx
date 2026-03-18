@@ -333,7 +333,7 @@ function TaskRow({
 
         <button
           onClick={handleDeleteTask}
-          className="opacity-0 group-hover:opacity-100 transition-opacity text-[#0A0A0A]/30 hover:text-red-500 shrink-0 mt-0.5"
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-[#0A0A0A]/30 hover:text-[#0A0A0A] shrink-0 mt-0.5"
         >
           <X size={12} />
         </button>
@@ -430,7 +430,7 @@ function SubtaskItemRow({
       />
       <button
         onClick={onDelete}
-        className="opacity-0 group-hover/sub:opacity-100 transition-opacity text-[#0A0A0A]/20 hover:text-red-400 shrink-0"
+        className="opacity-0 group-hover/sub:opacity-100 transition-opacity text-[#0A0A0A]/20 hover:text-[#0A0A0A] shrink-0"
       >
         <X size={10} />
       </button>
@@ -542,7 +542,7 @@ function SectionBlock({
             )}
             <button
               onClick={handleDeleteSection}
-              className="text-[#0A0A0A]/20 hover:text-red-500 transition-colors"
+              className="text-[#0A0A0A]/20 hover:text-[#0A0A0A] transition-colors"
             >
               <Trash2 size={12} />
             </button>
@@ -756,7 +756,7 @@ function SprintShareButton({
       >
         {copied ? (
           <>
-            <CheckCheck size={11} className="text-green-600" />
+            <CheckCheck size={11} className="text-[#0A0A0A]" />
             Copied!
           </>
         ) : (
@@ -769,7 +769,7 @@ function SprintShareButton({
       <button
         onClick={handleToggle}
         disabled={isPending}
-        className="p-1.5 border border-[#0A0A0A]/20 text-[#0A0A0A]/30 hover:text-red-500 hover:border-red-300 transition-colors disabled:opacity-40"
+        className="p-1.5 border border-[#0A0A0A]/20 text-[#0A0A0A]/30 hover:text-[#0A0A0A] hover:border-[#0A0A0A]/40 transition-colors disabled:opacity-40"
         title="Disable public link"
       >
         {isPending ? (
@@ -895,8 +895,8 @@ function SprintAIImport({
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 pt-16 px-4">
-          <div className="w-full max-w-2xl bg-white border border-[#0A0A0A]/20 shadow-2xl max-h-[80vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#0A0A0A]/40 pt-16 px-4">
+          <div className="w-full max-w-2xl bg-white border border-[#0A0A0A]/20 max-h-[80vh] flex flex-col">
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#0A0A0A]/10 shrink-0">
               <div className="flex items-center gap-2">
                 <Sparkles size={14} className="text-[#0A0A0A]/50" />
@@ -933,7 +933,7 @@ function SprintAIImport({
                   className="w-full font-mono text-sm text-[#0A0A0A]/80 bg-[#F3F3EF] border border-[#0A0A0A]/10 p-4 focus:outline-none focus:border-[#0A0A0A]/30 resize-none placeholder:text-[#0A0A0A]/25 leading-relaxed"
                 />
                 {error && (
-                  <p className="font-mono text-xs text-red-600 mt-2">{error}</p>
+                  <p className="font-mono text-xs text-[#0A0A0A]/70 mt-2">{error}</p>
                 )}
                 <div className="flex items-center gap-3 mt-4">
                   <button
@@ -1019,7 +1019,7 @@ function SprintAIImport({
                           </select>
                           <button
                             onClick={() => removeSection(si)}
-                            className="text-[#0A0A0A]/20 hover:text-red-500 transition-colors p-1"
+                            className="text-[#0A0A0A]/20 hover:text-[#0A0A0A] transition-colors p-1"
                           >
                             <X size={12} />
                           </button>

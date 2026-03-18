@@ -111,8 +111,8 @@ export default async function ClientProjectsPage() {
 
 function ProjectStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    active: "bg-transparent text-green-700 border-green-400",
-    paused: "bg-transparent text-amber-700 border-amber-400",
+    active: "bg-[#0A0A0A] text-white border-[#0A0A0A]",
+    paused: "bg-transparent text-[#0A0A0A]/70 border-[#0A0A0A]/30",
     archived: "bg-transparent text-[#0A0A0A]/40 border-[#0A0A0A]/15",
     unknown: "bg-transparent text-[#0A0A0A]/30 border-[#0A0A0A]/10",
   };

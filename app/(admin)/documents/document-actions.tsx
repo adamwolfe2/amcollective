@@ -44,7 +44,7 @@ export function DocumentActions({
       <button
         onClick={handleDelete}
         disabled={deleting}
-        className="p-1.5 text-[#0A0A0A]/30 hover:text-red-600 transition-colors disabled:opacity-50"
+        className="p-1.5 text-[#0A0A0A]/30 hover:text-[#0A0A0A]/70 transition-colors disabled:opacity-50"
         title="Delete document"
       >
         <Trash2 className="h-3.5 w-3.5" />

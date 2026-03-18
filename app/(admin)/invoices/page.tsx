@@ -17,17 +17,14 @@ import { InvoiceStatusFilter } from "./invoice-status-filter";
 import { CreateInvoiceDialog } from "./create-invoice-dialog";
 import { SyncStripeButton } from "./sync-stripe-button";
 import { ExportCsvButton } from "./export-csv-button";
+import { statusBadge, statusText, invoiceStatusCategory } from "@/lib/ui/status-colors";
 
 const STATUS_STYLES: Record<string, string> = {
-  draft: "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/50",
-  sent: "border-blue-700 bg-blue-50 text-blue-700",
-  open: "border-blue-600 bg-blue-50 text-blue-600",
-  paid: "border-green-800 bg-green-50 text-green-800",
-  overdue: "border-red-700 bg-red-50 text-red-700",
-  void: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/30 line-through",
-  uncollectible:
-    "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/30 line-through",
-  cancelled: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/30",
+  ...Object.fromEntries(
+    Object.entries(invoiceStatusCategory).map(([k, v]) => [k, statusBadge[v]])
+  ),
+  void: `${statusBadge.negative} line-through`,
+  uncollectible: `${statusBadge.negative} line-through`,
 };
 
 function formatCents(cents: number): string {
@@ -111,7 +108,7 @@ export default async function InvoicesPage({
             Overdue
           </p>
           <p
-            className={`font-mono text-xl font-bold ${kpis.overdue.count > 0 ? "text-red-700" : "text-[#0A0A0A]"}`}
+            className={`font-mono text-xl font-bold ${kpis.overdue.count > 0 ? statusText.negative : "text-[#0A0A0A]"}`}
           >
             {formatCents(kpis.overdue.total)}
           </p>

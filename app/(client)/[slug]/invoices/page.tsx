@@ -179,9 +179,9 @@ export default async function ClientInvoicesPage({
 function InvoiceStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     draft: "bg-transparent text-[#0A0A0A]/50 border-[#0A0A0A]/20",
-    sent: "bg-transparent text-blue-700 border-blue-400",
-    paid: "bg-transparent text-green-700 border-green-400",
-    overdue: "bg-transparent text-red-700 border-red-400",
+    sent: "bg-[#0A0A0A]/5 text-[#0A0A0A]/60 border-[#0A0A0A]/25",
+    paid: "bg-[#0A0A0A] text-white border-[#0A0A0A]",
+    overdue: "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border-[#0A0A0A]/20",
     cancelled: "bg-transparent text-[#0A0A0A]/30 border-[#0A0A0A]/10",
   };
 

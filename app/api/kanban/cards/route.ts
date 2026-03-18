@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, sql } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
@@ -102,13 +102,12 @@ export async function POST(req: NextRequest) {
     const { columnId, clientId, title, description, dueDate, assigneeId, priority, labels } = parsed.data;
 
     // Get max position in target column
-    const existing = await db
-      .select({ position: schema.kanbanCards.position })
+    const [maxResult] = await db
+      .select({ maxPos: sql<number>`COALESCE(MAX(${schema.kanbanCards.position}), -1)` })
       .from(schema.kanbanCards)
-      .where(eq(schema.kanbanCards.columnId, columnId))
-      .orderBy(asc(schema.kanbanCards.position));
+      .where(eq(schema.kanbanCards.columnId, columnId));
 
-    const maxPos = existing.length > 0 ? existing[existing.length - 1].position : -1;
+    const maxPos = maxResult.maxPos;
 
     const [card] = await db
       .insert(schema.kanbanCards)

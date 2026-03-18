@@ -23,6 +23,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { createInvoice } from "@/lib/actions/invoices";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
+import { statusText } from "@/lib/ui/status-colors";
 
 type LineItem = {
   description: string;
@@ -234,7 +235,7 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
                     <button
                       type="button"
                       onClick={() => removeLineItem(index)}
-                      className="p-2 text-[#0A0A0A]/30 hover:text-red-600"
+                      className="p-2 text-[#0A0A0A]/30 hover:text-[#0A0A0A]/70"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -269,7 +270,7 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
               </p>
             )}
             {clientId && !clientHasStripe && (
-              <p className="font-mono text-[10px] text-red-600 pl-6">
+              <p className={`font-mono text-[10px] ${statusText.negative} pl-6`}>
                 Selected client has no Stripe customer ID
               </p>
             )}
@@ -287,8 +288,8 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
 
           {/* Error display */}
           {error && (
-            <div className="border border-red-600 bg-red-50 p-2">
-              <p className="font-mono text-xs text-red-700">{error}</p>
+            <div className="border border-[#0A0A0A]/20 bg-[#0A0A0A]/5 p-2">
+              <p className={`font-mono text-xs ${statusText.negative}`}>{error}</p>
             </div>
           )}
 

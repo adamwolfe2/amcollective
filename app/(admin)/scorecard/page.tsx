@@ -11,11 +11,11 @@ function getValueColor(
 ): string {
   switch (targetDirection) {
     case "above":
-      return value >= targetValue ? "text-emerald-600" : "text-red-600";
+      return value >= targetValue ? "text-[#0A0A0A]" : "text-[#0A0A0A]/70";
     case "below":
-      return value <= targetValue ? "text-emerald-600" : "text-red-600";
+      return value <= targetValue ? "text-[#0A0A0A]" : "text-[#0A0A0A]/70";
     case "exact":
-      return value === targetValue ? "text-emerald-600" : "text-amber-600";
+      return value === targetValue ? "text-[#0A0A0A]" : "text-[#0A0A0A]/60";
     default:
       return "";
   }

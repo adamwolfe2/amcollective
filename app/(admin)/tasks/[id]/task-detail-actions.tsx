@@ -110,7 +110,7 @@ export function TaskDetailActions({
       <button
         onClick={archive}
         disabled={loading}
-        className="w-full px-4 py-2 border border-red-700 text-red-700 font-mono text-sm hover:bg-red-50 transition-colors disabled:opacity-50"
+        className="w-full px-4 py-2 border border-[#0A0A0A]/30 text-[#0A0A0A]/70 font-mono text-sm hover:bg-[#0A0A0A]/5 transition-colors disabled:opacity-50"
       >
         Archive Task
       </button>

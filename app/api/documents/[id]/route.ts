@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { del } from "@vercel/blob";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -16,6 +17,17 @@ import { createAuditLog } from "@/lib/db/repositories/audit";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { aj } from "@/lib/middleware/arcjet";
+
+const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "am_collective", "personal", "untagged"] as const;
+
+const documentUpdateSchema = z.object({
+  title: z.string().min(1).max(500).trim(),
+  content: z.string().max(100000).nullable(),
+  docType: z.enum(["contract", "proposal", "note", "sop", "invoice", "brief", "other"]),
+  companyTag: z.enum(companyTags),
+  isClientVisible: z.boolean(),
+  clientId: z.string().uuid().nullable(),
+}).partial().refine(data => Object.keys(data).length > 0, "At least one field required");
 
 export async function GET(
   _req: NextRequest,
@@ -66,15 +78,25 @@ export async function PATCH(
 
   try {
     const body = await req.json();
+
+    const parsed = documentUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
     const updates: Record<string, unknown> = {};
 
-    if (body.title !== undefined) updates.title = body.title;
-    if (body.content !== undefined) updates.content = body.content;
-    if (body.docType !== undefined) updates.docType = body.docType;
-    if (body.companyTag !== undefined) updates.companyTag = body.companyTag;
-    if (body.isClientVisible !== undefined)
-      updates.isClientVisible = body.isClientVisible;
-    if (body.clientId !== undefined) updates.clientId = body.clientId || null;
+    if (data.title !== undefined) updates.title = data.title;
+    if (data.content !== undefined) updates.content = data.content;
+    if (data.docType !== undefined) updates.docType = data.docType;
+    if (data.companyTag !== undefined) updates.companyTag = data.companyTag;
+    if (data.isClientVisible !== undefined)
+      updates.isClientVisible = data.isClientVisible;
+    if (data.clientId !== undefined) updates.clientId = data.clientId || null;
 
     const [updated] = await db
       .update(schema.documents)

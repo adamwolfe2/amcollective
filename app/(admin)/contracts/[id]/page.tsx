@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { ContractActions } from "./contract-actions";
+import { statusBadge, statusText, contractStatusCategory } from "@/lib/ui/status-colors";
 
 type PageProps = { params: Promise<{ id: string }> };
 
@@ -15,16 +16,9 @@ function formatCents(cents: number | null): string {
   })}`;
 }
 
-const STATUS_STYLES: Record<string, string> = {
-  draft: "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/50",
-  sent: "border-blue-700 bg-blue-50 text-blue-700",
-  viewed: "border-amber-700 bg-amber-50 text-amber-700",
-  signed: "border-green-700 bg-green-50 text-green-700",
-  countersigned: "border-green-800 bg-green-50 text-green-800",
-  active: "border-green-900 bg-green-100 text-green-900",
-  expired: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/30",
-  terminated: "border-red-700 bg-red-50 text-red-700",
-};
+const STATUS_STYLES: Record<string, string> = Object.fromEntries(
+  Object.entries(contractStatusCategory).map(([k, v]) => [k, statusBadge[v]])
+);
 
 export default async function ContractDetailPage({ params }: PageProps) {
   const { id } = await params;
@@ -96,7 +90,7 @@ export default async function ContractDetailPage({ params }: PageProps) {
                   <h3 className="font-serif font-bold text-sm mb-2">
                     {section.title}
                     {section.isRequired && (
-                      <span className="ml-2 font-mono text-[10px] text-red-600">
+                      <span className={`ml-2 font-mono text-[10px] ${statusText.negative}`}>
                         REQUIRED
                       </span>
                     )}
@@ -183,11 +177,11 @@ export default async function ContractDetailPage({ params }: PageProps) {
 
           {/* Countersign Info */}
           {contract.countersignedAt && (
-            <div className="border border-green-700 bg-green-50 p-6">
-              <h2 className="font-mono text-xs uppercase tracking-widest text-green-800 mb-2">
+            <div className={`border ${statusBadge.positive} p-6`}>
+              <h2 className="font-mono text-xs uppercase tracking-widest mb-2">
                 Countersigned
               </h2>
-              <p className="font-mono text-sm text-green-800">
+              <p className="font-mono text-sm">
                 {format(contract.countersignedAt, "MMM d, yyyy h:mm a")}
               </p>
             </div>

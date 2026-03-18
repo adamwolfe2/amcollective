@@ -9,18 +9,18 @@ import { TaskCommentForm } from "./task-comment-form";
 type PageProps = { params: Promise<{ id: string }> };
 
 const PRIORITY_STYLES: Record<string, string> = {
-  urgent: "border-red-700 bg-red-50 text-red-700",
-  high: "border-amber-700 bg-amber-50 text-amber-700",
-  medium: "border-blue-700 bg-blue-50 text-blue-700",
+  urgent: "border-[#0A0A0A] bg-[#0A0A0A] text-white",
+  high: "border-[#0A0A0A]/30 bg-transparent text-[#0A0A0A]/70",
+  medium: "border-[#0A0A0A]/25 bg-[#0A0A0A]/5 text-[#0A0A0A]/60",
   low: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/40",
 };
 
 const STATUS_STYLES: Record<string, string> = {
   backlog: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/40",
   todo: "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/50",
-  in_progress: "border-blue-700 bg-blue-50 text-blue-700",
-  in_review: "border-amber-700 bg-amber-50 text-amber-700",
-  done: "border-green-700 bg-green-50 text-green-700",
+  in_progress: "border-[#0A0A0A]/25 bg-[#0A0A0A]/5 text-[#0A0A0A]/60",
+  in_review: "border-[#0A0A0A]/30 bg-transparent text-[#0A0A0A]/70",
+  done: "border-[#0A0A0A] bg-[#0A0A0A] text-white",
   cancelled: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/30",
 };
 
@@ -176,7 +176,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
                   className={`font-mono text-sm ${
                     new Date(task.dueDate) < new Date() &&
                     !["done", "cancelled"].includes(task.status)
-                      ? "text-red-600 font-bold"
+                      ? "text-[#0A0A0A]/70 font-bold"
                       : ""
                   }`}
                 >
@@ -217,7 +217,7 @@ export default async function TaskDetailPage({ params }: PageProps) {
                 <p className="font-mono text-[10px] text-[#0A0A0A]/40 mb-0.5">
                   Completed
                 </p>
-                <p className="font-mono text-sm text-green-700">
+                <p className="font-mono text-sm text-[#0A0A0A]">
                   {format(task.completedAt, "MMM d, yyyy")}
                 </p>
               </div>

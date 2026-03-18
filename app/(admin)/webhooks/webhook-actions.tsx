@@ -87,7 +87,7 @@ export function WebhookActions({
       <button
         onClick={handleDelete}
         disabled={loading}
-        className={`${btnClass} text-red-700 border-red-300 hover:bg-red-50`}
+        className={`${btnClass} text-[#0A0A0A]/70 border-[#0A0A0A]/30 hover:bg-[#0A0A0A]/5`}
       >
         Delete
       </button>

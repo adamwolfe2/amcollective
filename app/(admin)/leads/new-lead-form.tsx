@@ -55,7 +55,7 @@ export function NewLeadForm() {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A0A0A]/40">
       <div className="bg-white border border-[#0A0A0A]/10 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-4 border-b border-[#0A0A0A]/10">
           <h2 className="font-serif text-lg font-bold text-[#0A0A0A]">

@@ -98,8 +98,8 @@ export default function SecurityPage() {
         <span
           className={`px-2 py-0.5 text-xs font-mono border ${
             activeCount === services.length
-              ? "border-emerald-700 bg-emerald-50 text-emerald-700"
-              : "border-amber-600 bg-amber-50 text-amber-600"
+              ? "border-[#0A0A0A] bg-[#0A0A0A] text-white"
+              : "border-[#0A0A0A]/30 bg-transparent text-[#0A0A0A]/70"
           }`}
         >
           {activeCount}/{services.length} active
@@ -120,14 +120,14 @@ export default function SecurityPage() {
               <div className="flex items-center gap-2">
                 <span
                   className={`w-2 h-2 shrink-0 ${
-                    service.connected ? "bg-emerald-500" : "bg-red-500"
+                    service.connected ? "bg-[#0A0A0A]" : "bg-[#0A0A0A]/25"
                   }`}
                 />
                 <span
                   className={`font-mono text-xs ${
                     service.connected
-                      ? "text-emerald-700"
-                      : "text-red-600"
+                      ? "text-[#0A0A0A]"
+                      : "text-[#0A0A0A]/50"
                   }`}
                 >
                   {service.connected ? "Active" : "Inactive"}

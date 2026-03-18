@@ -124,13 +124,13 @@ export function ArticleEditor({
         <button
           onClick={handleDelete}
           disabled={deleting}
-          className="px-4 py-2 border border-red-700 text-red-700 font-mono text-sm hover:bg-red-50 transition-colors disabled:opacity-50"
+          className="px-4 py-2 border border-[#0A0A0A]/30 text-[#0A0A0A]/70 font-mono text-sm hover:bg-[#0A0A0A]/5 transition-colors disabled:opacity-50"
         >
           {deleting ? "Deleting..." : "Delete Article"}
         </button>
         <div className="flex items-center gap-2">
           {saved && (
-            <span className="font-mono text-xs text-green-700">Saved</span>
+            <span className="font-mono text-xs text-[#0A0A0A]">Saved</span>
           )}
           <button
             onClick={save}

@@ -37,6 +37,7 @@ import {
   FileCheck,
   Zap,
 } from "lucide-react";
+import { statusDot, statusText, statusBadge } from "@/lib/ui/status-colors";
 
 function greeting() {
   const h = new Date().getHours();
@@ -401,7 +402,7 @@ function CardStat({
       <div className="flex items-baseline gap-1">
         <span
           className={`font-mono font-bold text-base leading-tight ${
-            alert ? "text-red-600" : "text-[#0A0A0A]"
+            alert ? statusText.negative : "text-[#0A0A0A]"
           }`}
         >
           {value}
@@ -662,10 +663,10 @@ async function TaskSpaceCard() {
               </div>
               {d.rocksOnTrack + d.rocksAtRisk + d.rocksBlocked + d.rocksCompleted > 0 && (
                 <div className="flex gap-0.5 h-1 mt-2">
-                  {d.rocksOnTrack > 0 && <div className="h-full bg-emerald-400" style={{ flex: d.rocksOnTrack }} title={`On-track: ${d.rocksOnTrack}`} />}
-                  {d.rocksAtRisk > 0 && <div className="h-full bg-amber-400" style={{ flex: d.rocksAtRisk }} title={`At-risk: ${d.rocksAtRisk}`} />}
-                  {d.rocksBlocked > 0 && <div className="h-full bg-red-400" style={{ flex: d.rocksBlocked }} title={`Blocked: ${d.rocksBlocked}`} />}
-                  {d.rocksCompleted > 0 && <div className="h-full bg-[#0A0A0A]/15" style={{ flex: d.rocksCompleted }} title={`Completed: ${d.rocksCompleted}`} />}
+                  {d.rocksOnTrack > 0 && <div className={`h-full ${statusDot.positive}`} style={{ flex: d.rocksOnTrack }} title={`On-track: ${d.rocksOnTrack}`} />}
+                  {d.rocksAtRisk > 0 && <div className={`h-full ${statusDot.warning}`} style={{ flex: d.rocksAtRisk }} title={`At-risk: ${d.rocksAtRisk}`} />}
+                  {d.rocksBlocked > 0 && <div className={`h-full ${statusDot.negative}`} style={{ flex: d.rocksBlocked }} title={`Blocked: ${d.rocksBlocked}`} />}
+                  {d.rocksCompleted > 0 && <div className={`h-full ${statusDot.neutral}`} style={{ flex: d.rocksCompleted }} title={`Completed: ${d.rocksCompleted}`} />}
                 </div>
               )}
             </div>
@@ -700,7 +701,7 @@ async function TBGCCard() {
           <div className="p-4 space-y-3 flex-1">
             {/* Stage badge */}
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider bg-amber-100 text-amber-700 border border-amber-200">
+              <span className={`inline-flex items-center px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${statusBadge.warning}`}>
                 {d.stage}
               </span>
               <span className="font-mono text-[9px] text-[#0A0A0A]/40">Custom B2B wholesale portal</span>
@@ -753,7 +754,7 @@ async function HookCard() {
           <div className="p-4 space-y-3 flex-1">
             {/* Stage badge */}
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider bg-blue-100 text-blue-700 border border-blue-200">
+              <span className={`inline-flex items-center px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider ${statusBadge.info}`}>
                 {d.stage}
               </span>
               <span className="font-mono text-[9px] text-[#0A0A0A]/40">AI viral content platform</span>
@@ -955,10 +956,10 @@ async function ActionsPanel() {
                   <span
                     className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${
                       item.severity === "critical"
-                        ? "bg-red-500"
+                        ? statusDot.positive
                         : item.severity === "warning"
-                          ? "bg-amber-500"
-                          : "bg-emerald-500"
+                          ? statusDot.warning
+                          : statusDot.info
                     }`}
                   />
                   <div className="min-w-0 flex-1">
@@ -1201,7 +1202,7 @@ function MetricPill({
       href={href}
       className={`block border bg-white px-3 py-2.5 hover:bg-[#0A0A0A]/[0.02] transition-colors ${
         alert
-          ? "border-red-300 border-l-2 border-l-red-500"
+          ? "border-[#0A0A0A]/30 border-l-2 border-l-[#0A0A0A]"
           : "border-[#0A0A0A]/10"
       }`}
     >

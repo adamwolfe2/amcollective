@@ -224,9 +224,21 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
   const isStreaming = status === "streaming";
   const isSubmitting = status === "submitted";
 
+  const loadConversations = useCallback(async () => {
+    try {
+      const res = await fetch("/api/ai/chat");
+      if (res.ok) {
+        const data = await res.json();
+        setConversations(data.conversations ?? []);
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
   useEffect(() => {
     loadConversations();
-  }, []);
+  }, [loadConversations]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -246,18 +258,6 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialMessage]);
-
-  const loadConversations = useCallback(async () => {
-    try {
-      const res = await fetch("/api/ai/chat");
-      if (res.ok) {
-        const data = await res.json();
-        setConversations(data.conversations ?? []);
-      }
-    } catch {
-      // Ignore
-    }
-  }, []);
 
   const handleNewChat = useCallback(() => {
     setActiveConvId(null);

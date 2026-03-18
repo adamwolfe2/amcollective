@@ -316,7 +316,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       {/* Mobile Sidebar Overlay */}
       {mobileOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/60 md:hidden"
+          className="fixed inset-0 z-40 bg-[#0A0A0A]/40 md:hidden"
           onClick={() => setMobileOpen(false)}
         />
       )}

@@ -27,19 +27,36 @@ export default async function ClientDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const client = await clientsRepo.getClient(id);
-  if (!client) notFound();
 
-  const [projects, invoices, activity, subs, recentPayments, billingSummary, kanbanCards] =
-    await Promise.all([
-      clientsRepo.getClientProjects(id),
-      getClientInvoices(id),
-      getEntityActivity("client", id),
-      clientsRepo.getClientSubscriptions(id),
-      clientsRepo.getClientPayments(id),
-      clientsRepo.getClientBillingSummary(id),
-      db.select().from(schema.kanbanCards).where(eq(schema.kanbanCards.clientId, id)),
-    ]);
+  let client;
+  let projects: Awaited<ReturnType<typeof clientsRepo.getClientProjects>> = [];
+  let invoices: Awaited<ReturnType<typeof getClientInvoices>> = [];
+  let activity: Awaited<ReturnType<typeof getEntityActivity>> = [];
+  let subs: Awaited<ReturnType<typeof clientsRepo.getClientSubscriptions>> = [];
+  let recentPayments: Awaited<ReturnType<typeof clientsRepo.getClientPayments>> = [];
+  let billingSummary: Awaited<ReturnType<typeof clientsRepo.getClientBillingSummary>> = { totalPaid: 0, totalInvoiced: 0, invoiceCount: 0, paidCount: 0, outstandingCount: 0, outstandingAmount: 0, avgDaysToPay: 0 };
+  let kanbanCards: (typeof schema.kanbanCards.$inferSelect)[] = [];
+
+  try {
+    client = await clientsRepo.getClient(id);
+    if (!client) notFound();
+
+    [projects, invoices, activity, subs, recentPayments, billingSummary, kanbanCards] =
+      await Promise.all([
+        clientsRepo.getClientProjects(id),
+        getClientInvoices(id),
+        getEntityActivity("client", id),
+        clientsRepo.getClientSubscriptions(id),
+        clientsRepo.getClientPayments(id),
+        clientsRepo.getClientBillingSummary(id),
+        db.select().from(schema.kanbanCards).where(eq(schema.kanbanCards.clientId, id)),
+      ]);
+  } catch (error) {
+    // Re-throw Next.js navigation errors (notFound, redirect)
+    if (error && typeof error === "object" && "digest" in error) throw error;
+    console.error("[client-detail] Failed to fetch client data:", error);
+    if (!client) notFound();
+  }
 
   return (
     <div>
@@ -326,7 +343,7 @@ export default async function ClientDetailPage({
                   : "\u2014"}
               </p>
               {billingSummary.outstandingCount > 0 && (
-                <p className="font-mono text-[10px] text-amber-600 mt-1">
+                <p className="font-mono text-[10px] text-[#0A0A0A]/60 mt-1">
                   {billingSummary.outstandingCount} outstanding ($
                   {(billingSummary.outstandingAmount / 100).toLocaleString()})
                 </p>
@@ -566,9 +583,9 @@ export default async function ClientDetailPage({
                       variant="outline"
                       className={`rounded-none text-[9px] uppercase font-mono tracking-wider shrink-0 ml-2 ${
                         card.priority === "urgent"
-                          ? "text-red-600 border-red-300"
+                          ? "text-[#0A0A0A] border-[#0A0A0A]"
                           : card.priority === "high"
-                            ? "text-amber-600 border-amber-300"
+                            ? "text-[#0A0A0A]/60 border-[#0A0A0A]/30"
                             : ""
                       }`}
                     >
@@ -656,9 +673,9 @@ function AccessBadge({ level }: { level: string }) {
 function InvoiceStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
     paid: "bg-[#0A0A0A] text-white border-[#0A0A0A]",
-    sent: "bg-transparent text-[#0A0A0A] border-[#0A0A0A]",
+    sent: "bg-[#0A0A0A]/5 text-[#0A0A0A]/60 border-[#0A0A0A]/25",
     draft: "bg-transparent text-[#0A0A0A]/40 border-[#0A0A0A]/15",
-    overdue: "bg-transparent text-red-700 border-red-300",
+    overdue: "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border-[#0A0A0A]/20",
     cancelled: "bg-transparent text-[#0A0A0A]/30 border-[#0A0A0A]/10 line-through",
   };
 
@@ -684,9 +701,9 @@ function formatCents(cents: number, currency: string) {
 
 function PaymentStatusBadge({ status }: { status: string | null }) {
   const styles: Record<string, string> = {
-    healthy: "bg-transparent text-green-700 border-green-400",
-    at_risk: "bg-transparent text-amber-700 border-amber-400",
-    failed: "bg-transparent text-red-700 border-red-400",
+    healthy: "bg-[#0A0A0A] text-white border-[#0A0A0A]",
+    at_risk: "bg-transparent text-[#0A0A0A]/70 border-[#0A0A0A]/30",
+    failed: "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border-[#0A0A0A]/20",
     churned: "bg-transparent text-[#0A0A0A]/30 border-[#0A0A0A]/10",
   };
 
@@ -706,13 +723,13 @@ function PaymentStatusBadge({ status }: { status: string | null }) {
 
 function SubscriptionStatusBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    active: "bg-transparent text-green-700 border-green-400",
-    past_due: "bg-transparent text-amber-700 border-amber-400",
+    active: "bg-[#0A0A0A] text-white border-[#0A0A0A]",
+    past_due: "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border-[#0A0A0A]/20",
     cancelled: "bg-transparent text-[#0A0A0A]/30 border-[#0A0A0A]/10",
-    trialing: "bg-transparent text-blue-700 border-blue-400",
-    paused: "bg-transparent text-[#0A0A0A]/50 border-[#0A0A0A]/20",
-    incomplete: "bg-transparent text-red-700 border-red-400",
-    unpaid: "bg-transparent text-red-700 border-red-400",
+    trialing: "bg-[#0A0A0A]/5 text-[#0A0A0A]/60 border-[#0A0A0A]/25",
+    paused: "bg-transparent text-[#0A0A0A]/70 border-[#0A0A0A]/30",
+    incomplete: "bg-transparent text-[#0A0A0A]/70 border-[#0A0A0A]/30",
+    unpaid: "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border-[#0A0A0A]/20",
   };
 
   return (
@@ -729,11 +746,11 @@ function SubscriptionStatusBadge({ status }: { status: string }) {
 
 function PaymentBadge({ status }: { status: string }) {
   const styles: Record<string, string> = {
-    succeeded: "bg-transparent text-green-700 border-green-400",
-    failed: "bg-transparent text-red-700 border-red-400",
-    refunded: "bg-transparent text-amber-700 border-amber-400",
+    succeeded: "bg-[#0A0A0A] text-white border-[#0A0A0A]",
+    failed: "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border-[#0A0A0A]/20",
+    refunded: "bg-transparent text-[#0A0A0A]/70 border-[#0A0A0A]/30",
     pending: "bg-transparent text-[#0A0A0A]/50 border-[#0A0A0A]/20",
-    partially_refunded: "bg-transparent text-amber-700 border-amber-400",
+    partially_refunded: "bg-transparent text-[#0A0A0A]/70 border-[#0A0A0A]/30",
   };
 
   return (

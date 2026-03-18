@@ -15,12 +15,12 @@ export default function MeetingsError({
   }, [error]);
 
   return (
-    <div className="flex items-center justify-center h-64 border border-red-200 bg-red-50/50">
+    <div className="flex items-center justify-center h-64 border border-[#0A0A0A]/20 bg-[#0A0A0A]/5">
       <div className="text-center space-y-3">
-        <p className="text-sm text-red-700 font-mono">
+        <p className="text-sm text-[#0A0A0A]/70 font-mono">
           Failed to load meetings
         </p>
-        <p className="text-xs text-red-500/60 font-mono max-w-md">
+        <p className="text-xs text-[#0A0A0A]/40 font-mono max-w-md">
           {error.message}
         </p>
         <button

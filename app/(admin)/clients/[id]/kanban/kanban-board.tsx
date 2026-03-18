@@ -59,8 +59,8 @@ interface KanbanBoardProps {
 // ─── Priority Colors ─────────────────────────────────────────────────────────
 
 const PRIORITY_STYLES: Record<string, string> = {
-  urgent: "text-red-600 border-red-300 bg-red-50",
-  high: "text-amber-600 border-amber-300 bg-amber-50",
+  urgent: "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border-[#0A0A0A]/20",
+  high: "bg-transparent text-[#0A0A0A]/70 border-[#0A0A0A]/30",
   medium: "text-[#0A0A0A]/60 border-[#0A0A0A]/20",
   low: "text-[#0A0A0A]/40 border-[#0A0A0A]/10",
 };
@@ -511,7 +511,7 @@ export function KanbanBoard({
                 <div className="pt-4 border-t border-[#0A0A0A]/10">
                   <button
                     onClick={() => deleteCard(selectedCard.id)}
-                    className="flex items-center gap-2 text-red-600 font-mono text-xs uppercase tracking-wider hover:text-red-800 transition-colors"
+                    className="flex items-center gap-2 text-[#0A0A0A]/70 font-mono text-xs uppercase tracking-wider hover:text-[#0A0A0A] transition-colors"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                     Delete Card

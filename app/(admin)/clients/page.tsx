@@ -57,15 +57,22 @@ export default async function ClientsPage({
         ? conditions[0]
         : undefined;
 
-  const [clientsList, totalCount] = await Promise.all([
-    db
-      .select()
-      .from(schema.clients)
-      .where(whereClause)
-      .orderBy(desc(schema.clients.currentMrr))
-      .limit(50),
-    clientsRepo.getClientCount(),
-  ]);
+  let clientsList: (typeof schema.clients.$inferSelect)[] = [];
+  let totalCount = 0;
+
+  try {
+    [clientsList, totalCount] = await Promise.all([
+      db
+        .select()
+        .from(schema.clients)
+        .where(whereClause)
+        .orderBy(desc(schema.clients.currentMrr))
+        .limit(50),
+      clientsRepo.getClientCount(),
+    ]);
+  } catch (error) {
+    console.error("[clients-list] Failed to fetch clients:", error);
+  }
 
   return (
     <div>
@@ -190,9 +197,9 @@ export default async function ClientsPage({
 
 function PaymentStatusBadge({ status }: { status: string | null }) {
   const styles: Record<string, string> = {
-    healthy: "bg-transparent text-green-700 border-green-400",
-    at_risk: "bg-transparent text-amber-700 border-amber-400",
-    failed: "bg-transparent text-red-700 border-red-400",
+    healthy: "bg-[#0A0A0A] text-white border-[#0A0A0A]",
+    at_risk: "bg-transparent text-[#0A0A0A]/70 border-[#0A0A0A]/30",
+    failed: "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border-[#0A0A0A]/20",
     churned: "bg-transparent text-[#0A0A0A]/30 border-[#0A0A0A]/10",
   };
 

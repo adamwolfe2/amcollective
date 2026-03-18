@@ -68,7 +68,7 @@ export function ThreadReplyForm({
         />
         <div className="flex items-center justify-between px-4 py-2 border-t border-[#0A0A0A]/5">
           {error && (
-            <span className="font-mono text-[10px] text-red-600">{error}</span>
+            <span className="font-mono text-[10px] text-[#0A0A0A]/70">{error}</span>
           )}
           {!error && <span />}
           <button

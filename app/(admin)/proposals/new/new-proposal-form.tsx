@@ -233,7 +233,7 @@ export function NewProposalForm({
               <button
                 type="button"
                 onClick={() => removeSection(idx)}
-                className="p-1 hover:bg-red-50"
+                className="p-1 hover:bg-[#0A0A0A]/5"
               >
                 <Trash2 className="h-3 w-3 text-[#0A0A0A]/40" />
               </button>
@@ -274,7 +274,7 @@ export function NewProposalForm({
               <button
                 type="button"
                 onClick={() => removeDeliverable(idx)}
-                className="p-1 hover:bg-red-50"
+                className="p-1 hover:bg-[#0A0A0A]/5"
               >
                 <Trash2 className="h-3 w-3 text-[#0A0A0A]/40" />
               </button>
@@ -347,7 +347,7 @@ export function NewProposalForm({
               <button
                 type="button"
                 onClick={() => removeLineItem(idx)}
-                className="p-1 hover:bg-red-50"
+                className="p-1 hover:bg-[#0A0A0A]/5"
               >
                 <Trash2 className="h-3 w-3 text-[#0A0A0A]/40" />
               </button>

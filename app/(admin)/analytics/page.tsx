@@ -229,7 +229,7 @@ export default async function AnalyticsPage() {
                 <div className="flex items-center gap-3">
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      isConfigured ? "bg-emerald-500" : "bg-[#0A0A0A]/20"
+                      isConfigured ? "bg-[#0A0A0A]" : "bg-[#0A0A0A]/20"
                     }`}
                   />
                   <span className="font-serif text-sm font-medium">

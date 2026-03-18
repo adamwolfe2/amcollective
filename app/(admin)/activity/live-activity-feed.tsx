@@ -15,11 +15,11 @@ type AuditEntry = {
 };
 
 const ACTION_COLORS: Record<string, string> = {
-  create: "bg-blue-600",
-  update: "bg-amber-600",
-  delete: "bg-red-600",
-  send: "bg-purple-600",
-  resolve: "bg-emerald-600",
+  create: "bg-[#0A0A0A]",
+  update: "bg-[#0A0A0A]/60",
+  delete: "bg-[#0A0A0A]/40",
+  send: "bg-[#0A0A0A]/50",
+  resolve: "bg-[#0A0A0A]/30",
 };
 
 function getActionColor(action: string): string {
@@ -72,7 +72,7 @@ export function LiveActivityFeed() {
       <div className="flex items-center gap-2 mb-4">
         <span
           className={`w-2 h-2 rounded-full ${
-            connected ? "bg-emerald-500 animate-pulse" : "bg-red-500"
+            connected ? "bg-[#0A0A0A] animate-pulse" : "bg-[#0A0A0A]/25"
           }`}
         />
         <span className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50">

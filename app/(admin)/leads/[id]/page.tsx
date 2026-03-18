@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { LeadDetailActions } from "./lead-detail-actions";
 import { AddActivityForm } from "./add-activity-form";
+import { getStatusBadge, leadStageCategory } from "@/lib/ui/status-colors";
 
 const STAGE_LABELS: Record<string, string> = {
   awareness: "Awareness",
@@ -25,16 +26,6 @@ const STAGE_LABELS: Record<string, string> = {
   closed_won: "Closed Won",
   closed_lost: "Closed Lost",
   nurture: "Nurture",
-};
-
-const STAGE_COLORS: Record<string, string> = {
-  awareness: "bg-gray-100 text-gray-700",
-  interest: "bg-blue-100 text-blue-700",
-  consideration: "bg-purple-100 text-purple-700",
-  intent: "bg-amber-100 text-amber-700",
-  closed_won: "bg-green-100 text-green-700",
-  closed_lost: "bg-red-100 text-red-700",
-  nurture: "bg-cyan-100 text-cyan-700",
 };
 
 const ACTIVITY_LABELS: Record<string, string> = {
@@ -92,7 +83,7 @@ export default async function LeadDetailPage({
           )}
         </div>
         <span
-          className={`px-3 py-1 font-mono text-xs ${STAGE_COLORS[lead.stage]}`}
+          className={`px-3 py-1 font-mono text-xs ${getStatusBadge(lead.stage, leadStageCategory)}`}
         >
           {STAGE_LABELS[lead.stage]}
         </span>

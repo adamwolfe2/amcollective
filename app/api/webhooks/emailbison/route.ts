@@ -13,14 +13,12 @@ import { createAuditLog } from "@/lib/db/repositories/audit";
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify shared secret via X-API-Key header
+    // Verify shared secret via X-API-Key header (fail closed if env var missing)
     const expectedKey = process.env.EMAILBISON_API_KEY;
-    if (expectedKey) {
-      const providedKey = request.headers.get("x-api-key");
-      if (providedKey !== expectedKey) {
-        console.warn("[EmailBison Webhook] Invalid or missing X-API-Key header");
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+    const providedKey = request.headers.get("x-api-key");
+    if (!expectedKey || providedKey !== expectedKey) {
+      console.warn("[EmailBison Webhook] Invalid or missing X-API-Key header");
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json();

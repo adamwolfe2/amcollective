@@ -66,17 +66,17 @@ function fmtMo(cents: number): string {
 
 function PriorityBadge({ priority }: { priority: number }) {
   if (priority === 2) return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-red-50 text-red-700 border border-red-200 rounded">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-[#0A0A0A] text-white border border-[#0A0A0A] rounded-none">
       <AlertTriangle className="h-3 w-3" /> URGENT
     </span>
   );
   if (priority === 1) return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-transparent text-[#0A0A0A]/70 border border-[#0A0A0A]/30 rounded-none">
       <Zap className="h-3 w-3" /> ACTION
     </span>
   );
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 rounded">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-[#0A0A0A]/5 text-[#0A0A0A]/60 border border-[#0A0A0A]/25 rounded-none">
       INFO
     </span>
   );
@@ -85,24 +85,24 @@ function PriorityBadge({ priority }: { priority: number }) {
 function TypeIcon({ type }: { type: string }) {
   const cls = "h-4 w-4";
   switch (type) {
-    case "revenue_opportunity": return <DollarSign className={`${cls} text-green-600`} />;
-    case "cost_reduction": return <TrendingDown className={`${cls} text-blue-600`} />;
-    case "risk": return <Shield className={`${cls} text-red-600`} />;
-    case "growth": return <TrendingUp className={`${cls} text-purple-600`} />;
-    default: return <BarChart3 className={`${cls} text-gray-600`} />;
+    case "revenue_opportunity": return <DollarSign className={`${cls} text-[#0A0A0A]`} />;
+    case "cost_reduction": return <TrendingDown className={`${cls} text-[#0A0A0A]/60`} />;
+    case "risk": return <Shield className={`${cls} text-[#0A0A0A]/70`} />;
+    case "growth": return <TrendingUp className={`${cls} text-[#0A0A0A]/50`} />;
+    default: return <BarChart3 className={`${cls} text-[#0A0A0A]/40`} />;
   }
 }
 
 function HealthScoreMeter({ score }: { score: number }) {
-  const color = score >= 80 ? "bg-green-500" : score >= 60 ? "bg-amber-500" : score >= 40 ? "bg-orange-500" : "bg-red-500";
+  const color = score >= 80 ? "bg-[#0A0A0A]" : score >= 60 ? "bg-[#0A0A0A]/60" : score >= 40 ? "bg-[#0A0A0A]/40" : "bg-[#0A0A0A]/25";
   const label = score >= 80 ? "Healthy" : score >= 60 ? "Needs Attention" : score >= 40 ? "At Risk" : "Critical";
   return (
     <div className="flex items-center gap-2">
-      <div className="flex-1 h-2 bg-gray-100 border border-gray-200 rounded-none overflow-hidden">
+      <div className="flex-1 h-2 bg-[#0A0A0A]/5 border border-[#0A0A0A]/10 rounded-none overflow-hidden">
         <div className={`h-full ${color} transition-all`} style={{ width: `${score}%` }} />
       </div>
-      <span className="text-xs font-mono font-semibold text-gray-700">{score}/100</span>
-      <span className="text-xs text-gray-500">{label}</span>
+      <span className="text-xs font-mono font-semibold text-[#0A0A0A]">{score}/100</span>
+      <span className="text-xs text-[#0A0A0A]/50">{label}</span>
     </div>
   );
 }
@@ -128,10 +128,10 @@ function RecommendationCard({
   };
 
   return (
-    <div className={`border border-gray-200 bg-white ${rec.priority === 2 ? "border-l-4 border-l-red-500" : rec.priority === 1 ? "border-l-4 border-l-amber-400" : ""}`}>
+    <div className={`border border-[#0A0A0A]/10 bg-white ${rec.priority === 2 ? "border-l-4 border-l-[#0A0A0A]" : rec.priority === 1 ? "border-l-4 border-l-[#0A0A0A]/40" : ""}`}>
       <button
         type="button"
-        className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-gray-50 transition-colors"
+        className="w-full text-left px-4 py-3 flex items-start gap-3 hover:bg-[#0A0A0A]/5 transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex-shrink-0 mt-0.5">
@@ -140,47 +140,47 @@ function RecommendationCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <PriorityBadge priority={rec.priority} />
-            <span className="text-xs text-gray-400 uppercase tracking-wide font-medium">
+            <span className="text-xs text-[#0A0A0A]/40 uppercase tracking-wide font-medium">
               {typeLabel[rec.type] ?? rec.type}
             </span>
             {rec.product && (
-              <span className="text-xs px-1.5 py-0.5 bg-gray-100 border border-gray-200 text-gray-600 rounded font-mono">
+              <span className="text-xs px-1.5 py-0.5 bg-[#0A0A0A]/5 border border-[#0A0A0A]/10 text-[#0A0A0A]/60 rounded-none font-mono">
                 {rec.product}
               </span>
             )}
             {rec.estimatedValueCents && (
-              <span className="text-xs font-semibold text-green-700">
+              <span className="text-xs font-semibold text-[#0A0A0A]">
                 ~{fmtMo(rec.estimatedValueCents)} impact
               </span>
             )}
           </div>
-          <p className="text-sm font-semibold text-gray-900 leading-snug">{rec.title}</p>
+          <p className="text-sm font-semibold text-[#0A0A0A] leading-snug">{rec.title}</p>
         </div>
-        <ChevronRight className={`h-4 w-4 text-gray-400 flex-shrink-0 mt-1 transition-transform ${expanded ? "rotate-90" : ""}`} />
+        <ChevronRight className={`h-4 w-4 text-[#0A0A0A]/30 flex-shrink-0 mt-1 transition-transform ${expanded ? "rotate-90" : ""}`} />
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 border-t border-gray-100">
+        <div className="px-4 pb-4 border-t border-[#0A0A0A]/10">
           <div className="pt-3 space-y-3">
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Situation</p>
-              <p className="text-sm text-gray-700 leading-relaxed">{rec.situation}</p>
+              <p className="text-xs font-semibold text-[#0A0A0A]/50 uppercase tracking-wide mb-1">Situation</p>
+              <p className="text-sm text-[#0A0A0A]/70 leading-relaxed">{rec.situation}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Recommended Action</p>
-              <p className="text-sm text-gray-900 font-medium leading-relaxed">{rec.recommendation}</p>
+              <p className="text-xs font-semibold text-[#0A0A0A]/50 uppercase tracking-wide mb-1">Recommended Action</p>
+              <p className="text-sm text-[#0A0A0A] font-medium leading-relaxed">{rec.recommendation}</p>
             </div>
             <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Expected Impact</p>
-              <p className="text-sm text-gray-700 leading-relaxed">{rec.expectedImpact}</p>
+              <p className="text-xs font-semibold text-[#0A0A0A]/50 uppercase tracking-wide mb-1">Expected Impact</p>
+              <p className="text-sm text-[#0A0A0A]/70 leading-relaxed">{rec.expectedImpact}</p>
             </div>
 
             <div className="flex items-center gap-2 pt-1 flex-wrap">
               {rec.effort && (
-                <span className={`text-xs px-2 py-0.5 border rounded font-medium ${
-                  rec.effort === "low" ? "bg-green-50 text-green-700 border-green-200" :
-                  rec.effort === "medium" ? "bg-amber-50 text-amber-700 border-amber-200" :
-                  "bg-red-50 text-red-700 border-red-200"
+                <span className={`text-xs px-2 py-0.5 border rounded-none font-medium ${
+                  rec.effort === "low" ? "bg-[#0A0A0A]/5 text-[#0A0A0A] border-[#0A0A0A]/20" :
+                  rec.effort === "medium" ? "bg-transparent text-[#0A0A0A]/70 border-[#0A0A0A]/30" :
+                  "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border-[#0A0A0A]/20"
                 }`}>
                   {rec.effort.charAt(0).toUpperCase() + rec.effort.slice(1)} effort
                 </span>
@@ -190,7 +190,7 @@ function RecommendationCard({
                 type="button"
                 disabled={updating}
                 onClick={() => startUpdate(() => onUpdate(rec.id, "done"))}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-gray-900 text-white hover:bg-gray-700 border border-gray-900 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#0A0A0A] text-white hover:bg-[#0A0A0A]/80 border border-[#0A0A0A] transition-colors disabled:opacity-50"
               >
                 <CheckCircle className="h-3.5 w-3.5" />
                 Mark Done
@@ -199,7 +199,7 @@ function RecommendationCard({
                 type="button"
                 disabled={updating}
                 onClick={() => startUpdate(() => onUpdate(rec.id, "dismissed"))}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 transition-colors disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#0A0A0A]/50 hover:text-[#0A0A0A]/70 border border-[#0A0A0A]/10 hover:border-[#0A0A0A]/20 transition-colors disabled:opacity-50"
               >
                 <XCircle className="h-3.5 w-3.5" />
                 Dismiss
@@ -277,10 +277,10 @@ export function StrategyClient({
     .sort((a, b) => b[1].marginPct - a[1].marginPct)[0];
 
   const riskColors: Record<string, string> = {
-    low: "text-green-700",
-    medium: "text-amber-700",
-    high: "text-orange-700",
-    critical: "text-red-700",
+    low: "text-[#0A0A0A]",
+    medium: "text-[#0A0A0A]/60",
+    high: "text-[#0A0A0A]/70",
+    critical: "text-[#0A0A0A]/70",
   };
 
   return (
@@ -288,26 +288,26 @@ export function StrategyClient({
       {/* ── Run Analysis Bar ─────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 tracking-tight">Strategic Command</h1>
+          <h1 className="text-xl font-bold text-[#0A0A0A] tracking-tight">Strategic Command</h1>
           {metrics?.weekOf && (
-            <p className="text-xs text-gray-500 mt-0.5">
+            <p className="text-xs text-[#0A0A0A]/50 mt-0.5">
               Last analysis: week of {metrics.weekOf}
               {metrics.executiveSummary && (
-                <span className="ml-2 text-gray-600"> — {metrics.executiveSummary}</span>
+                <span className="ml-2 text-[#0A0A0A]/60"> — {metrics.executiveSummary}</span>
               )}
             </p>
           )}
         </div>
         <div className="flex items-center gap-2">
           {runMessage && (
-            <span className="text-xs text-gray-500 animate-pulse">{runMessage}</span>
+            <span className="text-xs text-[#0A0A0A]/50 animate-pulse">{runMessage}</span>
           )}
           <Button
             variant="outline"
             size="sm"
             disabled={running}
             onClick={() => handleRunAnalysis(false)}
-            className="border-gray-200 text-gray-700 hover:bg-gray-50 rounded-none"
+            className="border-[#0A0A0A]/10 text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/5 rounded-none"
           >
             <RefreshCw className={`h-3.5 w-3.5 mr-1.5 ${running ? "animate-spin" : ""}`} />
             Run Analysis
@@ -316,7 +316,7 @@ export function StrategyClient({
             size="sm"
             disabled={running}
             onClick={() => handleRunAnalysis(true)}
-            className="bg-gray-900 text-white hover:bg-gray-700 rounded-none text-xs"
+            className="bg-[#0A0A0A] text-white hover:bg-[#0A0A0A]/80 rounded-none text-xs"
           >
             <Zap className="h-3.5 w-3.5 mr-1.5" />
             Deep Analysis (Opus)
@@ -326,19 +326,19 @@ export function StrategyClient({
 
       {/* ── Executive Strip ──────────────────────────────────────────────── */}
       {metrics && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border border-gray-200">
-          <div className="p-4 border-r border-gray-200">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">Cash Runway</p>
-            <p className={`text-2xl font-bold font-mono ${runway !== null && runway < 6 ? "text-red-700" : runway !== null && runway < 12 ? "text-amber-700" : "text-gray-900"}`}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-0 border border-[#0A0A0A]/10">
+          <div className="p-4 border-r border-[#0A0A0A]/10">
+            <p className="text-xs text-[#0A0A0A]/50 uppercase tracking-wide font-medium mb-1">Cash Runway</p>
+            <p className={`text-2xl font-bold font-mono ${runway !== null && runway < 6 ? "text-[#0A0A0A]/70" : runway !== null && runway < 12 ? "text-[#0A0A0A]/60" : "text-[#0A0A0A]"}`}>
               {runway !== null ? `${runway}mo` : "—"}
             </p>
             {metrics.totalCashCents > 0 && (
-              <p className="text-xs text-gray-500 mt-0.5">{fmtCents(metrics.totalCashCents)} on hand</p>
+              <p className="text-xs text-[#0A0A0A]/50 mt-0.5">{fmtCents(metrics.totalCashCents)} on hand</p>
             )}
           </div>
-          <div className="p-4 border-r border-gray-200">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">MRR Growth</p>
-            <p className={`text-2xl font-bold font-mono flex items-center gap-1 ${growth === null ? "text-gray-400" : growth > 0 ? "text-green-700" : growth < 0 ? "text-red-700" : "text-gray-600"}`}>
+          <div className="p-4 border-r border-[#0A0A0A]/10">
+            <p className="text-xs text-[#0A0A0A]/50 uppercase tracking-wide font-medium mb-1">MRR Growth</p>
+            <p className={`text-2xl font-bold font-mono flex items-center gap-1 ${growth === null ? "text-[#0A0A0A]/30" : growth > 0 ? "text-[#0A0A0A]" : growth < 0 ? "text-[#0A0A0A]/70" : "text-[#0A0A0A]/60"}`}>
               {growth === null ? "—" : (
                 <>
                   {growth > 0 ? <TrendingUp className="h-5 w-5" /> : growth < 0 ? <TrendingDown className="h-5 w-5" /> : <Minus className="h-5 w-5" />}
@@ -346,28 +346,28 @@ export function StrategyClient({
                 </>
               )}
             </p>
-            <p className="text-xs text-gray-500 mt-0.5">vs 30 days ago</p>
+            <p className="text-xs text-[#0A0A0A]/50 mt-0.5">vs 30 days ago</p>
           </div>
-          <div className="p-4 border-r border-gray-200">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-1">Best Margin</p>
+          <div className="p-4 border-r border-[#0A0A0A]/10">
+            <p className="text-xs text-[#0A0A0A]/50 uppercase tracking-wide font-medium mb-1">Best Margin</p>
             {bestMarginProduct ? (
               <>
-                <p className="text-2xl font-bold font-mono text-gray-900">{bestMarginProduct[1].marginPct}%</p>
-                <p className="text-xs text-gray-500 mt-0.5 capitalize">{bestMarginProduct[0]}</p>
+                <p className="text-2xl font-bold font-mono text-[#0A0A0A]">{bestMarginProduct[1].marginPct}%</p>
+                <p className="text-xs text-[#0A0A0A]/50 mt-0.5 capitalize">{bestMarginProduct[0]}</p>
               </>
             ) : (
-              <p className="text-2xl font-bold font-mono text-gray-400">—</p>
+              <p className="text-2xl font-bold font-mono text-[#0A0A0A]/30">—</p>
             )}
           </div>
           <div className="p-4">
-            <p className="text-xs text-gray-500 uppercase tracking-wide font-medium mb-2">Health Score</p>
+            <p className="text-xs text-[#0A0A0A]/50 uppercase tracking-wide font-medium mb-2">Health Score</p>
             {healthScore !== null ? (
               <HealthScoreMeter score={healthScore} />
             ) : (
-              <p className="text-sm text-gray-400">No data yet</p>
+              <p className="text-sm text-[#0A0A0A]/30">No data yet</p>
             )}
             {metrics.riskLevel && (
-              <p className={`text-xs font-semibold mt-1 capitalize ${riskColors[metrics.riskLevel] ?? "text-gray-600"}`}>
+              <p className={`text-xs font-semibold mt-1 capitalize ${riskColors[metrics.riskLevel] ?? "text-[#0A0A0A]/60"}`}>
                 Risk: {metrics.riskLevel}
               </p>
             )}
@@ -381,31 +381,31 @@ export function StrategyClient({
         {/* ── Recommendations (3/5 width) ──────────────────────────────── */}
         <div className="lg:col-span-3 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide">
+            <h2 className="text-sm font-bold text-[#0A0A0A] uppercase tracking-wide">
               AI Recommendations
             </h2>
             <div className="flex items-center gap-2">
               {urgentCount > 0 && (
-                <span className="text-xs font-semibold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5 rounded">
+                <span className="text-xs font-semibold text-white bg-[#0A0A0A] border border-[#0A0A0A] px-2 py-0.5 rounded-none">
                   {urgentCount} urgent
                 </span>
               )}
               {actionCount > 0 && (
-                <span className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                <span className="text-xs font-semibold text-[#0A0A0A]/70 bg-transparent border border-[#0A0A0A]/30 px-2 py-0.5 rounded-none">
                   {actionCount} action
                 </span>
               )}
               {sortedRecs.length === 0 && (
-                <span className="text-xs text-gray-400">No active recommendations</span>
+                <span className="text-xs text-[#0A0A0A]/30">No active recommendations</span>
               )}
             </div>
           </div>
 
           {sortedRecs.length === 0 ? (
-            <div className="border border-dashed border-gray-200 p-8 text-center">
-              <BarChart3 className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm text-gray-500">No active recommendations.</p>
-              <p className="text-xs text-gray-400 mt-1">Run an analysis to generate strategic insights.</p>
+            <div className="border border-dashed border-[#0A0A0A]/10 p-8 text-center">
+              <BarChart3 className="h-8 w-8 text-[#0A0A0A]/20 mx-auto mb-2" />
+              <p className="text-sm text-[#0A0A0A]/50">No active recommendations.</p>
+              <p className="text-xs text-[#0A0A0A]/30 mt-1">Run an analysis to generate strategic insights.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -420,34 +420,34 @@ export function StrategyClient({
         <div className="lg:col-span-2 space-y-4">
 
           {/* Product Profitability */}
-          <div className="border border-gray-200 bg-white">
-            <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
-              <h2 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Product Profitability</h2>
-              <span className="text-xs text-gray-400">monthly</span>
+          <div className="border border-[#0A0A0A]/10 bg-white">
+            <div className="px-4 py-3 border-b border-[#0A0A0A]/10 flex items-center justify-between">
+              <h2 className="text-xs font-bold text-[#0A0A0A]/70 uppercase tracking-wide">Product Profitability</h2>
+              <span className="text-xs text-[#0A0A0A]/30">monthly</span>
             </div>
             {Object.keys(productMargins).length === 0 ? (
-              <div className="p-4 text-center text-xs text-gray-400">Run analysis to populate</div>
+              <div className="p-4 text-center text-xs text-[#0A0A0A]/30">Run analysis to populate</div>
             ) : (
               <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="text-left px-4 py-2 text-xs text-gray-500 font-medium">Product</th>
-                    <th className="text-right px-2 py-2 text-xs text-gray-500 font-medium">Rev</th>
-                    <th className="text-right px-2 py-2 text-xs text-gray-500 font-medium">Cost</th>
-                    <th className="text-right px-4 py-2 text-xs text-gray-500 font-medium">Margin</th>
+                  <tr className="border-b border-[#0A0A0A]/5">
+                    <th className="text-left px-4 py-2 text-xs text-[#0A0A0A]/50 font-medium">Product</th>
+                    <th className="text-right px-2 py-2 text-xs text-[#0A0A0A]/50 font-medium">Rev</th>
+                    <th className="text-right px-2 py-2 text-xs text-[#0A0A0A]/50 font-medium">Cost</th>
+                    <th className="text-right px-4 py-2 text-xs text-[#0A0A0A]/50 font-medium">Margin</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-[#0A0A0A]/5">
                   {Object.entries(productMargins)
                     .sort((a, b) => b[1].mrrCents - a[1].mrrCents)
                     .map(([tag, m]) => (
-                      <tr key={tag} className="hover:bg-gray-50">
-                        <td className="px-4 py-2 text-xs font-medium text-gray-700 capitalize">{tag}</td>
-                        <td className="px-2 py-2 text-xs text-right font-mono text-gray-700">{fmtCents(m.mrrCents)}</td>
-                        <td className="px-2 py-2 text-xs text-right font-mono text-gray-500">{fmtCents(m.costCents)}</td>
+                      <tr key={tag} className="hover:bg-[#0A0A0A]/5">
+                        <td className="px-4 py-2 text-xs font-medium text-[#0A0A0A]/70 capitalize">{tag}</td>
+                        <td className="px-2 py-2 text-xs text-right font-mono text-[#0A0A0A]/70">{fmtCents(m.mrrCents)}</td>
+                        <td className="px-2 py-2 text-xs text-right font-mono text-[#0A0A0A]/50">{fmtCents(m.costCents)}</td>
                         <td className="px-4 py-2 text-right">
-                          <span className={`text-xs font-bold font-mono ${m.marginPct >= 70 ? "text-green-700" : m.marginPct >= 50 ? "text-amber-700" : "text-red-700"}`}>
+                          <span className={`text-xs font-bold font-mono ${m.marginPct >= 70 ? "text-[#0A0A0A]" : m.marginPct >= 50 ? "text-[#0A0A0A]/60" : "text-[#0A0A0A]/70"}`}>
                             {m.marginPct}%
                           </span>
                         </td>
@@ -456,16 +456,16 @@ export function StrategyClient({
                 </tbody>
                 {metrics && (
                   <tfoot>
-                    <tr className="border-t border-gray-200 bg-gray-50">
-                      <td className="px-4 py-2 text-xs font-bold text-gray-700">Platform</td>
-                      <td className="px-2 py-2 text-xs text-right font-mono font-bold text-gray-700">
+                    <tr className="border-t border-[#0A0A0A]/10 bg-[#0A0A0A]/5">
+                      <td className="px-4 py-2 text-xs font-bold text-[#0A0A0A]/70">Platform</td>
+                      <td className="px-2 py-2 text-xs text-right font-mono font-bold text-[#0A0A0A]/70">
                         {fmtCents(metrics.totalMrrCents)}
                       </td>
-                      <td className="px-2 py-2 text-xs text-right font-mono text-gray-500">
+                      <td className="px-2 py-2 text-xs text-right font-mono text-[#0A0A0A]/50">
                         {fmtCents(metrics.monthlyBurnCents)}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        <span className="text-xs font-bold font-mono text-gray-900">
+                        <span className="text-xs font-bold font-mono text-[#0A0A0A]">
                           {metrics.totalMrrCents > 0
                             ? `${Math.round(((metrics.totalMrrCents - metrics.monthlyBurnCents) / metrics.totalMrrCents) * 100)}%`
                             : "—"}
@@ -481,25 +481,25 @@ export function StrategyClient({
 
           {/* Revenue Forecast */}
           {forecast.length > 0 && (
-            <div className="border border-gray-200 bg-white">
-              <div className="px-4 py-3 border-b border-gray-200">
-                <h2 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Revenue Forecast</h2>
-                <p className="text-xs text-gray-400 mt-0.5">Based on current growth trajectory</p>
+            <div className="border border-[#0A0A0A]/10 bg-white">
+              <div className="px-4 py-3 border-b border-[#0A0A0A]/10">
+                <h2 className="text-xs font-bold text-[#0A0A0A]/70 uppercase tracking-wide">Revenue Forecast</h2>
+                <p className="text-xs text-[#0A0A0A]/30 mt-0.5">Based on current growth trajectory</p>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-[#0A0A0A]/5">
                 {forecast.map((f, i) => {
                   const current = metrics?.totalMrrCents ?? 0;
                   const growthAmt = f.projectedMrrCents - current;
                   return (
                     <div key={f.month} className="px-4 py-3 flex items-center justify-between">
                       <div>
-                        <p className="text-xs font-medium text-gray-700">{f.month}</p>
-                        <p className="text-xs text-gray-400">Month +{i + 1}</p>
+                        <p className="text-xs font-medium text-[#0A0A0A]/70">{f.month}</p>
+                        <p className="text-xs text-[#0A0A0A]/30">Month +{i + 1}</p>
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-bold font-mono text-gray-900">{fmtCents(f.projectedMrrCents)}</p>
+                        <p className="text-sm font-bold font-mono text-[#0A0A0A]">{fmtCents(f.projectedMrrCents)}</p>
                         {growthAmt > 0 && (
-                          <p className="text-xs text-green-700 font-medium">+{fmtCents(growthAmt)}</p>
+                          <p className="text-xs text-[#0A0A0A] font-medium">+{fmtCents(growthAmt)}</p>
                         )}
                       </div>
                     </div>
@@ -511,20 +511,20 @@ export function StrategyClient({
 
           {/* Risk Register */}
           {metrics && (
-            <div className="border border-gray-200 bg-white">
-              <div className="px-4 py-3 border-b border-gray-200">
-                <h2 className="text-xs font-bold text-gray-700 uppercase tracking-wide">Risk Register</h2>
+            <div className="border border-[#0A0A0A]/10 bg-white">
+              <div className="px-4 py-3 border-b border-[#0A0A0A]/10">
+                <h2 className="text-xs font-bold text-[#0A0A0A]/70 uppercase tracking-wide">Risk Register</h2>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-[#0A0A0A]/5">
                 {/* Runway risk */}
                 {runway !== null && (
                   <div className="px-4 py-3 flex items-start gap-3">
-                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${runway < 6 ? "bg-red-100 text-red-700" : runway < 12 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${runway < 6 ? "bg-[#0A0A0A]/10 text-[#0A0A0A]/70" : runway < 12 ? "bg-[#0A0A0A]/8 text-[#0A0A0A]/60" : "bg-[#0A0A0A]/5 text-[#0A0A0A]"}`}>
                       {runway < 6 ? "HIGH" : runway < 12 ? "MED" : "LOW"}
                     </span>
                     <div>
-                      <p className="text-xs font-medium text-gray-800">Cash Runway</p>
-                      <p className="text-xs text-gray-500">{runway}mo at {fmtMo(metrics.monthlyBurnCents)} burn</p>
+                      <p className="text-xs font-medium text-[#0A0A0A]">Cash Runway</p>
+                      <p className="text-xs text-[#0A0A0A]/50">{runway}mo at {fmtMo(metrics.monthlyBurnCents)} burn</p>
                     </div>
                   </div>
                 )}
@@ -532,12 +532,12 @@ export function StrategyClient({
                 {/* Concentration risk */}
                 {metrics.concentrationPct !== null && (
                   <div className="px-4 py-3 flex items-start gap-3">
-                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${metrics.concentrationPct > 60 ? "bg-red-100 text-red-700" : metrics.concentrationPct > 40 ? "bg-amber-100 text-amber-700" : "bg-green-100 text-green-700"}`}>
+                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${metrics.concentrationPct > 60 ? "bg-[#0A0A0A]/10 text-[#0A0A0A]/70" : metrics.concentrationPct > 40 ? "bg-[#0A0A0A]/8 text-[#0A0A0A]/60" : "bg-[#0A0A0A]/5 text-[#0A0A0A]"}`}>
                       {metrics.concentrationPct > 60 ? "HIGH" : metrics.concentrationPct > 40 ? "MED" : "LOW"}
                     </span>
                     <div>
-                      <p className="text-xs font-medium text-gray-800">Revenue Concentration</p>
-                      <p className="text-xs text-gray-500">Top product = {metrics.concentrationPct}% of MRR</p>
+                      <p className="text-xs font-medium text-[#0A0A0A]">Revenue Concentration</p>
+                      <p className="text-xs text-[#0A0A0A]/50">Top product = {metrics.concentrationPct}% of MRR</p>
                     </div>
                   </div>
                 )}
@@ -545,18 +545,18 @@ export function StrategyClient({
                 {/* Urgent recommendations as risks */}
                 {urgentCount > 0 && (
                   <div className="px-4 py-3 flex items-start gap-3">
-                    <span className="text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 bg-red-100 text-red-700">
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded flex-shrink-0 bg-[#0A0A0A]/10 text-[#0A0A0A]/70">
                       HIGH
                     </span>
                     <div>
-                      <p className="text-xs font-medium text-gray-800">Open Urgent Items</p>
-                      <p className="text-xs text-gray-500">{urgentCount} recommendation{urgentCount > 1 ? "s" : ""} require immediate action</p>
+                      <p className="text-xs font-medium text-[#0A0A0A]">Open Urgent Items</p>
+                      <p className="text-xs text-[#0A0A0A]/50">{urgentCount} recommendation{urgentCount > 1 ? "s" : ""} require immediate action</p>
                     </div>
                   </div>
                 )}
 
                 {runway === null && metrics.concentrationPct === null && urgentCount === 0 && (
-                  <div className="px-4 py-3 text-xs text-gray-400 text-center">Run analysis to populate risk register</div>
+                  <div className="px-4 py-3 text-xs text-[#0A0A0A]/30 text-center">Run analysis to populate risk register</div>
                 )}
               </div>
             </div>
@@ -564,22 +564,22 @@ export function StrategyClient({
 
           {/* Completed / Dismissed */}
           {recommendations.filter((r) => r.status === "done" || r.status === "dismissed").length > 0 && (
-            <div className="border border-gray-100 bg-gray-50">
-              <div className="px-4 py-3 border-b border-gray-100">
-                <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+            <div className="border border-[#0A0A0A]/5 bg-[#0A0A0A]/5">
+              <div className="px-4 py-3 border-b border-[#0A0A0A]/5">
+                <h2 className="text-xs font-bold text-[#0A0A0A]/30 uppercase tracking-wide flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5" /> Resolved
                 </h2>
               </div>
-              <div className="divide-y divide-gray-100">
+              <div className="divide-y divide-[#0A0A0A]/5">
                 {recommendations
                   .filter((r) => r.status === "done" || r.status === "dismissed")
                   .slice(0, 5)
                   .map((r) => (
                     <div key={r.id} className="px-4 py-2.5 flex items-center gap-2">
                       {r.status === "done"
-                        ? <CheckCircle className="h-3.5 w-3.5 text-green-500 flex-shrink-0" />
-                        : <XCircle className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />}
-                      <p className="text-xs text-gray-500 line-through truncate">{r.title}</p>
+                        ? <CheckCircle className="h-3.5 w-3.5 text-[#0A0A0A] flex-shrink-0" />
+                        : <XCircle className="h-3.5 w-3.5 text-[#0A0A0A]/30 flex-shrink-0" />}
+                      <p className="text-xs text-[#0A0A0A]/50 line-through truncate">{r.title}</p>
                     </div>
                   ))}
               </div>

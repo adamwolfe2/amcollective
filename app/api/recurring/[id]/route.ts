@@ -5,12 +5,35 @@
  */
 
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+
+const lineItemSchema = z.object({
+  description: z.string().min(1).max(500),
+  quantity: z.number().min(0),
+  unitPrice: z.number().int().min(0),
+  amount: z.number().int().min(0),
+});
+
+const recurringUpdateSchema = z.object({
+  lineItems: z.array(lineItemSchema).min(1),
+  subtotal: z.number().int().min(0),
+  taxRate: z.number().int().min(0).max(10000),
+  taxAmount: z.number().int().min(0),
+  total: z.number().int().min(0),
+  paymentTerms: z.string().max(200),
+  notes: z.string().max(10000).nullable(),
+  interval: z.enum(["weekly", "biweekly", "monthly", "quarterly", "annual"]),
+  endDate: z.string().nullable(),
+  nextBillingDate: z.string(),
+  autoSend: z.boolean(),
+  status: z.enum(["active", "paused", "cancelled"]),
+}).partial().refine(data => Object.keys(data).length > 0, "At least one field required");
 
 export async function GET(
   _req: Request,
@@ -68,25 +91,35 @@ export async function PATCH(
     const { id } = await params;
     const body = await req.json();
 
+    const parsed = recurringUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
+
     const [updated] = await db
       .update(schema.recurringInvoices)
       .set({
-        ...(body.lineItems !== undefined && { lineItems: body.lineItems }),
-        ...(body.subtotal !== undefined && { subtotal: body.subtotal }),
-        ...(body.taxRate !== undefined && { taxRate: body.taxRate }),
-        ...(body.taxAmount !== undefined && { taxAmount: body.taxAmount }),
-        ...(body.total !== undefined && { total: body.total }),
-        ...(body.paymentTerms !== undefined && {
-          paymentTerms: body.paymentTerms,
+        ...(data.lineItems !== undefined && { lineItems: data.lineItems }),
+        ...(data.subtotal !== undefined && { subtotal: data.subtotal }),
+        ...(data.taxRate !== undefined && { taxRate: data.taxRate }),
+        ...(data.taxAmount !== undefined && { taxAmount: data.taxAmount }),
+        ...(data.total !== undefined && { total: data.total }),
+        ...(data.paymentTerms !== undefined && {
+          paymentTerms: data.paymentTerms,
         }),
-        ...(body.notes !== undefined && { notes: body.notes }),
-        ...(body.interval !== undefined && { interval: body.interval }),
-        ...(body.endDate !== undefined && { endDate: body.endDate }),
-        ...(body.nextBillingDate !== undefined && {
-          nextBillingDate: body.nextBillingDate,
+        ...(data.notes !== undefined && { notes: data.notes }),
+        ...(data.interval !== undefined && { interval: data.interval }),
+        ...(data.endDate !== undefined && { endDate: data.endDate }),
+        ...(data.nextBillingDate !== undefined && {
+          nextBillingDate: data.nextBillingDate,
         }),
-        ...(body.autoSend !== undefined && { autoSend: body.autoSend }),
-        ...(body.status !== undefined && { status: body.status }),
+        ...(data.autoSend !== undefined && { autoSend: data.autoSend }),
+        ...(data.status !== undefined && { status: data.status }),
       })
       .where(eq(schema.recurringInvoices.id, id))
       .returning();
@@ -101,7 +134,7 @@ export async function PATCH(
       action: "update",
       entityType: "recurring_invoice",
       entityId: id,
-      metadata: { fields: Object.keys(body) },
+      metadata: { fields: Object.keys(data) },
     });
 
     return NextResponse.json(updated);

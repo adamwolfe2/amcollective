@@ -99,15 +99,15 @@ export function ConnectionCard({
         <div className="flex items-center gap-2">
           {configured ? (
             <>
-              <span className="w-2 h-2 shrink-0 bg-emerald-500" />
-              <span className="font-mono text-xs text-emerald-700">
+              <span className="w-2 h-2 shrink-0 bg-[#0A0A0A]" />
+              <span className="font-mono text-xs text-[#0A0A0A]">
                 Connected
               </span>
             </>
           ) : (
             <>
-              <span className="w-2 h-2 shrink-0 bg-red-500" />
-              <span className="font-mono text-xs text-red-600">
+              <span className="w-2 h-2 shrink-0 bg-[#0A0A0A]/25" />
+              <span className="font-mono text-xs text-[#0A0A0A]/50">
                 Not configured
               </span>
             </>
@@ -124,11 +124,11 @@ export function ConnectionCard({
       {lastSync && (
         <div className="flex items-center gap-2 mb-3">
           {lastSync.status === "success" ? (
-            <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+            <CheckCircle2 className="h-3 w-3 text-[#0A0A0A]" />
           ) : lastSync.status === "error" ? (
-            <XCircle className="h-3 w-3 text-red-500" />
+            <XCircle className="h-3 w-3 text-[#0A0A0A]/40" />
           ) : (
-            <Circle className="h-3 w-3 text-amber-500" />
+            <Circle className="h-3 w-3 text-[#0A0A0A]/25" />
           )}
           <span className="font-mono text-[10px] text-[#0A0A0A]/40">
             Last sync{" "}
@@ -172,7 +172,7 @@ export function ConnectionCard({
           {verifyResult && (
             <span
               className={`font-mono text-[10px] ${
-                verifyResult.reachable ? "text-emerald-600" : "text-red-600"
+                verifyResult.reachable ? "text-[#0A0A0A]" : "text-[#0A0A0A]/70"
               }`}
             >
               {verifyResult.reachable
@@ -185,7 +185,7 @@ export function ConnectionCard({
           {syncResult && (
             <span
               className={`font-mono text-[10px] ${
-                syncResult.success ? "text-emerald-600" : "text-red-600"
+                syncResult.success ? "text-[#0A0A0A]" : "text-[#0A0A0A]/70"
               }`}
             >
               {syncResult.message}

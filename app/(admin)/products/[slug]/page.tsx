@@ -29,6 +29,8 @@ import {
   Target,
   Activity,
 } from "lucide-react";
+import { statusBadge, statusText } from "@/lib/ui/status-colors";
+import type { StatusCategory } from "@/lib/ui/status-colors";
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -39,18 +41,22 @@ function formatCurrency(cents: number) {
   return `$${Math.round(cents / 100).toLocaleString()}`;
 }
 
+const productStageCategory: Record<string, StatusCategory> = {
+  idea: "neutral",
+  building: "warning",
+  beta: "info",
+  launched: "positive",
+  scaling: "info",
+  mature: "neutral",
+};
+
 function StageBadge({ stage }: { stage: string | null }) {
   if (!stage) return null;
-  const styles: Record<string, string> = {
-    idea: "bg-gray-100 text-gray-600 border-gray-200",
-    building: "bg-amber-100 text-amber-700 border-amber-200",
-    beta: "bg-blue-100 text-blue-700 border-blue-200",
-    launched: "bg-emerald-100 text-emerald-700 border-emerald-200",
-    scaling: "bg-purple-100 text-purple-700 border-purple-200",
-    mature: "bg-[#0A0A0A]/10 text-[#0A0A0A]/60 border-[#0A0A0A]/20",
-  };
+  const styles: Record<string, string> = Object.fromEntries(
+    Object.entries(productStageCategory).map(([k, v]) => [k, statusBadge[v]])
+  );
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider border ${styles[stage] ?? styles.launched}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider border ${styles[stage] ?? statusBadge.positive}`}>
       {stage}
     </span>
   );
@@ -71,7 +77,7 @@ function Stat({
     <div className="border border-[#0A0A0A]/10 bg-white px-4 py-3">
       <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block">{label}</span>
       <div className="flex items-baseline gap-1 mt-0.5">
-        <span className={`font-mono font-bold text-base ${alert ? "text-red-600" : ""}`}>{value}</span>
+        <span className={`font-mono font-bold text-base ${alert ? statusText.negative : ""}`}>{value}</span>
         {sub && <span className="font-mono text-[9px] text-[#0A0A0A]/40">{sub}</span>}
       </div>
     </div>
@@ -208,9 +214,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
     : null;
 
   const priorityLabel = (p: number) => {
-    if (p === 2) return { label: "Urgent", color: "text-red-600 bg-red-50 border-red-200" };
-    if (p === 1) return { label: "Action", color: "text-amber-700 bg-amber-50 border-amber-200" };
-    return { label: "Info", color: "text-[#0A0A0A]/50 bg-[#0A0A0A]/5 border-[#0A0A0A]/10" };
+    if (p === 2) return { label: "Urgent", color: statusBadge.negative };
+    if (p === 1) return { label: "Action", color: statusBadge.warning };
+    return { label: "Info", color: statusBadge.info };
   };
 
   return (
@@ -250,7 +256,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
               </p>
             )}
             {project.productStage === "building" && (
-              <p className="font-mono text-[10px] text-amber-600">Not yet launched</p>
+              <p className={`font-mono text-[10px] ${statusText.warning}`}>Not yet launched</p>
             )}
           </div>
         </div>
@@ -299,9 +305,9 @@ export default async function ProductDetailPage({ params }: PageProps) {
               <div>
                 <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block">Velocity</span>
                 <div className="flex items-center gap-1.5 mt-1">
-                  {sprintContext.velocity === "accelerating" && <TrendingUp size={14} className="text-emerald-500" />}
-                  {sprintContext.velocity === "declining" && <TrendingDown size={14} className="text-red-500" />}
-                  {(sprintContext.velocity === "stable" || sprintContext.velocity === "inactive") && <Minus size={14} className="text-amber-500" />}
+                  {sprintContext.velocity === "accelerating" && <TrendingUp size={14} className={statusText.positive} />}
+                  {sprintContext.velocity === "declining" && <TrendingDown size={14} className={statusText.negative} />}
+                  {(sprintContext.velocity === "stable" || sprintContext.velocity === "inactive") && <Minus size={14} className={statusText.warning} />}
                   <span className="font-mono text-sm font-bold capitalize">{sprintContext.velocity}</span>
                 </div>
               </div>
@@ -311,7 +317,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
               </div>
               <div>
                 <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40 block">Open Tasks</span>
-                <span className={`font-mono text-sm font-bold mt-1 block ${sprintContext.openTaskCount > 10 ? "text-amber-600" : ""}`}>
+                <span className={`font-mono text-sm font-bold mt-1 block ${sprintContext.openTaskCount > 10 ? statusText.warning : ""}`}>
                   {sprintContext.openTaskCount}
                 </span>
               </div>
@@ -388,7 +394,7 @@ export default async function ProductDetailPage({ params }: PageProps) {
                   <div className="flex items-center gap-3 mt-2 pt-2 border-t border-[#0A0A0A]/5">
                     <span className="font-mono text-[9px] text-[#0A0A0A]/40">Impact: {rec.expectedImpact}</span>
                     {rec.estimatedValueCents && (
-                      <span className="font-mono text-[9px] text-emerald-600">
+                      <span className={`font-mono text-[9px] ${statusText.positive}`}>
                         ~{formatCurrency(rec.estimatedValueCents)}/mo
                       </span>
                     )}

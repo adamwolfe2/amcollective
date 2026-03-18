@@ -4,9 +4,9 @@ import { getAlerts, getUnresolvedCount } from "@/lib/db/repositories/alerts";
 import { Badge } from "@/components/ui/badge";
 
 const SEVERITY_COLORS: Record<string, string> = {
-  critical: "bg-red-500",
-  warning: "bg-amber-500",
-  info: "bg-blue-500",
+  critical: "bg-[#0A0A0A]",
+  warning: "bg-[#0A0A0A]/40",
+  info: "bg-[#0A0A0A]/25",
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -43,7 +43,7 @@ export default async function AlertsPage({
           Alerts
         </h1>
         {unresolvedCount > 0 && (
-          <span className="inline-flex items-center justify-center bg-red-500 text-white font-mono text-xs font-bold px-2 py-0.5 min-w-[24px]">
+          <span className="inline-flex items-center justify-center bg-[#0A0A0A] text-white font-mono text-xs font-bold px-2 py-0.5 min-w-[24px]">
             {unresolvedCount}
           </span>
         )}
@@ -104,7 +104,7 @@ export default async function AlertsPage({
                 <div className="flex items-start gap-3 min-w-0">
                   <span
                     className={`w-2.5 h-2.5 shrink-0 mt-1 ${
-                      SEVERITY_COLORS[alert.severity] ?? "bg-gray-400"
+                      SEVERITY_COLORS[alert.severity] ?? "bg-[#0A0A0A]/15"
                     }`}
                   />
                   <div className="min-w-0">
@@ -125,7 +125,7 @@ export default async function AlertsPage({
                         {TYPE_LABELS[alert.type] ?? alert.type}
                       </Badge>
                       {alert.isResolved && (
-                        <Badge className="bg-emerald-500 text-white font-mono text-[10px] uppercase tracking-wider px-1.5 py-0 rounded-none border-transparent">
+                        <Badge className="bg-[#0A0A0A] text-white font-mono text-[10px] uppercase tracking-wider px-1.5 py-0 rounded-none border-transparent">
                           Resolved
                         </Badge>
                       )}

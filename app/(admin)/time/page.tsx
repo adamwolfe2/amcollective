@@ -200,11 +200,11 @@ export default async function TimePage() {
                         non-billable
                       </span>
                     ) : isInvoiced ? (
-                      <span className="inline-flex items-center px-2 py-0.5 text-xs font-mono border border-green-800 bg-green-50 text-green-800">
+                      <span className="inline-flex items-center px-2 py-0.5 text-xs font-mono bg-[#0A0A0A] text-white border border-[#0A0A0A]">
                         invoiced
                       </span>
                     ) : (
-                      <span className="inline-flex items-center px-2 py-0.5 text-xs font-mono border border-blue-700 bg-blue-50 text-blue-700">
+                      <span className="inline-flex items-center px-2 py-0.5 text-xs font-mono bg-[#0A0A0A]/5 text-[#0A0A0A]/60 border border-[#0A0A0A]/25">
                         unbilled
                       </span>
                     )}

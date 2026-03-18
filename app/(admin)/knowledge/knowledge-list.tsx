@@ -21,9 +21,9 @@ type Props = {
 };
 
 const TYPE_STYLES: Record<string, string> = {
-  sop: "border-blue-700 bg-blue-50 text-blue-700",
+  sop: "border-[#0A0A0A] bg-[#0A0A0A] text-white",
   note: "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/50",
-  brief: "border-amber-700 bg-amber-50 text-amber-700",
+  brief: "border-[#0A0A0A]/30 bg-transparent text-[#0A0A0A]/70",
 };
 
 export function KnowledgeList({ initialArticles, allTags }: Props) {
@@ -173,7 +173,7 @@ export function KnowledgeList({ initialArticles, allTags }: Props) {
           <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50">
             SOPs
           </p>
-          <p className="font-mono text-lg font-bold text-blue-700">
+          <p className="font-mono text-lg font-bold text-[#0A0A0A]">
             {initialArticles.filter((a) => a.docType === "sop").length}
           </p>
         </div>

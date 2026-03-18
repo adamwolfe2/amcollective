@@ -31,7 +31,7 @@ export function TimeActions({
     <button
       onClick={handleDelete}
       disabled={loading}
-      className="p-1.5 border border-[#0A0A0A]/20 hover:bg-red-50 hover:border-red-200 disabled:opacity-50"
+      className="p-1.5 border border-[#0A0A0A]/20 hover:bg-[#0A0A0A]/5 hover:border-[#0A0A0A]/40 disabled:opacity-50"
       title="Delete entry"
     >
       <Trash2 className="h-3 w-3" />

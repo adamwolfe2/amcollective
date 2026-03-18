@@ -64,11 +64,11 @@ export default async function PublicContractPage({ params }: PageProps) {
 
         {/* Status Messages */}
         {isSigned && (
-          <div className="border border-green-700 bg-green-50 p-6 mb-4">
-            <h2 className="font-serif font-bold text-green-800 mb-1">
+          <div className="border border-[#0A0A0A] bg-[#0A0A0A]/5 p-6 mb-4">
+            <h2 className="font-serif font-bold text-[#0A0A0A] mb-1">
               Contract Signed
             </h2>
-            <p className="font-serif text-sm text-green-700">
+            <p className="font-serif text-sm text-[#0A0A0A]/70">
               This contract has been signed. Thank you for your agreement.
             </p>
           </div>
@@ -87,11 +87,11 @@ export default async function PublicContractPage({ params }: PageProps) {
         )}
 
         {isTerminated && (
-          <div className="border border-red-700 bg-red-50 p-6 mb-4">
-            <h2 className="font-serif font-bold text-red-800 mb-1">
+          <div className="border border-[#0A0A0A]/30 bg-[#0A0A0A]/5 p-6 mb-4">
+            <h2 className="font-serif font-bold text-[#0A0A0A]/70 mb-1">
               Contract Terminated
             </h2>
-            <p className="font-serif text-sm text-red-700">
+            <p className="font-serif text-sm text-[#0A0A0A]/50">
               This contract has been terminated and is no longer active.
             </p>
           </div>

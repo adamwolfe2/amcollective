@@ -6,12 +6,23 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { put } from "@vercel/blob";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
+
+const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "am_collective", "personal", "untagged"] as const;
+
+const uploadMetadataSchema = z.object({
+  title: z.string().min(1, "title is required").max(500).trim(),
+  companyTag: z.enum(companyTags).default("am_collective"),
+  docType: z.enum(["contract", "proposal", "note", "sop", "invoice", "brief", "other"]).default("other"),
+  clientId: z.string().uuid().nullable().default(null),
+  isClientVisible: z.enum(["true", "false"]).default("false").transform(v => v === "true"),
+});
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -45,18 +56,29 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
-    const title = formData.get("title") as string;
-    const companyTag = (formData.get("companyTag") as string) || "am_collective";
-    const docType = (formData.get("docType") as string) || "other";
-    const clientId = formData.get("clientId") as string | null;
-    const isClientVisible = formData.get("isClientVisible") === "true";
 
-    if (!title) {
+    const rawMetadata = {
+      title: formData.get("title") as string | null,
+      companyTag: formData.get("companyTag") as string | null,
+      docType: formData.get("docType") as string | null,
+      clientId: formData.get("clientId") as string | null,
+      isClientVisible: formData.get("isClientVisible") as string | null,
+    };
+
+    // Strip null/undefined keys so Zod defaults kick in
+    const cleaned = Object.fromEntries(
+      Object.entries(rawMetadata).filter(([, v]) => v != null && v !== "")
+    );
+
+    const parsed = uploadMetadataSchema.safeParse(cleaned);
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "title is required" },
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
+
+    const { title, companyTag, docType, clientId, isClientVisible } = parsed.data;
 
     let fileUrl: string | null = null;
     let fileName: string | null = null;

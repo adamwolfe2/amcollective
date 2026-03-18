@@ -45,7 +45,7 @@ export const proposals = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     clientId: uuid("client_id")
       .notNull()
-      .references(() => clients.id),
+      .references(() => clients.id, { onDelete: "cascade" }),
     companyTag: companyTagEnum("company_tag").notNull().default("am_collective"),
 
     title: text("title").notNull(),

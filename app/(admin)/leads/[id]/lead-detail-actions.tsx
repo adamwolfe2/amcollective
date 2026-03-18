@@ -89,7 +89,7 @@ export function LeadDetailActions({ lead }: { lead: Lead }) {
           <button
             onClick={handleConvert}
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-2 bg-green-700 text-white font-mono text-sm hover:bg-green-800 transition-colors disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 py-2 bg-[#0A0A0A] text-white font-mono text-sm hover:bg-[#0A0A0A]/90 transition-colors disabled:opacity-50"
           >
             <ArrowRightCircle className="h-4 w-4" />
             Convert to Client
@@ -108,7 +108,7 @@ export function LeadDetailActions({ lead }: { lead: Lead }) {
       <button
         onClick={handleArchive}
         disabled={loading}
-        className="w-full flex items-center justify-center gap-2 py-2 border border-red-200 text-red-600 font-mono text-sm hover:bg-red-50 transition-colors disabled:opacity-50"
+        className="w-full flex items-center justify-center gap-2 py-2 border border-[#0A0A0A]/20 text-[#0A0A0A]/70 font-mono text-sm hover:bg-[#0A0A0A]/5 transition-colors disabled:opacity-50"
       >
         <Archive className="h-4 w-4" />
         Archive Lead

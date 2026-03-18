@@ -236,7 +236,7 @@ export default async function IntegrationsPage() {
             Gmail — OAuth Connection
           </h2>
           {gmailAccount && (
-            <span className="px-2 py-0.5 text-xs font-mono border border-emerald-600 text-emerald-600">
+            <span className="px-2 py-0.5 text-xs font-mono border border-[#0A0A0A] text-[#0A0A0A]">
               Connected
             </span>
           )}
@@ -272,11 +272,11 @@ export default async function IntegrationsPage() {
               >
                 <div className="flex items-center gap-3 min-w-0">
                   {run.status === "success" ? (
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                    <CheckCircle2 className="h-3.5 w-3.5 text-[#0A0A0A] shrink-0" />
                   ) : run.status === "error" ? (
-                    <XCircle className="h-3.5 w-3.5 text-red-500 shrink-0" />
+                    <XCircle className="h-3.5 w-3.5 text-[#0A0A0A]/40 shrink-0" />
                   ) : (
-                    <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <Clock className="h-3.5 w-3.5 text-[#0A0A0A]/25 shrink-0" />
                   )}
                   <span className="px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider bg-[#0A0A0A]/5 text-[#0A0A0A]/60">
                     {run.service}
@@ -287,7 +287,7 @@ export default async function IntegrationsPage() {
                     </span>
                   )}
                   {run.errorMessage && (
-                    <span className="font-mono text-[10px] text-red-500 truncate max-w-[200px]">
+                    <span className="font-mono text-[10px] text-[#0A0A0A]/70 truncate max-w-[200px]">
                       {run.errorMessage}
                     </span>
                   )}
@@ -342,7 +342,7 @@ export default async function IntegrationsPage() {
                 <div className="flex items-center gap-3">
                   <span
                     className={`w-2 h-2 rounded-full ${
-                      isConfigured ? "bg-emerald-500" : "bg-[#0A0A0A]/20"
+                      isConfigured ? "bg-[#0A0A0A]" : "bg-[#0A0A0A]/20"
                     }`}
                   />
                   <span className="font-serif text-sm font-medium">
@@ -376,7 +376,7 @@ export default async function IntegrationsPage() {
           <code className="font-mono text-xs">MERCURY_API_KEY</code> in your
           environment variables to enable the connection.
           {process.env.MERCURY_SANDBOX === "true" && (
-            <span className="ml-2 font-mono text-xs text-amber-600">
+            <span className="ml-2 font-mono text-xs text-[#0A0A0A]/60">
               (Sandbox mode)
             </span>
           )}

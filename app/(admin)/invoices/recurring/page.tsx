@@ -13,12 +13,7 @@ import {
 } from "@/components/ui/table";
 import { RecurringActions } from "./recurring-actions";
 import { NewRecurringDialog } from "./new-recurring-dialog";
-
-const STATUS_STYLES: Record<string, string> = {
-  active: "border-green-800 bg-green-50 text-green-800",
-  paused: "border-yellow-700 bg-yellow-50 text-yellow-700",
-  cancelled: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/30",
-};
+import { getStatusBadge, recurringStatusCategory } from "@/lib/ui/status-colors";
 
 const INTERVAL_LABELS: Record<string, string> = {
   weekly: "Weekly",
@@ -258,8 +253,8 @@ export default async function RecurringInvoicesPage() {
                 </TableCell>
                 <TableCell>
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 text-xs font-mono border rounded-none ${
-                      STATUS_STYLES[template.status] ?? STATUS_STYLES.cancelled
+                    className={`inline-flex items-center px-2 py-0.5 text-xs font-mono rounded-none ${
+                      getStatusBadge(template.status, recurringStatusCategory)
                     }`}
                   >
                     {template.status}

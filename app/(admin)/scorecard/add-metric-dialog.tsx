@@ -149,7 +149,7 @@ export function AddMetricDialog({ teamMembers }: { teamMembers: TeamMember[] }) 
         </div>
 
         {error && (
-          <p className="font-mono text-xs text-red-600">{error}</p>
+          <p className="font-mono text-xs text-[#0A0A0A]/70">{error}</p>
         )}
 
         <div className="flex gap-2">

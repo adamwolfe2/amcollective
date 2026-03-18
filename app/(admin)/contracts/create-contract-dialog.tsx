@@ -50,7 +50,7 @@ export function CreateContractDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A0A0A]/40">
       <div className="bg-white border border-[#0A0A0A] p-6 w-full max-w-md">
         <h2 className="text-lg font-bold font-serif mb-4">New Contract</h2>
 

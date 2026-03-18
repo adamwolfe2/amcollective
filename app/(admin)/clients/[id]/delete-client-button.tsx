@@ -42,7 +42,7 @@ export function DeleteClientButton({
       <DialogTrigger asChild>
         <Button
           variant="outline"
-          className="font-mono text-xs uppercase tracking-wider rounded-none border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 h-8 px-3"
+          className="font-mono text-xs uppercase tracking-wider rounded-none border-[#0A0A0A]/20 text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/5 hover:text-[#0A0A0A] h-8 px-3"
         >
           Delete
         </Button>
@@ -70,7 +70,7 @@ export function DeleteClientButton({
             <Button
               onClick={handleDelete}
               disabled={pending}
-              className="font-mono text-xs uppercase tracking-wider rounded-none bg-red-600 text-white hover:bg-red-700"
+              className="font-mono text-xs uppercase tracking-wider rounded-none bg-[#0A0A0A] text-white hover:bg-[#0A0A0A]/80"
             >
               {pending ? "Deleting..." : "Delete"}
             </Button>

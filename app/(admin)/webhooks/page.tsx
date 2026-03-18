@@ -48,7 +48,7 @@ export default async function WebhooksPage() {
           </p>
         </div>
         <div className="border border-[#0A0A0A]/10 bg-white p-4">
-          <p className="font-mono text-2xl font-bold text-green-700">
+          <p className="font-mono text-2xl font-bold text-[#0A0A0A]">
             {activeCount}
           </p>
           <p className="font-serif text-xs text-[#0A0A0A]/50 mt-1">Active</p>
@@ -62,7 +62,7 @@ export default async function WebhooksPage() {
           </p>
         </div>
         <div className="border border-[#0A0A0A]/10 bg-white p-4">
-          <p className="font-mono text-2xl font-bold text-red-700">
+          <p className="font-mono text-2xl font-bold text-[#0A0A0A]/70">
             {Number(deliveryStats[0]?.failed ?? 0)}
           </p>
           <p className="font-serif text-xs text-[#0A0A0A]/50 mt-1">Failed</p>
@@ -103,7 +103,7 @@ export default async function WebhooksPage() {
                         variant="outline"
                         className={`font-mono text-[10px] uppercase tracking-wider rounded-none px-2 py-0.5 shrink-0 ${
                           reg.isActive
-                            ? "text-green-700 border-green-400 bg-transparent"
+                            ? "text-[#0A0A0A] border-[#0A0A0A] bg-transparent"
                             : "text-[#0A0A0A]/40 border-[#0A0A0A]/15 bg-transparent"
                         }`}
                       >
@@ -127,13 +127,13 @@ export default async function WebhooksPage() {
                         {format(new Date(reg.createdAt), "MMM d, yyyy")}
                       </span>
                       {reg.lastPingAt && (
-                        <span className="font-mono text-[10px] text-green-600">
+                        <span className="font-mono text-[10px] text-[#0A0A0A]/50">
                           Last ping{" "}
                           {format(new Date(reg.lastPingAt), "MMM d HH:mm")}
                         </span>
                       )}
                       {reg.lastFailureAt && (
-                        <span className="font-mono text-[10px] text-red-600">
+                        <span className="font-mono text-[10px] text-[#0A0A0A]/70">
                           Last failure{" "}
                           {format(new Date(reg.lastFailureAt), "MMM d HH:mm")}
                         </span>

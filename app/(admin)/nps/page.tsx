@@ -16,16 +16,16 @@ function classifyNps(score: number): { label: string; style: string } {
   if (score >= 9)
     return {
       label: "Promoter",
-      style: "border-green-800 bg-green-50 text-green-800",
+      style: "bg-[#0A0A0A] text-white border border-[#0A0A0A]",
     };
   if (score >= 7)
     return {
       label: "Passive",
-      style: "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/50",
+      style: "bg-transparent text-[#0A0A0A]/40 border border-[#0A0A0A]/15",
     };
   return {
     label: "Detractor",
-    style: "border-red-700 bg-red-50 text-red-700",
+    style: "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border border-[#0A0A0A]/20",
   };
 }
 
@@ -88,7 +88,7 @@ export default async function NpsPage() {
             NPS Score
           </p>
           <p
-            className={`font-mono text-xl font-bold ${npsScore !== null ? (npsScore >= 50 ? "text-green-800" : npsScore >= 0 ? "text-[#0A0A0A]" : "text-red-700") : ""}`}
+            className={`font-mono text-xl font-bold ${npsScore !== null ? (npsScore >= 50 ? "text-[#0A0A0A]" : npsScore >= 0 ? "text-[#0A0A0A]/60" : "text-[#0A0A0A]/70") : ""}`}
           >
             {npsScore !== null ? npsScore : "--"}
           </p>
@@ -110,9 +110,9 @@ export default async function NpsPage() {
             Breakdown
           </p>
           <p className="font-mono text-sm">
-            <span className="text-green-800">{promoters}P</span>{" "}
+            <span className="text-[#0A0A0A]">{promoters}P</span>{" "}
             <span className="text-[#0A0A0A]/40">{npsData[0]?.passives ?? 0}N</span>{" "}
-            <span className="text-red-700">{detractors}D</span>
+            <span className="text-[#0A0A0A]/70">{detractors}D</span>
           </p>
         </div>
       </div>
@@ -193,10 +193,10 @@ export default async function NpsPage() {
                     <span
                       className={`inline-flex items-center px-2 py-0.5 text-xs font-mono border ${
                         survey.status === "completed"
-                          ? "border-green-800 bg-green-50 text-green-800"
+                          ? "bg-[#0A0A0A] text-white border-[#0A0A0A]"
                           : survey.status === "sent"
-                            ? "border-blue-700 bg-blue-50 text-blue-700"
-                            : "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/40"
+                            ? "bg-[#0A0A0A]/5 text-[#0A0A0A]/60 border-[#0A0A0A]/25"
+                            : "bg-transparent text-[#0A0A0A]/40 border-[#0A0A0A]/15"
                       }`}
                     >
                       {survey.status}

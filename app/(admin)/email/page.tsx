@@ -11,13 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { EmailActions } from "./email-actions";
-
-const STATUS_STYLES: Record<string, string> = {
-  draft: "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/50",
-  ready: "border-blue-700 bg-blue-50 text-blue-700",
-  sent: "border-green-800 bg-green-50 text-green-800",
-  failed: "border-red-700 bg-red-50 text-red-700",
-};
+import { getStatusBadge, emailStatusCategory } from "@/lib/ui/status-colors";
 
 export default async function EmailPage() {
   const [drafts, sentCount, draftCount] = await Promise.all([
@@ -142,7 +136,7 @@ export default async function EmailPage() {
                 </TableCell>
                 <TableCell>
                   <span
-                    className={`inline-flex items-center px-2 py-0.5 text-xs font-mono border ${STATUS_STYLES[draft.status] ?? STATUS_STYLES.draft}`}
+                    className={`inline-flex items-center px-2 py-0.5 text-xs font-mono ${getStatusBadge(draft.status, emailStatusCategory)}`}
                   >
                     {draft.status}
                   </span>

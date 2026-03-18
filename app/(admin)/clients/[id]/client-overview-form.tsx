@@ -205,7 +205,7 @@ export function ClientOverviewForm({ client }: { client: ClientData }) {
           </span>
         )}
         {error && (
-          <span className="font-mono text-xs text-red-600">{error}</span>
+          <span className="font-mono text-xs text-[#0A0A0A]/70">{error}</span>
         )}
       </div>
     </form>

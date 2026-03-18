@@ -58,7 +58,7 @@ export function SyncButton({ service }: { service: string }) {
       {result && (
         <span
           className={`font-mono text-[10px] ${
-            result.success ? "text-emerald-600" : "text-red-600"
+            result.success ? "text-[#0A0A0A]" : "text-[#0A0A0A]/70"
           }`}
         >
           {result.message}

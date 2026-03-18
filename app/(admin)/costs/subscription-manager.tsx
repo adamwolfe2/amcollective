@@ -335,7 +335,7 @@ export function SubscriptionManager({
       </div>
 
       {error && (
-        <div className="mb-3 px-4 py-2 border border-red-200 bg-red-50 text-red-700 font-mono text-xs flex items-center justify-between">
+        <div className="mb-3 px-4 py-2 border border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/70 font-mono text-xs flex items-center justify-between">
           <span>{error}</span>
           <button onClick={() => setError(null)}>
             <X size={12} />
@@ -448,7 +448,7 @@ export function SubscriptionManager({
                     <td
                       className={`px-5 py-3 text-right font-mono text-xs ${
                         renewalSoon
-                          ? "text-amber-600 font-bold"
+                          ? "text-[#0A0A0A] font-bold"
                           : "text-[#0A0A0A]/50"
                       }`}
                     >
@@ -474,7 +474,7 @@ export function SubscriptionManager({
                         </button>
                         <button
                           onClick={() => handleDeactivate(sub.id, sub.name)}
-                          className="p-1 text-[#0A0A0A]/40 hover:text-red-600"
+                          className="p-1 text-[#0A0A0A]/40 hover:text-[#0A0A0A]"
                           title="Deactivate"
                           disabled={isPending}
                         >

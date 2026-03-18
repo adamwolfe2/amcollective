@@ -146,9 +146,9 @@ export function TransactionFeed({
                 <TableCell
                   className={`font-mono text-sm text-right font-medium ${
                     txn.direction === "credit"
-                      ? "text-emerald-600"
+                      ? "text-[#0A0A0A]"
                       : txn.direction === "debit"
-                        ? "text-red-600"
+                        ? "text-[#0A0A0A]/60"
                         : ""
                   }`}
                 >
@@ -175,7 +175,7 @@ export function TransactionFeed({
                     variant="outline"
                     className={`rounded-none text-[9px] uppercase font-mono tracking-wider ${
                       txn.status === "pending"
-                        ? "text-amber-600 border-amber-300"
+                        ? "text-[#0A0A0A]/70 border-[#0A0A0A]/30"
                         : ""
                     }`}
                   >

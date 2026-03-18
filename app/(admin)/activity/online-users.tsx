@@ -65,7 +65,7 @@ export function OnlineUsers() {
                 </p>
               )}
             </div>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="w-2 h-2 rounded-full bg-[#0A0A0A] animate-pulse" />
           </div>
         ))}
       </div>

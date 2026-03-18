@@ -25,13 +25,14 @@ const MAX_SMS_LENGTH = 10000;
 export async function POST(req: NextRequest) {
   const rawBody = await req.text();
 
-  // Verify Bloo.io webhook signature
+  // Verify Bloo.io webhook signature (fail closed if env var missing)
   const secret = process.env.BLOOIO_WEBHOOK_SECRET;
-  if (secret) {
-    const signature = req.headers.get("x-bloo-signature") ?? "";
-    if (!verifyWebhookSignature(rawBody, signature, secret)) {
-      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-    }
+  if (!secret) {
+    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
+  }
+  const signature = req.headers.get("x-bloo-signature") ?? "";
+  if (!verifyWebhookSignature(rawBody, signature, secret)) {
+    return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
   if (ajWebhook) {

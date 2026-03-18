@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
@@ -12,6 +13,19 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { aj } from "@/lib/middleware/arcjet";
+
+const taskUpdateSchema = z.object({
+  title: z.string().min(1).max(500).trim(),
+  description: z.string().max(10000).nullable(),
+  status: z.enum(["backlog", "todo", "in_progress", "in_review", "done", "cancelled"]),
+  priority: z.enum(["high", "urgent", "medium", "low"]),
+  dueDate: z.string().nullable(),
+  assigneeId: z.string().uuid().nullable(),
+  projectId: z.string().uuid().nullable(),
+  clientId: z.string().uuid().nullable(),
+  labels: z.array(z.string().max(100)).nullable(),
+  position: z.number().int().min(0),
+}).partial().refine(data => Object.keys(data).length > 0, "At least one field required");
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -80,24 +94,33 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
     const { id } = await ctx.params;
     const body = await request.json();
 
+    const parsed = taskUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
     const updates: Record<string, unknown> = {};
 
-    if (body.title !== undefined) updates.title = body.title;
-    if (body.description !== undefined) updates.description = body.description;
-    if (body.status !== undefined) {
-      updates.status = body.status;
-      if (body.status === "done") {
+    if (data.title !== undefined) updates.title = data.title;
+    if (data.description !== undefined) updates.description = data.description;
+    if (data.status !== undefined) {
+      updates.status = data.status;
+      if (data.status === "done") {
         updates.completedAt = new Date();
       }
     }
-    if (body.priority !== undefined) updates.priority = body.priority;
-    if (body.dueDate !== undefined)
-      updates.dueDate = body.dueDate ? new Date(body.dueDate) : null;
-    if (body.assigneeId !== undefined) updates.assigneeId = body.assigneeId;
-    if (body.projectId !== undefined) updates.projectId = body.projectId;
-    if (body.clientId !== undefined) updates.clientId = body.clientId;
-    if (body.labels !== undefined) updates.labels = body.labels;
-    if (body.position !== undefined) updates.position = body.position;
+    if (data.priority !== undefined) updates.priority = data.priority;
+    if (data.dueDate !== undefined)
+      updates.dueDate = data.dueDate ? new Date(data.dueDate) : null;
+    if (data.assigneeId !== undefined) updates.assigneeId = data.assigneeId;
+    if (data.projectId !== undefined) updates.projectId = data.projectId;
+    if (data.clientId !== undefined) updates.clientId = data.clientId;
+    if (data.labels !== undefined) updates.labels = data.labels;
+    if (data.position !== undefined) updates.position = data.position;
 
     const [updated] = await db
       .update(schema.tasks)
@@ -115,7 +138,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
       action: "task.updated",
       entityType: "task",
       entityId: id,
-      metadata: body,
+      metadata: data,
     });
 
     return NextResponse.json(updated);

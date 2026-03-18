@@ -59,7 +59,7 @@ export function LeadActions({ lead }: { lead: Lead }) {
           <button
             onClick={handleConvert}
             disabled={loading}
-            className="p-1.5 text-green-600 hover:bg-green-50 transition-colors"
+            className="p-1.5 text-[#0A0A0A] hover:bg-[#0A0A0A]/5 transition-colors"
             title="Convert to client"
           >
             <ArrowRightCircle className="h-3.5 w-3.5" />
@@ -68,7 +68,7 @@ export function LeadActions({ lead }: { lead: Lead }) {
       {lead.convertedToClientId && (
         <a
           href={`/clients/${lead.convertedToClientId}`}
-          className="p-1.5 text-blue-600 hover:bg-blue-50 transition-colors"
+          className="p-1.5 text-[#0A0A0A]/60 hover:bg-[#0A0A0A]/5 transition-colors"
           title="View client"
         >
           <ExternalLink className="h-3.5 w-3.5" />
@@ -77,7 +77,7 @@ export function LeadActions({ lead }: { lead: Lead }) {
       <button
         onClick={handleArchive}
         disabled={loading}
-        className="p-1.5 text-[#0A0A0A]/40 hover:text-red-600 hover:bg-red-50 transition-colors"
+        className="p-1.5 text-[#0A0A0A]/40 hover:text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/5 transition-colors"
         title="Archive"
       >
         <Archive className="h-3.5 w-3.5" />

@@ -22,7 +22,7 @@ export function SprintDeleteButton({ id, title }: { id: string; title: string })
     <button
       onClick={handleDelete}
       disabled={isPending}
-      className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-[#0A0A0A]/30 hover:text-red-500 disabled:opacity-50 shrink-0"
+      className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 text-[#0A0A0A]/30 hover:text-[#0A0A0A] disabled:opacity-50 shrink-0"
       title="Delete sprint"
     >
       <Trash2 size={14} />

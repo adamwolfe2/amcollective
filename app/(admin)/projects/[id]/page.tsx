@@ -26,18 +26,18 @@ import {
 } from "@/components/ui/table";
 
 const statusStyles: Record<string, string> = {
-  active: "border-green-600 text-green-700 bg-green-50",
-  paused: "border-yellow-600 text-yellow-700 bg-yellow-50",
+  active: "border-[#0A0A0A] text-[#0A0A0A] bg-[#0A0A0A]/5",
+  paused: "border-[#0A0A0A]/30 text-[#0A0A0A]/60 bg-transparent",
   archived: "border-[#0A0A0A]/30 text-[#0A0A0A]/50 bg-[#0A0A0A]/5",
 };
 
 const deployStateColor: Record<string, string> = {
-  READY: "bg-emerald-500",
-  ERROR: "bg-red-500",
-  BUILDING: "bg-amber-500",
-  CANCELED: "bg-gray-400",
-  QUEUED: "bg-blue-400",
-  INITIALIZING: "bg-blue-400",
+  READY: "bg-[#0A0A0A]",
+  ERROR: "bg-[#0A0A0A]/40",
+  BUILDING: "bg-[#0A0A0A]/25",
+  CANCELED: "bg-[#0A0A0A]/15",
+  QUEUED: "bg-[#0A0A0A]/20",
+  INITIALIZING: "bg-[#0A0A0A]/20",
 };
 
 async function getProjectCosts(projectId: string) {
@@ -246,7 +246,7 @@ export default async function ProjectDetailPage({
           {deploys.length > 0 ? (
             <div className="flex items-center gap-2">
               <span
-                className={`w-2 h-2 rounded-full ${deployStateColor[deploys[0].state] ?? "bg-gray-400"}`}
+                className={`w-2 h-2 rounded-full ${deployStateColor[deploys[0].state] ?? "bg-[#0A0A0A]/25"}`}
               />
               <span className="font-mono text-sm">
                 {formatDistanceToNow(new Date(deploys[0].created), {
@@ -298,7 +298,7 @@ export default async function ProjectDetailPage({
               >
                 <span
                   className={`w-2 h-2 rounded-full ${
-                    d.verified ? "bg-emerald-500" : "bg-amber-500"
+                    d.verified ? "bg-[#0A0A0A]" : "bg-[#0A0A0A]/25"
                   }`}
                 />
                 <span className="font-mono text-sm">{d.name}</span>
@@ -392,9 +392,9 @@ export default async function ProjectDetailPage({
                   </p>
                   <p className={`text-sm font-mono font-bold mt-1 ${
                     projectContext.velocity === "accelerating"
-                      ? "text-green-600"
+                      ? "text-[#0A0A0A]"
                       : projectContext.velocity === "declining"
-                      ? "text-red-500"
+                      ? "text-[#0A0A0A]/70"
                       : projectContext.velocity === "inactive"
                       ? "text-[#0A0A0A]/30"
                       : "text-[#0A0A0A]"
@@ -646,7 +646,7 @@ export default async function ProjectDetailPage({
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <span
-                            className={`w-2 h-2 rounded-full ${deployStateColor[d.state] ?? "bg-gray-400"}`}
+                            className={`w-2 h-2 rounded-full ${deployStateColor[d.state] ?? "bg-[#0A0A0A]/25"}`}
                           />
                           <span className="font-mono text-xs uppercase">
                             {d.state}

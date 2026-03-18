@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { sendInvoiceAction, markPaid } from "@/lib/actions/invoices";
 import { Send, CheckCircle, Eye, Copy, RotateCcw, Download } from "lucide-react";
 import { toast } from "sonner";
+import { statusBadge } from "@/lib/ui/status-colors";
 
 export function InvoiceActions({
   invoiceId,
@@ -96,7 +97,7 @@ export function InvoiceActions({
             onClick={handleMarkPaid}
             disabled={loading}
             variant="outline"
-            className="border-green-800 text-green-800 rounded-none font-mono text-xs hover:bg-green-50"
+            className={`${statusBadge.positive} rounded-none font-mono text-xs`}
           >
             <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
             {loading ? "Processing..." : "Mark Paid"}

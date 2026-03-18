@@ -16,6 +16,7 @@ import { FileText, Paperclip, Eye } from "lucide-react";
 import { UploadDocumentDialog } from "./upload-dialog";
 import { DocumentFilters } from "./document-filters";
 import { DocumentActions } from "./document-actions";
+import { getStatusBadge, docTypeCategory } from "@/lib/ui/status-colors";
 
 function formatFileSize(bytes: number | null): string {
   if (!bytes) return "";
@@ -23,16 +24,6 @@ function formatFileSize(bytes: number | null): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
-
-const DOC_TYPE_STYLES: Record<string, string> = {
-  contract: "bg-blue-500/10 text-blue-700 border-blue-300",
-  proposal: "bg-purple-500/10 text-purple-700 border-purple-300",
-  note: "bg-[#0A0A0A]/5 text-[#0A0A0A]/60 border-[#0A0A0A]/10",
-  sop: "bg-amber-500/10 text-amber-700 border-amber-300",
-  invoice: "bg-green-500/10 text-green-700 border-green-300",
-  brief: "bg-cyan-500/10 text-cyan-700 border-cyan-300",
-  other: "bg-[#0A0A0A]/5 text-[#0A0A0A]/40 border-[#0A0A0A]/10",
-};
 
 export default async function DocumentsPage({
   searchParams,
@@ -175,7 +166,7 @@ export default async function DocumentsPage({
                     <Badge
                       variant="outline"
                       className={`font-mono text-[10px] uppercase tracking-wider rounded-none px-2 py-0.5 ${
-                        DOC_TYPE_STYLES[doc.docType] || DOC_TYPE_STYLES.other
+                        getStatusBadge(doc.docType, docTypeCategory)
                       }`}
                     >
                       {doc.docType}

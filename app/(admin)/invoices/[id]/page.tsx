@@ -14,14 +14,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { ArrowLeft } from "lucide-react";
 import { InvoiceActions } from "./invoice-actions";
-
-const STATUS_STYLES: Record<string, string> = {
-  draft: "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/50",
-  sent: "border-blue-700 bg-blue-50 text-blue-700",
-  paid: "border-green-800 bg-green-50 text-green-800",
-  overdue: "border-red-700 bg-red-50 text-red-700",
-  cancelled: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/30",
-};
+import { getStatusBadge, invoiceStatusCategory, statusText } from "@/lib/ui/status-colors";
 
 type LineItem = {
   description: string;
@@ -67,8 +60,8 @@ export default async function InvoiceDetailPage({
               {invoice.number || `INV-${invoice.id.slice(0, 8)}`}
             </h1>
             <span
-              className={`inline-flex items-center px-2 py-0.5 text-xs font-mono border rounded-none ${
-                STATUS_STYLES[invoice.status] || STATUS_STYLES.draft
+              className={`inline-flex items-center px-2 py-0.5 text-xs font-mono rounded-none ${
+                getStatusBadge(invoice.status, invoiceStatusCategory)
               }`}
             >
               {invoice.status}
@@ -138,7 +131,7 @@ export default async function InvoiceDetailPage({
                 <span className="font-mono text-xs text-[#0A0A0A]/40">
                   Sent At
                 </span>
-                <span className="font-mono text-xs text-blue-700">
+                <span className={`font-mono text-xs ${statusText.info}`}>
                   {format(invoice.sentAt, "MMMM d, yyyy")}
                 </span>
               </div>
@@ -148,7 +141,7 @@ export default async function InvoiceDetailPage({
                 <span className="font-mono text-xs text-[#0A0A0A]/40">
                   Paid At
                 </span>
-                <span className="font-mono text-xs text-green-800">
+                <span className={`font-mono text-xs ${statusText.positive}`}>
                   {format(invoice.paidAt, "MMMM d, yyyy")}
                 </span>
               </div>
@@ -234,7 +227,7 @@ export default async function InvoiceDetailPage({
             href={invoice.stripePaymentLinkUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-mono text-xs text-blue-700 underline break-all"
+            className={`font-mono text-xs ${statusText.info} underline break-all`}
           >
             {invoice.stripePaymentLinkUrl}
           </a>

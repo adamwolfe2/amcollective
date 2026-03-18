@@ -58,7 +58,7 @@ export function ForecastDashboard() {
   if (!data) {
     return (
       <div className="text-center py-20">
-        <p className="font-mono text-sm text-red-600">
+        <p className="font-mono text-sm text-[#0A0A0A]/70">
           Failed to load forecast data.
         </p>
       </div>
@@ -90,7 +90,7 @@ export function ForecastDashboard() {
           <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 mb-1">
             Weighted Pipeline
           </p>
-          <p className="font-mono text-xl font-bold text-blue-700">
+          <p className="font-mono text-xl font-bold text-[#0A0A0A]/60">
             {formatCents(summary.weightedPipeline)}
           </p>
           <p className="font-mono text-[10px] text-[#0A0A0A]/40 mt-0.5">
@@ -101,7 +101,7 @@ export function ForecastDashboard() {
           <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 mb-1">
             Contracted Value
           </p>
-          <p className="font-mono text-xl font-bold text-green-800">
+          <p className="font-mono text-xl font-bold text-[#0A0A0A]">
             {formatCents(summary.contractedRevenue)}
           </p>
           <p className="font-mono text-[10px] text-[#0A0A0A]/40 mt-0.5">
@@ -150,7 +150,7 @@ export function ForecastDashboard() {
             <div key={f.month} className="flex-1 flex flex-col items-center relative">
               {/* Confidence range */}
               <div
-                className="absolute w-full bg-blue-100 border border-blue-200"
+                className="absolute w-full bg-[#0A0A0A]/5 border border-[#0A0A0A]/10"
                 style={{
                   height: `${((f.high - f.low) / maxValue) * 100}%`,
                   bottom: `${(f.low / maxValue) * 100}%`,
@@ -158,13 +158,13 @@ export function ForecastDashboard() {
               />
               {/* Forecast bar */}
               <div
-                className="w-full bg-blue-700/60 transition-all relative z-10"
+                className="w-full bg-[#0A0A0A]/40 transition-all relative z-10"
                 style={{
                   height: `${(f.total / maxValue) * 100}%`,
                   minHeight: f.total > 0 ? "2px" : "0",
                 }}
               />
-              <p className="font-mono text-[8px] text-blue-700 mt-1 text-center">
+              <p className="font-mono text-[8px] text-[#0A0A0A]/50 mt-1 text-center">
                 {f.month}
               </p>
             </div>
@@ -178,13 +178,13 @@ export function ForecastDashboard() {
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-blue-700/60" />
+            <div className="w-3 h-3 bg-[#0A0A0A]/40" />
             <span className="font-mono text-[10px] text-[#0A0A0A]/50">
               Forecast
             </span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 bg-blue-100 border border-blue-200" />
+            <div className="w-3 h-3 bg-[#0A0A0A]/5 border border-[#0A0A0A]/10" />
             <span className="font-mono text-[10px] text-[#0A0A0A]/50">
               Confidence Range
             </span>
@@ -233,7 +233,7 @@ export function ForecastDashboard() {
                 <td className="text-right px-4 py-2 font-mono text-sm text-[#0A0A0A]/60">
                   {formatCents(f.recurring)}
                 </td>
-                <td className="text-right px-4 py-2 font-mono text-sm text-blue-700">
+                <td className="text-right px-4 py-2 font-mono text-sm text-[#0A0A0A]/50">
                   {formatCents(f.pipeline)}
                 </td>
                 <td className="text-right px-4 py-2 font-mono text-sm font-bold">

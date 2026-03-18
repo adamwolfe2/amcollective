@@ -8,8 +8,8 @@ import { eq, asc } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
 
 const PRIORITY_STYLES: Record<string, string> = {
-  urgent: "text-red-600 border-red-300 bg-red-50",
-  high: "text-amber-600 border-amber-300 bg-amber-50",
+  urgent: "text-[#0A0A0A] border-[#0A0A0A] bg-[#0A0A0A]/5",
+  high: "text-[#0A0A0A]/70 border-[#0A0A0A]/30 bg-transparent",
   medium: "text-[#0A0A0A]/60 border-[#0A0A0A]/20",
   low: "text-[#0A0A0A]/40 border-[#0A0A0A]/10",
 };

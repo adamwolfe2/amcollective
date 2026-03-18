@@ -19,9 +19,9 @@ import { Badge } from "@/components/ui/badge";
 
 const STATUS_STYLES: Record<string, string> = {
   draft: "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/50",
-  sent: "border-blue-700 bg-blue-50 text-blue-700",
-  paid: "border-green-800 bg-green-50 text-green-800",
-  overdue: "border-red-700 bg-red-50 text-red-700",
+  sent: "border-[#0A0A0A]/25 bg-[#0A0A0A]/5 text-[#0A0A0A]/60",
+  paid: "border-[#0A0A0A] bg-[#0A0A0A] text-white",
+  overdue: "border-[#0A0A0A]/20 bg-[#0A0A0A]/8 text-[#0A0A0A]/70",
   cancelled: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/30",
 };
 
@@ -151,7 +151,7 @@ export default async function ClientInvoiceDetailPage({
           {invoice.paidAt && (
             <div className="flex justify-between">
               <span className="font-mono text-xs text-[#0A0A0A]/40">Paid</span>
-              <span className="font-mono text-xs text-green-800">
+              <span className="font-mono text-xs text-[#0A0A0A]">
                 {format(invoice.paidAt, "MMMM d, yyyy")}
               </span>
             </div>

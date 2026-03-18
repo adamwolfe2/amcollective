@@ -69,7 +69,7 @@ export function ProposalActions({
         <button
           onClick={handleSend}
           disabled={loading}
-          className="p-1.5 border border-[#0A0A0A]/20 hover:bg-blue-50 hover:border-blue-200 disabled:opacity-50"
+          className="p-1.5 border border-[#0A0A0A]/20 hover:bg-[#0A0A0A]/5 hover:border-[#0A0A0A]/30 disabled:opacity-50"
           title="Send to client"
         >
           <Send className="h-3 w-3" />
@@ -81,7 +81,7 @@ export function ProposalActions({
         <button
           onClick={handleConvert}
           disabled={loading}
-          className="p-1.5 border border-[#0A0A0A]/20 hover:bg-green-50 hover:border-green-200 disabled:opacity-50"
+          className="p-1.5 border border-[#0A0A0A]/20 hover:bg-[#0A0A0A]/5 hover:border-[#0A0A0A]/30 disabled:opacity-50"
           title="Convert to invoice"
         >
           <ArrowRight className="h-3 w-3" />

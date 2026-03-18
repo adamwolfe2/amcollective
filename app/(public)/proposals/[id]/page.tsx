@@ -51,12 +51,12 @@ export default async function PublicProposalPage({
         <p className="font-mono text-xs text-[#0A0A0A]/50 mb-8">
           AM COLLECTIVE CAPITAL
         </p>
-        <div className="border-2 border-green-800 bg-green-50 p-8 mb-6">
-          <p className="font-mono text-xs uppercase tracking-widest text-green-800 mb-2">
+        <div className="border-2 border-[#0A0A0A] bg-[#0A0A0A]/5 p-8 mb-6">
+          <p className="font-mono text-xs uppercase tracking-widest text-[#0A0A0A] mb-2">
             Approved
           </p>
           <h1 className="text-2xl font-serif mb-2">{proposal.title}</h1>
-          <p className="font-mono text-sm text-green-800">
+          <p className="font-mono text-sm text-[#0A0A0A]/70">
             You approved this proposal on{" "}
             {proposal.approvedAt
               ? format(proposal.approvedAt, "MMMM d, yyyy")

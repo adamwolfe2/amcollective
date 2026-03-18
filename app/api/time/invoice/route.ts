@@ -60,26 +60,29 @@ export async function POST(request: NextRequest) {
     const subtotal = lineItems.reduce((sum, li) => sum + li.unitPrice, 0);
     const invoiceNumber = await generateInvoiceNumber();
 
-    // Create the invoice
-    const [invoice] = await db
-      .insert(schema.invoices)
-      .values({
-        clientId,
-        number: invoiceNumber,
-        status: "draft",
-        amount: subtotal,
-        subtotal,
-        lineItems,
-        dueDate: dueDate ? new Date(dueDate) : null,
-        notes: `Generated from ${entries.length} time ${entries.length === 1 ? "entry" : "entries"}`,
-      })
-      .returning();
+    // Create invoice + link time entries atomically
+    const [invoice] = await db.transaction(async (tx) => {
+      const [inv] = await tx
+        .insert(schema.invoices)
+        .values({
+          clientId,
+          number: invoiceNumber,
+          status: "draft",
+          amount: subtotal,
+          subtotal,
+          lineItems,
+          dueDate: dueDate ? new Date(dueDate) : null,
+          notes: `Generated from ${entries.length} time ${entries.length === 1 ? "entry" : "entries"}`,
+        })
+        .returning();
 
-    // Link time entries to the invoice
-    await db
-      .update(schema.timeEntries)
-      .set({ invoiceId: invoice.id })
-      .where(inArray(schema.timeEntries.id, entryIds));
+      await tx
+        .update(schema.timeEntries)
+        .set({ invoiceId: inv.id })
+        .where(inArray(schema.timeEntries.id, entryIds));
+
+      return [inv];
+    });
 
     await createAuditLog({
       actorId: userId,

@@ -101,7 +101,7 @@ export function NewRecurringDialog({
   return (
     <>
       <div
-        className="fixed inset-0 bg-black/30 z-40"
+        className="fixed inset-0 bg-[#0A0A0A]/40 z-40"
         onClick={() => setOpen(false)}
       />
       <div className="fixed inset-y-0 right-0 w-full max-w-lg bg-[#F3F3EF] border-l border-[#0A0A0A] z-50 overflow-y-auto">
@@ -243,7 +243,7 @@ export function NewRecurringDialog({
                     <button
                       type="button"
                       onClick={() => removeLineItem(idx)}
-                      className="p-1 hover:bg-red-50"
+                      className="p-1 hover:bg-[#0A0A0A]/5"
                     >
                       <Trash2 className="h-3 w-3 text-[#0A0A0A]/40" />
                     </button>

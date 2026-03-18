@@ -5,6 +5,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
@@ -12,6 +13,30 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { aj } from "@/lib/middleware/arcjet";
+
+const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "am_collective", "personal", "untagged"] as const;
+
+const leadUpdateSchema = z.object({
+  contactName: z.string().min(1).max(200).trim(),
+  companyName: z.string().max(200).nullable(),
+  email: z.string().email().max(320).nullable(),
+  phone: z.string().max(50).nullable(),
+  linkedinUrl: z.string().url().max(500).nullable(),
+  website: z.string().url().max(500).nullable(),
+  stage: z.enum(["awareness", "interest", "consideration", "intent", "closed_won", "closed_lost", "nurture"]),
+  source: z.enum(["referral", "inbound", "outbound", "conference", "social", "university", "other"]).nullable(),
+  assignedTo: z.string().max(255).nullable(),
+  estimatedValue: z.number().int().min(0).max(100_000_000).nullable(),
+  probability: z.number().int().min(0).max(100).nullable(),
+  expectedCloseDate: z.string().nullable(),
+  industry: z.string().max(200).nullable(),
+  companySize: z.string().max(100).nullable(),
+  notes: z.string().max(10000).nullable(),
+  tags: z.array(z.string()).nullable(),
+  companyTag: z.enum(companyTags),
+  lastContactedAt: z.string().nullable(),
+  nextFollowUpAt: z.string().nullable(),
+}).partial().refine(data => Object.keys(data).length > 0, "At least one field required");
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -65,6 +90,16 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
     const { id } = await ctx.params;
     const body = await request.json();
 
+    const parsed = leadUpdateSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const data = parsed.data;
+
     const [current] = await db
       .select()
       .from(schema.leads)
@@ -78,49 +113,49 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
     const [updated] = await db
       .update(schema.leads)
       .set({
-        ...(body.contactName !== undefined && {
-          contactName: body.contactName,
+        ...(data.contactName !== undefined && {
+          contactName: data.contactName,
         }),
-        ...(body.companyName !== undefined && {
-          companyName: body.companyName,
+        ...(data.companyName !== undefined && {
+          companyName: data.companyName,
         }),
-        ...(body.email !== undefined && { email: body.email }),
-        ...(body.phone !== undefined && { phone: body.phone }),
-        ...(body.linkedinUrl !== undefined && {
-          linkedinUrl: body.linkedinUrl,
+        ...(data.email !== undefined && { email: data.email }),
+        ...(data.phone !== undefined && { phone: data.phone }),
+        ...(data.linkedinUrl !== undefined && {
+          linkedinUrl: data.linkedinUrl,
         }),
-        ...(body.website !== undefined && { website: body.website }),
-        ...(body.stage !== undefined && { stage: body.stage }),
-        ...(body.source !== undefined && { source: body.source }),
-        ...(body.assignedTo !== undefined && {
-          assignedTo: body.assignedTo,
+        ...(data.website !== undefined && { website: data.website }),
+        ...(data.stage !== undefined && { stage: data.stage }),
+        ...(data.source !== undefined && { source: data.source }),
+        ...(data.assignedTo !== undefined && {
+          assignedTo: data.assignedTo,
         }),
-        ...(body.estimatedValue !== undefined && {
-          estimatedValue: body.estimatedValue,
+        ...(data.estimatedValue !== undefined && {
+          estimatedValue: data.estimatedValue,
         }),
-        ...(body.probability !== undefined && {
-          probability: body.probability,
+        ...(data.probability !== undefined && {
+          probability: data.probability,
         }),
-        ...(body.expectedCloseDate !== undefined && {
-          expectedCloseDate: body.expectedCloseDate,
+        ...(data.expectedCloseDate !== undefined && {
+          expectedCloseDate: data.expectedCloseDate,
         }),
-        ...(body.industry !== undefined && { industry: body.industry }),
-        ...(body.companySize !== undefined && {
-          companySize: body.companySize,
+        ...(data.industry !== undefined && { industry: data.industry }),
+        ...(data.companySize !== undefined && {
+          companySize: data.companySize,
         }),
-        ...(body.notes !== undefined && { notes: body.notes }),
-        ...(body.tags !== undefined && { tags: body.tags }),
-        ...(body.companyTag !== undefined && {
-          companyTag: body.companyTag,
+        ...(data.notes !== undefined && { notes: data.notes }),
+        ...(data.tags !== undefined && { tags: data.tags }),
+        ...(data.companyTag !== undefined && {
+          companyTag: data.companyTag,
         }),
-        ...(body.lastContactedAt !== undefined && {
-          lastContactedAt: body.lastContactedAt
-            ? new Date(body.lastContactedAt)
+        ...(data.lastContactedAt !== undefined && {
+          lastContactedAt: data.lastContactedAt
+            ? new Date(data.lastContactedAt)
             : null,
         }),
-        ...(body.nextFollowUpAt !== undefined && {
-          nextFollowUpAt: body.nextFollowUpAt
-            ? new Date(body.nextFollowUpAt)
+        ...(data.nextFollowUpAt !== undefined && {
+          nextFollowUpAt: data.nextFollowUpAt
+            ? new Date(data.nextFollowUpAt)
             : null,
         }),
       })
@@ -128,11 +163,11 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
       .returning();
 
     // Log stage change as activity
-    if (body.stage && body.stage !== current.stage) {
+    if (data.stage && data.stage !== current.stage) {
       await db.insert(schema.leadActivities).values({
         leadId: id,
         type: "stage_change",
-        content: `Stage changed from ${current.stage} to ${body.stage}`,
+        content: `Stage changed from ${current.stage} to ${data.stage}`,
         createdById: userId,
       });
     }
@@ -143,7 +178,7 @@ export async function PATCH(request: NextRequest, ctx: RouteContext) {
       action: "lead.updated",
       entityType: "lead",
       entityId: id,
-      metadata: body,
+      metadata: data,
     });
 
     return NextResponse.json(updated);

@@ -61,7 +61,7 @@ export default async function TeamMemberDetailPage({
             <span
               className={`inline-flex items-center px-2 py-0.5 text-xs font-mono border rounded-none ${
                 member.isActive
-                  ? "border-green-800 bg-green-50 text-green-800"
+                  ? "border-[#0A0A0A] bg-[#0A0A0A] text-white"
                   : "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/40"
               }`}
             >

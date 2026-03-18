@@ -21,9 +21,9 @@ export default async function KnowledgeArticlePage({ params }: PageProps) {
   if (!doc) notFound();
 
   const TYPE_STYLES: Record<string, string> = {
-    sop: "border-blue-700 bg-blue-50 text-blue-700",
+    sop: "border-[#0A0A0A] bg-[#0A0A0A] text-white",
     note: "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/50",
-    brief: "border-amber-700 bg-amber-50 text-amber-700",
+    brief: "border-[#0A0A0A]/30 bg-transparent text-[#0A0A0A]/70",
   };
 
   return (

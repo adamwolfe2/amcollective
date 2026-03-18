@@ -12,17 +12,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { CreateContractDialog } from "./create-contract-dialog";
+import { statusBadge, statusText, contractStatusCategory } from "@/lib/ui/status-colors";
 
-const STATUS_STYLES: Record<string, string> = {
-  draft: "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/50",
-  sent: "border-blue-700 bg-blue-50 text-blue-700",
-  viewed: "border-amber-700 bg-amber-50 text-amber-700",
-  signed: "border-green-700 bg-green-50 text-green-700",
-  countersigned: "border-green-800 bg-green-50 text-green-800",
-  active: "border-green-900 bg-green-100 text-green-900",
-  expired: "border-[#0A0A0A]/20 bg-[#0A0A0A]/5 text-[#0A0A0A]/30",
-  terminated: "border-red-700 bg-red-50 text-red-700",
-};
+const STATUS_STYLES: Record<string, string> = Object.fromEntries(
+  Object.entries(contractStatusCategory).map(([k, v]) => [k, statusBadge[v]])
+);
 
 function formatCents(cents: number | null): string {
   if (!cents) return "-";
@@ -87,7 +81,7 @@ export default async function ContractsPage() {
           <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 mb-1">
             Active
           </p>
-          <p className="font-mono text-xl font-bold text-green-800">
+          <p className={`font-mono text-xl font-bold ${statusText.positive}`}>
             {activeCount}
           </p>
         </div>
@@ -95,7 +89,7 @@ export default async function ContractsPage() {
           <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 mb-1">
             Pending Signature
           </p>
-          <p className="font-mono text-xl font-bold text-amber-700">
+          <p className={`font-mono text-xl font-bold ${statusText.warning}`}>
             {pendingSignature}
           </p>
         </div>

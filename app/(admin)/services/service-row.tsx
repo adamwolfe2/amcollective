@@ -105,7 +105,7 @@ export function ServiceRow({
         <span
           className={`inline-flex items-center px-2 py-0.5 text-xs font-mono border rounded-none ${
             service.isActive
-              ? "border-green-800 bg-green-50 text-green-800"
+              ? "border-[#0A0A0A] bg-[#0A0A0A] text-white"
               : "border-[#0A0A0A]/30 bg-[#0A0A0A]/5 text-[#0A0A0A]/40"
           }`}
         >
@@ -210,7 +210,7 @@ export function ServiceRow({
           <button
             onClick={handleDelete}
             disabled={deleting}
-            className="p-1.5 text-[#0A0A0A]/30 hover:text-red-600"
+            className="p-1.5 text-[#0A0A0A]/30 hover:text-[#0A0A0A]"
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>

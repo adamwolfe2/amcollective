@@ -340,11 +340,11 @@ export function AnalyticsCharts() {
                     ? (inv.total / totalInvoiced) * 100
                     : 0;
                 const statusColors: Record<string, string> = {
-                  paid: "bg-emerald-600",
-                  sent: "bg-blue-600",
-                  draft: "bg-[#0A0A0A]/30",
-                  overdue: "bg-red-600",
-                  open: "bg-amber-600",
+                  paid: "bg-[#0A0A0A]",
+                  sent: "bg-[#0A0A0A]/50",
+                  draft: "bg-[#0A0A0A]/20",
+                  overdue: "bg-[#0A0A0A]/70",
+                  open: "bg-[#0A0A0A]/40",
                   void: "bg-[#0A0A0A]/10",
                 };
                 return (
@@ -442,10 +442,10 @@ export function AnalyticsCharts() {
             {["urgent", "high", "medium", "low"].map((p) => {
               const found = data.tasksByPriority.find((t) => t.priority === p);
               const colorMap: Record<string, string> = {
-                urgent: "border-red-700 text-red-700",
-                high: "border-amber-700 text-amber-700",
-                medium: "border-blue-700 text-blue-700",
-                low: "border-[#0A0A0A]/30 text-[#0A0A0A]/50",
+                urgent: "border-[#0A0A0A] text-[#0A0A0A]",
+                high: "border-[#0A0A0A]/60 text-[#0A0A0A]/60",
+                medium: "border-[#0A0A0A]/40 text-[#0A0A0A]/50",
+                low: "border-[#0A0A0A]/20 text-[#0A0A0A]/40",
               };
               return (
                 <div

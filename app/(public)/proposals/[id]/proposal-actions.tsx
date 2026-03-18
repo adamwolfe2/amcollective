@@ -36,8 +36,8 @@ export function ProposalActions({ id }: { id: string }) {
 
   if (approved) {
     return (
-      <div className="border-2 border-green-800 bg-green-50 p-6 text-center">
-        <p className="font-mono text-sm text-green-800 font-bold">
+      <div className="border-2 border-[#0A0A0A] bg-[#0A0A0A]/5 p-6 text-center">
+        <p className="font-mono text-sm text-[#0A0A0A] font-bold">
           Proposal approved. We will be in touch shortly.
         </p>
       </div>

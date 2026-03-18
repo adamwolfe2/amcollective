@@ -7,13 +7,11 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty";
+import { statusBadge, statusText, rockStatusCategory } from "@/lib/ui/status-colors";
 
-const statusStyles: Record<string, string> = {
-  on_track: "text-emerald-700 border-emerald-400",
-  at_risk: "text-amber-700 border-amber-400",
-  off_track: "text-red-700 border-red-400",
-  done: "text-[#0A0A0A]/50 border-[#0A0A0A]/20",
-};
+const statusStyles: Record<string, string> = Object.fromEntries(
+  Object.entries(rockStatusCategory).map(([k, v]) => [k, statusBadge[v]])
+);
 
 const statusLabels: Record<string, string> = {
   on_track: "On Track",
@@ -65,13 +63,13 @@ export default async function RocksPage({
           <p className="text-2xl font-mono font-bold">{total}</p>
         </div>
         <div className="border border-[#0A0A0A]/10 bg-white p-4">
-          <p className="text-xs font-mono uppercase text-emerald-600 mb-1">
+          <p className={`text-xs font-mono uppercase ${statusText.positive} mb-1`}>
             On Track
           </p>
           <p className="text-2xl font-mono font-bold">{onTrack}</p>
         </div>
         <div className="border border-[#0A0A0A]/10 bg-white p-4">
-          <p className="text-xs font-mono uppercase text-amber-600 mb-1">
+          <p className={`text-xs font-mono uppercase ${statusText.warning} mb-1`}>
             At Risk
           </p>
           <p className="text-2xl font-mono font-bold">{atRisk}</p>

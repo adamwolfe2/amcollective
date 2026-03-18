@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   // Internal-only: require a shared secret to prevent abuse
   const authHeader = req.headers.get("authorization");
   const internalSecret = process.env.BOT_INTERNAL_SECRET;
-  if (internalSecret && authHeader !== `Bearer ${internalSecret}`) {
+  if (!internalSecret || authHeader !== `Bearer ${internalSecret}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -214,7 +214,7 @@ export function UploadDocumentDialog({ clients }: { clients: Client[] }) {
           </div>
 
           {error && (
-            <p className="text-sm font-mono text-red-600">{error}</p>
+            <p className="text-sm font-mono text-[#0A0A0A]/70">{error}</p>
           )}
 
           <div className="flex flex-wrap justify-end gap-2 pt-2">

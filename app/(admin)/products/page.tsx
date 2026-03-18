@@ -14,19 +14,25 @@ import * as tbgcConnector from "@/lib/connectors/tbgc";
 import * as hookConnector from "@/lib/connectors/hook";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { statusBadge, statusText } from "@/lib/ui/status-colors";
+import type { StatusCategory } from "@/lib/ui/status-colors";
+
+const productStageCategory: Record<string, StatusCategory> = {
+  idea: "neutral",
+  building: "warning",
+  beta: "info",
+  launched: "positive",
+  scaling: "info",
+  mature: "neutral",
+};
 
 function StageBadge({ stage }: { stage: string | null }) {
   if (!stage) return null;
-  const styles: Record<string, string> = {
-    idea: "bg-gray-100 text-gray-600 border-gray-200",
-    building: "bg-amber-100 text-amber-700 border-amber-200",
-    beta: "bg-blue-100 text-blue-700 border-blue-200",
-    launched: "bg-emerald-100 text-emerald-700 border-emerald-200",
-    scaling: "bg-purple-100 text-purple-700 border-purple-200",
-    mature: "bg-[#0A0A0A]/10 text-[#0A0A0A]/60 border-[#0A0A0A]/20",
-  };
+  const styles: Record<string, string> = Object.fromEntries(
+    Object.entries(productStageCategory).map(([k, v]) => [k, statusBadge[v]])
+  );
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider border ${styles[stage] ?? styles.launched}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider border ${styles[stage] ?? statusBadge.positive}`}>
       {stage}
     </span>
   );
@@ -34,9 +40,9 @@ function StageBadge({ stage }: { stage: string | null }) {
 
 function VelocityIcon({ label }: { label: string | null }) {
   if (!label) return <Minus size={12} className="text-[#0A0A0A]/30" />;
-  if (label === "accelerating") return <TrendingUp size={12} className="text-emerald-500" />;
-  if (label === "declining") return <TrendingDown size={12} className="text-red-500" />;
-  return <Minus size={12} className="text-amber-500" />;
+  if (label === "accelerating") return <TrendingUp size={12} className={statusText.positive} />;
+  if (label === "declining") return <TrendingDown size={12} className={statusText.negative} />;
+  return <Minus size={12} className={statusText.warning} />;
 }
 
 interface ProductRow {

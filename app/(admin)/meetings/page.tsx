@@ -1,13 +1,11 @@
 import { formatDistanceToNow, format } from "date-fns";
 import { getMeetings } from "@/lib/db/repositories/meetings";
 import { Badge } from "@/components/ui/badge";
+import { statusBadge, meetingStatusCategory } from "@/lib/ui/status-colors";
 
-const statusStyles: Record<string, string> = {
-  scheduled: "text-blue-700 border-blue-400",
-  in_progress: "text-amber-700 border-amber-400",
-  completed: "text-emerald-700 border-emerald-400",
-  cancelled: "text-[#0A0A0A]/40 border-[#0A0A0A]/15",
-};
+const statusStyles: Record<string, string> = Object.fromEntries(
+  Object.entries(meetingStatusCategory).map(([k, v]) => [k, statusBadge[v]])
+);
 
 const statusLabels: Record<string, string> = {
   scheduled: "scheduled",

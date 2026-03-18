@@ -124,6 +124,7 @@ export const subscriptions = pgTable(
     ),
     index("subscriptions_status_idx").on(table.status),
     index("subscriptions_cancelled_at_idx").on(table.cancelledAt),
+    index("subscriptions_current_period_end_idx").on(table.currentPeriodEnd),
   ]
 );
 
