@@ -70,13 +70,12 @@ export function ParallaxHero({
     <section className={`relative w-full ${height} overflow-hidden isolate ${className}`}>
       <div ref={bgRef} className="absolute inset-0 will-change-transform" style={bgStyle}>
         <Image
-          src="/parallax/mountain.png"
-          alt="Mount Hood over Portland"
+          src="/forest-backdrop.jpg"
+          alt="Misty forest landscape"
           fill
           priority
           sizes="100vw"
-          className="object-cover object-[center_35%] select-none pointer-events-none"
-          unoptimized
+          className="object-cover object-[center_40%] select-none pointer-events-none"
         />
       </div>
 

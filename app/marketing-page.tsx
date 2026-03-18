@@ -164,7 +164,7 @@ export function MarketingPage() {
   const [heroAnimateIn, setHeroAnimateIn] = useState(false);
   const welcomeRef = useRef<HTMLDivElement>(null);
 
-  // Panel slides up → mountains rise in → page auto-scrolls to Welcome.
+  // Panel slides up → forest hero rises in → page auto-scrolls to Welcome.
   const handleSlideStart = useCallback(() => {
     document.body.style.overflow = "";
     setHeroAnimateIn(true); // trigger parallax layer rise
