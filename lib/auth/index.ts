@@ -3,11 +3,10 @@ export { isSuperAdmin, SUPER_ADMIN_EMAILS, resolveRole } from "./require-admin";
 export { requireAdmin, requireMember, requireOwner, requireRole } from "./require-admin";
 
 /**
- * Super admin user IDs from environment. Fallback to the known owner ID.
+ * Super admin user IDs from environment. No hardcoded fallback — use
+ * SUPER_ADMIN_USER_IDS env var or rely on email-based checks.
  */
-const SUPER_ADMIN_USER_IDS = (
-  process.env.SUPER_ADMIN_USER_IDS || "user_2vqM8MZ1z7MxvJRLjJolHJAGnXp"
-)
+const SUPER_ADMIN_USER_IDS = (process.env.SUPER_ADMIN_USER_IDS || "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
@@ -19,7 +18,7 @@ const SUPER_ADMIN_USER_IDS = (
 export async function getAuthUserId(): Promise<string | null> {
   const { userId } = await auth();
   if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
+    if (process.env.BYPASS_AUTH_FOR_DEV === "true" && process.env.NODE_ENV === "development") return "dev-admin";
     return null;
   }
   return userId;
@@ -39,7 +38,7 @@ export async function requireAuth(): Promise<string> {
  */
 export async function getCurrentRole(): Promise<string> {
   const { sessionClaims } = await auth();
-  if (!sessionClaims && process.env.NODE_ENV === "development") return "owner";
+  if (!sessionClaims && process.env.BYPASS_AUTH_FOR_DEV === "true" && process.env.NODE_ENV === "development") return "owner";
   const user = await currentUser();
   const email = user?.emailAddresses?.[0]?.emailAddress;
   const { resolveRole } = await import("./require-admin");
@@ -55,7 +54,7 @@ export async function getCurrentRole(): Promise<string> {
 export async function checkAdmin(): Promise<string | null> {
   const { userId, sessionClaims } = await auth();
   if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
+    if (process.env.BYPASS_AUTH_FOR_DEV === "true" && process.env.NODE_ENV === "development") return "dev-admin";
     return null;
   }
   // Check session metadata role

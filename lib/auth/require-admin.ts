@@ -73,7 +73,7 @@ export async function requireRole(
   const { userId, sessionClaims } = await auth();
 
   if (!userId) {
-    if (process.env.NODE_ENV === "development") {
+    if (process.env.BYPASS_AUTH_FOR_DEV === "true" && process.env.NODE_ENV === "development") {
       return { userId: "dev-admin", role: "owner", error: null };
     }
     return {

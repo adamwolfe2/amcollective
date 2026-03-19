@@ -46,7 +46,7 @@ async function pingService(
       configured: true,
       reachable: false,
       latencyMs: Date.now() - start,
-      error: err instanceof Error ? err.message : String(err),
+      error: "Connection check failed",
     };
   }
 }
@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     captureError(err, { tags: { route: "POST /api/admin/connections/verify" } });
     return NextResponse.json(
-      { error: "Verification failed", message: err instanceof Error ? err.message : "Unknown" },
+      { error: "Verification failed" },
       { status: 500 }
     );
   }
