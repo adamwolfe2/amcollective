@@ -9,6 +9,7 @@
  */
 
 import { Redis } from "@upstash/redis";
+import { captureError } from "@/lib/errors";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -136,7 +137,9 @@ export async function safeCall<T>(
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Unknown connector error";
-    console.error(`[Connector Error] ${message}`);
+    captureError(err instanceof Error ? err : new Error(message), {
+      tags: { source: "connector" },
+    });
     return { success: false, error: message, fetchedAt: new Date() };
   }
 }

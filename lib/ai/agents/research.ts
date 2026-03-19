@@ -6,6 +6,7 @@
 
 import { getAnthropicClient, MODEL_SONNET } from "../client";
 import { storeEmbedding } from "../embeddings";
+import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { createAuditLog } from "@/lib/db/repositories/audit";
@@ -39,7 +40,9 @@ async function tavilySearch(
   });
 
   if (!res.ok) {
-    console.error("[research] Tavily search failed:", res.status);
+    captureError(new Error(`Tavily search failed: ${res.status}`), {
+      tags: { source: "research" },
+    });
     return { answer: "", results: [] };
   }
 
