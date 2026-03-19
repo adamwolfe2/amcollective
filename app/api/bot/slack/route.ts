@@ -26,6 +26,7 @@ import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { sanitizeUserInput } from "@/lib/ai/sanitize";
 import { ajWebhook } from "@/lib/middleware/arcjet";
+import { captureError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -250,7 +251,7 @@ export async function POST(req: NextRequest) {
   // Resolve user
   const user = resolveUser(slackUserId);
   if (!user) {
-    console.warn(`[bot/slack] Unknown Slack user: ${slackUserId}`);
+    captureError(new Error(`Unknown Slack user: ${slackUserId}`), { level: "warning", tags: { source: "bot-slack" } });
     return NextResponse.json({ ok: true });
   }
 

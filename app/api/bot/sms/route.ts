@@ -16,6 +16,7 @@ import { eq, desc } from "drizzle-orm";
 import { runCeoAgent, resolveUser } from "@/lib/ai/agents/ceo-agent";
 import { sanitizeUserInput } from "@/lib/ai/sanitize";
 import { ajWebhook } from "@/lib/middleware/arcjet";
+import { captureError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -73,7 +74,7 @@ export async function POST(req: NextRequest) {
   // Resolve user
   const user = resolveUser(senderPhone);
   if (!user) {
-    console.warn(`[bot/sms] Unknown sender: ${senderPhone}`);
+    captureError(new Error(`Unknown sender: ${senderPhone}`), { level: "warning", tags: { source: "bot-sms" } });
     return NextResponse.json({ ok: true }); // Silently ignore unknown senders
   }
 
