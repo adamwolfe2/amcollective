@@ -391,7 +391,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             />
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-safe bg-[#F3F3EF] min-h-0">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-8 bg-[#F3F3EF] min-h-0">{children}</main>
       </div>
     </div>
   );

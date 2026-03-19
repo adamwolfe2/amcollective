@@ -11,9 +11,9 @@ export const metadata: Metadata = {
 import * as schema from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import Link from "next/link";
-import { AlertCircle } from "lucide-react";
 import { LeadActions } from "./lead-actions";
 import { NewLeadForm } from "./new-lead-form";
+import { LeadKanban } from "./lead-kanban";
 import { statusBadge, statusText, leadStageCategory } from "@/lib/ui/status-colors";
 
 const STAGE_LABELS: Record<string, string> = {
@@ -83,14 +83,18 @@ export default async function LeadsPage() {
     .filter((l) => !["closed_won", "closed_lost"].includes(l.stage))
     .reduce((sum, l) => sum + (l.estimatedValue ?? 0), 0);
 
-  // Active pipeline stages for kanban
-  const kanbanStages = [
-    "awareness",
-    "interest",
-    "consideration",
-    "intent",
-    "nurture",
-  ] as const;
+  // Serialize leads for the kanban client component
+  const kanbanLeads = leads
+    .filter((l) => !["closed_won", "closed_lost"].includes(l.stage))
+    .map((l) => ({
+      id: l.id,
+      contactName: l.contactName,
+      companyName: l.companyName,
+      stage: l.stage,
+      estimatedValue: l.estimatedValue,
+      source: l.source,
+      nextFollowUpAt: l.nextFollowUpAt,
+    }));
 
   return (
     <div className="space-y-6">
@@ -147,88 +151,7 @@ export default async function LeadsPage() {
 
       {/* Kanban View */}
       <div className="overflow-x-auto">
-        <div className="flex gap-3 min-w-max pb-4">
-          {kanbanStages.map((stage) => {
-            const stageLeads = leads.filter((l) => l.stage === stage);
-            const stageValue = stageLeads.reduce(
-              (sum, l) => sum + (l.estimatedValue ?? 0),
-              0
-            );
-
-            return (
-              <div
-                key={stage}
-                className="w-64 shrink-0 border border-[#0A0A0A]/10 bg-white"
-              >
-                {/* Column header */}
-                <div className="p-3 border-b border-[#0A0A0A]/10">
-                  <div className="flex items-center justify-between">
-                    <span
-                      className={`px-2 py-0.5 text-xs font-mono ${STAGE_COLORS[stage]}`}
-                    >
-                      {STAGE_LABELS[stage]}
-                    </span>
-                    <span className="font-mono text-[10px] text-[#0A0A0A]/40">
-                      {stageLeads.length}
-                    </span>
-                  </div>
-                  <p className="font-mono text-[10px] text-[#0A0A0A]/40 mt-1">
-                    {fmtDollars(stageValue)}
-                  </p>
-                </div>
-
-                {/* Cards */}
-                <div className="p-2 space-y-2 min-h-[200px]">
-                  {stageLeads.map((lead) => {
-                    const isOverdue =
-                      lead.nextFollowUpAt && lead.nextFollowUpAt < now;
-
-                    return (
-                      <Link
-                        key={lead.id}
-                        href={`/leads/${lead.id}`}
-                        className="block p-3 border border-[#0A0A0A]/10 hover:border-[#0A0A0A]/30 transition-colors bg-[#F3F3EF]"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <p className="font-mono text-sm font-medium text-[#0A0A0A] truncate">
-                            {lead.contactName}
-                          </p>
-                          {isOverdue && (
-                            <AlertCircle className={`h-3.5 w-3.5 ${statusText.negative} shrink-0`} />
-                          )}
-                        </div>
-                        {lead.companyName && (
-                          <p className="font-mono text-[10px] text-[#0A0A0A]/50 mt-0.5 truncate">
-                            {lead.companyName}
-                          </p>
-                        )}
-                        <div className="flex items-center justify-between mt-2">
-                          {lead.estimatedValue ? (
-                            <span className="font-mono text-xs text-[#0A0A0A]/70">
-                              {fmtDollars(lead.estimatedValue)}
-                            </span>
-                          ) : (
-                            <span />
-                          )}
-                          {lead.source && (
-                            <span className="font-mono text-[9px] text-[#0A0A0A]/40 uppercase">
-                              {lead.source}
-                            </span>
-                          )}
-                        </div>
-                      </Link>
-                    );
-                  })}
-                  {stageLeads.length === 0 && (
-                    <p className="font-mono text-[10px] text-[#0A0A0A]/30 text-center py-8">
-                      No leads
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <LeadKanban leads={kanbanLeads} stageColors={STAGE_COLORS} />
       </div>
 
       {/* Table View */}
