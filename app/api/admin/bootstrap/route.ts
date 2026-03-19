@@ -28,11 +28,7 @@ export async function POST() {
 
     if (!isSuperAdmin(email)) {
       return NextResponse.json(
-        {
-          error: "Forbidden — not a super admin",
-          email,
-          allowedEmails: SUPER_ADMIN_EMAILS,
-        },
+        { error: "Forbidden" },
         { status: 403 }
       );
     }
@@ -72,12 +68,18 @@ export async function GET() {
     const user = await currentUser();
     const email = user?.emailAddresses?.[0]?.emailAddress;
 
+    if (!isSuperAdmin(email)) {
+      return NextResponse.json(
+        { error: "Forbidden" },
+        { status: 403 }
+      );
+    }
+
     return NextResponse.json({
       userId,
       email,
-      isSuperAdmin: isSuperAdmin(email),
+      isSuperAdmin: true,
       currentMetadata: user?.publicMetadata,
-      superAdminEmails: SUPER_ADMIN_EMAILS,
     });
   } catch (error) {
     captureError(error, { tags: { route: "GET /api/admin/bootstrap" } });
