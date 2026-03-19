@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { formatDistanceToNow, format } from "date-fns";
 import { getRocks, getCurrentQuarter } from "@/lib/db/repositories/rocks";
+
+export const metadata: Metadata = {
+  title: "Rocks | AM Collective",
+};
 import { Badge } from "@/components/ui/badge";
 import {
   Empty,

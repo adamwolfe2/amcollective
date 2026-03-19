@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { format, subMonths } from "date-fns";
+
+export const metadata: Metadata = {
+  title: "Exports | AM Collective",
+};
 import { ExportCard } from "./export-card";
 
 export default function ExportsPage() {

@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { formatDistanceToNow, format } from "date-fns";
 import { getMeetings } from "@/lib/db/repositories/meetings";
+
+export const metadata: Metadata = {
+  title: "Meetings | AM Collective",
+};
 import { Badge } from "@/components/ui/badge";
 import { statusBadge, meetingStatusCategory } from "@/lib/ui/status-colors";
 

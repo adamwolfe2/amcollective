@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { NavSettings } from "./nav-settings";
+
+export const metadata: Metadata = {
+  title: "Settings | AM Collective",
+};
 
 const TABS = [
   { label: "General", href: "/settings" },

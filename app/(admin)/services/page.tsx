@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { getServices } from "@/lib/db/repositories/services";
+
+export const metadata: Metadata = {
+  title: "Services | AM Collective",
+};
 import {
   Table,
   TableBody,

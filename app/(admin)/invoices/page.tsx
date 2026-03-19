@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
+
+export const metadata: Metadata = {
+  title: "Invoices | AM Collective",
+};
 import {
   getInvoices,
   getBillingKpis,

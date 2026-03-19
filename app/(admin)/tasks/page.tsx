@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
+
+export const metadata: Metadata = {
+  title: "Tasks | AM Collective",
+};
 import { TaskBoard } from "./task-board";
 
 export default async function TasksPage() {

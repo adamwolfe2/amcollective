@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getProjects } from "@/lib/db/repositories/projects";
+
+export const metadata: Metadata = {
+  title: "Projects | AM Collective",
+};
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { Badge } from "@/components/ui/badge";
 import {

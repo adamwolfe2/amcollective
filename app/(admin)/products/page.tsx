@@ -3,7 +3,12 @@
  * Shows stage, MRR, cost, margin, sprint velocity, and links to detail page
  */
 
+import type { Metadata } from "next";
 import Link from "next/link";
+
+export const metadata: Metadata = {
+  title: "Products | AM Collective",
+};
 import Image from "next/image";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";

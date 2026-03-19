@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, eq, sql, count } from "drizzle-orm";
+
+export const metadata: Metadata = {
+  title: "Sprints | AM Collective",
+};
 import Link from "next/link";
 import { createSprint } from "@/lib/actions/sprints";
 import { Plus, ChevronRight } from "lucide-react";

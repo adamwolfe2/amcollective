@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { ForecastDashboard } from "./forecast-dashboard";
+
+export const metadata: Metadata = {
+  title: "Forecast | AM Collective",
+};
 
 export default function ForecastPage() {
   return (

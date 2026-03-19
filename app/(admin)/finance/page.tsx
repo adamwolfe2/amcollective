@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, eq, and, gte, lte, sql, count } from "drizzle-orm";
+
+export const metadata: Metadata = {
+  title: "Finance | AM Collective",
+};
 import { format } from "date-fns";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as mercuryConnector from "@/lib/connectors/mercury";

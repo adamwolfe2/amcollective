@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, eq, sql, and, gte, asc, lte, isNotNull } from "drizzle-orm";
+
+export const metadata: Metadata = {
+  title: "Costs | AM Collective",
+};
 import { formatCents } from "@/lib/stripe/format";
 import { CostTrendChart } from "./cost-trend-chart";
 import { SyncButton } from "./sync-button";

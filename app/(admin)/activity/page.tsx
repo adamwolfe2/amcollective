@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { formatDistanceToNow } from "date-fns";
+
+export const metadata: Metadata = {
+  title: "Activity | AM Collective",
+};
 import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { Badge } from "@/components/ui/badge";
 import { LiveActivityFeed } from "./live-activity-feed";

@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, eq, or, sql } from "drizzle-orm";
+
+export const metadata: Metadata = {
+  title: "Knowledge | AM Collective",
+};
 import { KnowledgeList } from "./knowledge-list";
 
 export default async function KnowledgePage() {
