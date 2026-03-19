@@ -4,6 +4,16 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { ArrowRightCircle, Archive, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 type Lead = {
   id: string;
@@ -15,9 +25,10 @@ type Lead = {
 export function LeadActions({ lead }: { lead: Lead }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [showConvertDialog, setShowConvertDialog] = useState(false);
+  const [showArchiveDialog, setShowArchiveDialog] = useState(false);
 
   const handleConvert = async () => {
-    if (!confirm(`Convert ${lead.contactName} to a client?`)) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/leads/${lead.id}/convert`, {
@@ -37,7 +48,6 @@ export function LeadActions({ lead }: { lead: Lead }) {
   };
 
   const handleArchive = async () => {
-    if (!confirm(`Archive ${lead.contactName}?`)) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/leads/${lead.id}`, { method: "DELETE" });
@@ -57,10 +67,11 @@ export function LeadActions({ lead }: { lead: Lead }) {
       {!lead.convertedToClientId &&
         !["closed_won", "closed_lost"].includes(lead.stage) && (
           <button
-            onClick={handleConvert}
+            onClick={() => setShowConvertDialog(true)}
             disabled={loading}
-            className="p-1.5 text-[#0A0A0A] hover:bg-[#0A0A0A]/5 transition-colors"
+            className="p-1.5 text-[#0A0A0A] hover:bg-[#0A0A0A]/5 transition-colors disabled:opacity-50"
             title="Convert to client"
+            aria-label="Convert to client"
           >
             <ArrowRightCircle className="h-3.5 w-3.5" />
           </button>
@@ -70,18 +81,60 @@ export function LeadActions({ lead }: { lead: Lead }) {
           href={`/clients/${lead.convertedToClientId}`}
           className="p-1.5 text-[#0A0A0A]/60 hover:bg-[#0A0A0A]/5 transition-colors"
           title="View client"
+          aria-label="View client"
         >
           <ExternalLink className="h-3.5 w-3.5" />
         </a>
       )}
       <button
-        onClick={handleArchive}
+        onClick={() => setShowArchiveDialog(true)}
         disabled={loading}
-        className="p-1.5 text-[#0A0A0A]/40 hover:text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/5 transition-colors"
+        className="p-1.5 text-[#0A0A0A]/40 hover:text-[#0A0A0A]/70 hover:bg-[#0A0A0A]/5 transition-colors disabled:opacity-50"
         title="Archive"
+        aria-label="Archive lead"
       >
         <Archive className="h-3.5 w-3.5" />
       </button>
+
+      <AlertDialog open={showConvertDialog} onOpenChange={setShowConvertDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Convert to client</AlertDialogTitle>
+            <AlertDialogDescription>
+              Convert {lead.contactName} to a client? This will create a new client record from this lead.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={loading}
+              onClick={handleConvert}
+            >
+              {loading ? "Converting..." : "Convert"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showArchiveDialog} onOpenChange={setShowArchiveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive lead</AlertDialogTitle>
+            <AlertDialogDescription>
+              Archive {lead.contactName}? This lead will be moved to the archive.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={loading}
+              onClick={handleArchive}
+            >
+              {loading ? "Archiving..." : "Archive"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
