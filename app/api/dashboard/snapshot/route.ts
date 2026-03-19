@@ -49,7 +49,8 @@ export async function POST() {
           .where(eq(schema.invoices.status, "overdue")),
       ]);
 
-    const totalCash = mercuryAccounts.reduce(
+    const accounts = mercuryAccounts ?? [];
+    const totalCash = accounts.reduce(
       (s, a) => s + Number(a.balance),
       0
     );

@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { getTeam } from "@/lib/db/repositories/team";
+
+export const metadata: Metadata = {
+  title: "Team | AM Collective",
+};
 import { format } from "date-fns";
 import { Shield } from "lucide-react";
 import {

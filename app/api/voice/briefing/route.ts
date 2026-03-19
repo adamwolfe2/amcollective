@@ -92,7 +92,8 @@ export async function GET() {
     ]);
 
     const mrr = Number(mrrResult[0]?.total ?? 0) / 100;
-    const totalCash = mercuryAccounts.reduce((s, a) => s + Number(a.balance), 0) / 100;
+    const accounts = mercuryAccounts ?? [];
+    const totalCash = accounts.reduce((s, a) => s + Number(a.balance), 0) / 100;
     const overdueAmount = Number(overdueInvoices[0]?.total ?? 0) / 100;
     const pipelineValue = Number(activePipeline[0]?.totalValue ?? 0) / 100;
 

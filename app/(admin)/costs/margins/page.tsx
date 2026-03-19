@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { sql, eq, and, gte } from "drizzle-orm";
+
+export const metadata: Metadata = {
+  title: "Margins | AM Collective",
+};
 import { formatCents } from "@/lib/stripe/format";
 
 export default async function MarginsPage() {

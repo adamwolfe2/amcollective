@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
+
+export const metadata: Metadata = {
+  title: "Intelligence | AM Collective",
+};
 import { AlertTriangle, ArrowUp, TrendingUp, Users, Zap } from "lucide-react";
 
 const CATEGORY_ICONS: Record<string, typeof AlertTriangle> = {

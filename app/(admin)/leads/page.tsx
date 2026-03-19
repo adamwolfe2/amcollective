@@ -2,7 +2,12 @@
  * Leads Pipeline -- kanban and table views for managing prospects.
  */
 
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
+
+export const metadata: Metadata = {
+  title: "Leads | AM Collective",
+};
 import * as schema from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import Link from "next/link";

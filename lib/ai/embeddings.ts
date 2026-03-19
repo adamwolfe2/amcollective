@@ -59,8 +59,7 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
     return generateOpenAIEmbedding(text);
   }
 
-  // No embedding provider configured
-  console.warn("[embeddings] No embedding provider configured, skipping");
+  // No embedding provider configured — skip gracefully
   return null;
 }
 

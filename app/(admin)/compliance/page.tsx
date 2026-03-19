@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { ComplianceDashboard } from "./compliance-dashboard";
+
+export const metadata: Metadata = {
+  title: "Compliance | AM Collective",
+};
 
 export default function CompliancePage() {
   return (

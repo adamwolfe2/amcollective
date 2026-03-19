@@ -41,7 +41,9 @@ export function NavSettings() {
     try {
       const stored = localStorage.getItem(LS_KEY);
       if (stored) setHidden(JSON.parse(stored));
-    } catch {}
+    } catch {
+      // localStorage may be unavailable in SSR
+    }
   }, []);
 
   function toggle(href: string) {

@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, sql } from "drizzle-orm";
 import { format } from "date-fns";
+
+export const metadata: Metadata = {
+  title: "Webhooks | AM Collective",
+};
 import { Badge } from "@/components/ui/badge";
 import { WebhookActions } from "./webhook-actions";
 import { NewWebhookForm } from "./new-webhook-form";

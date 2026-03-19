@@ -22,7 +22,7 @@ export async function sendClientStatusEmail(data: {
 }) {
   const resend = getResend();
   if (!resend) {
-    console.warn("[email] Resend not configured, skipping client status email");
+    // Resend not configured — skip sending
     return null;
   }
 

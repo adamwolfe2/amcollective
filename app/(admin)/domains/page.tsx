@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 import * as vercelConnector from "@/lib/connectors/vercel";
+
+export const metadata: Metadata = {
+  title: "Domains | AM Collective",
+};
 import { getStatusBadge, statusBadge, statusText, type StatusCategory } from "@/lib/ui/status-colors";
 
 export default async function DomainsPage() {

@@ -13,9 +13,9 @@ import { del } from "@vercel/blob";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { checkAdmin } from "@/lib/auth";
-import { captureError } from "@/lib/errors";
 import { aj } from "@/lib/middleware/arcjet";
 
 const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
@@ -169,7 +169,7 @@ export async function DELETE(
       try {
         await del(doc.fileUrl);
       } catch (blobErr) {
-        console.warn("[documents] Blob delete warning:", blobErr);
+        captureError(blobErr, { level: "warning", tags: { source: "documents-blob-delete" } });
         // Continue with DB deletion even if blob delete fails
       }
     }

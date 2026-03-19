@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 import { VaultTable } from "./vault-client";
+
+export const metadata: Metadata = {
+  title: "Vault | AM Collective",
+};
 
 async function getCredentials() {
   return db

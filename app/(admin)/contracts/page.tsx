@@ -1,8 +1,13 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, eq } from "drizzle-orm";
+
+export const metadata: Metadata = {
+  title: "Contracts | AM Collective",
+};
 import {
   Table,
   TableBody,

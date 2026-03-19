@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
+
+export const metadata: Metadata = {
+  title: "Alerts | AM Collective",
+};
 import { getAlerts, getUnresolvedCount } from "@/lib/db/repositories/alerts";
 import { Badge } from "@/components/ui/badge";
 

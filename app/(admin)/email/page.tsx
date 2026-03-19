@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import { format } from "date-fns";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc, count } from "drizzle-orm";
+
+export const metadata: Metadata = {
+  title: "Email | AM Collective",
+};
 import {
   Table,
   TableBody,

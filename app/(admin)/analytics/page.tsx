@@ -1,7 +1,12 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 import { format } from "date-fns";
+
+export const metadata: Metadata = {
+  title: "Analytics | AM Collective",
+};
 import { Badge } from "@/components/ui/badge";
 import {
   Table,

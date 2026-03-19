@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc, and, type SQL } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
+import { captureError } from "@/lib/errors";
 
 export async function GET(req: NextRequest) {
   const userId = await checkAdmin();
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(docs);
   } catch (error) {
-    console.error("[documents-list]", error);
+    captureError(error, { tags: { source: "documents-list" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

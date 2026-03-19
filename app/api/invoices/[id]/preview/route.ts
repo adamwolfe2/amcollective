@@ -9,6 +9,7 @@ import { checkAdmin } from "@/lib/auth";
 import { getInvoice } from "@/lib/db/repositories/invoices";
 import { buildInvoiceEmail } from "@/lib/invoices/email";
 import { format } from "date-fns";
+import { captureError } from "@/lib/errors";
 
 export async function GET(
   _req: Request,
@@ -56,7 +57,7 @@ export async function GET(
       headers: { "Content-Type": "text/html; charset=utf-8" },
     });
   } catch (error) {
-    console.error("[invoice-preview]", error);
+    captureError(error, { tags: { source: "invoice-preview" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

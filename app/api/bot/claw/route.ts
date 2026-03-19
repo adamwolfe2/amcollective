@@ -58,7 +58,7 @@ const MAX_MESSAGE_LENGTH = 10000;
 function verifyAuth(request: NextRequest): boolean {
   const secret = process.env.OPENCLAW_SHARED_SECRET;
   if (!secret) {
-    console.warn("[OpenClaw] OPENCLAW_SHARED_SECRET is not set — all requests rejected");
+    // OPENCLAW_SHARED_SECRET not set — reject all requests
     return false;
   }
   const authHeader = request.headers.get("Authorization") ?? "";

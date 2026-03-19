@@ -1,5 +1,10 @@
+import type { Metadata } from "next";
 import { format } from "date-fns";
 import { getScorecardData } from "@/lib/db/repositories/scorecard";
+
+export const metadata: Metadata = {
+  title: "Scorecard | AM Collective",
+};
 import { getTeam } from "@/lib/db/repositories/team";
 import { AddMetricDialog } from "./add-metric-dialog";
 import { ScorecardCell } from "./scorecard-cell";

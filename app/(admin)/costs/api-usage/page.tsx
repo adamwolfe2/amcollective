@@ -1,6 +1,11 @@
+import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, sql, gte } from "drizzle-orm";
+
+export const metadata: Metadata = {
+  title: "API Usage | AM Collective",
+};
 import { formatCents } from "@/lib/stripe/format";
 
 export default async function ApiUsagePage() {

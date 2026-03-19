@@ -135,7 +135,9 @@ function useExpandedItems(pathname: string) {
     try {
       const stored = localStorage.getItem(LS_KEY);
       if (stored) setExpanded(new Set(JSON.parse(stored)));
-    } catch {}
+    } catch {
+      // localStorage may be unavailable in SSR
+    }
     setLoaded(true);
   }, []);
 
@@ -144,7 +146,9 @@ function useExpandedItems(pathname: string) {
     if (!loaded) return;
     try {
       localStorage.setItem(LS_KEY, JSON.stringify([...expanded]));
-    } catch {}
+    } catch {
+      // localStorage may be unavailable in SSR
+    }
   }, [expanded, loaded]);
 
   // Auto-expand items whose children contain the active page

@@ -1319,9 +1319,7 @@ export async function POST(req: NextRequest) {
 
   // ── 2. Verify Stripe is configured ─────────────────────────────────────────
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    console.warn(
-      "[stripe-webhook] STRIPE_WEBHOOK_SECRET not configured, skipping"
-    );
+    // STRIPE_WEBHOOK_SECRET not configured — skip processing
     return json({ received: true, skipped: true });
   }
 

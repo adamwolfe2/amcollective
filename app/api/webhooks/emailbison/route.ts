@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { captureError } from "@/lib/errors";
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +18,7 @@ export async function POST(request: NextRequest) {
     const expectedKey = process.env.EMAILBISON_API_KEY;
     const providedKey = request.headers.get("x-api-key");
     if (!expectedKey || providedKey !== expectedKey) {
-      console.warn("[EmailBison Webhook] Invalid or missing X-API-Key header");
+      captureError(new Error("Invalid or missing X-API-Key header"), { level: "warning", tags: { source: "emailbison-webhook" } });
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     // Update campaign stats if we have a valid campaign ID
     if (campaignId == null) {
-      console.warn(`[EmailBison Webhook] No campaignId in ${eventType} event, skipping campaign upsert`);
+      captureError(new Error(`No campaignId in ${eventType} event, skipping campaign upsert`), { level: "info", tags: { source: "emailbison-webhook" } });
     } else {
       const columnMap: Record<string, keyof typeof schema.outreachCampaigns> = {
         email_sent: "contacted",
