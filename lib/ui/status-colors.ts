@@ -113,34 +113,6 @@ export const taskPriorityCategory: Record<string, StatusCategory> = {
   none: "neutral",
 };
 
-/** Task status → status category */
-export const taskStatusCategory: Record<string, StatusCategory> = {
-  todo: "neutral",
-  in_progress: "info",
-  blocked: "negative",
-  done: "positive",
-  cancelled: "negative",
-};
-
-/** Product status → status category */
-export const productStatusCategory: Record<string, StatusCategory> = {
-  active: "positive",
-  draft: "neutral",
-  archived: "negative",
-  discontinued: "negative",
-  seasonal: "warning",
-};
-
-/** Subscription status → status category */
-export const subscriptionStatusCategory: Record<string, StatusCategory> = {
-  active: "positive",
-  past_due: "negative",
-  cancelled: "negative",
-  trialing: "info",
-  paused: "warning",
-  incomplete: "warning",
-  unpaid: "negative",
-};
 
 /** Document type → status category */
 export const docTypeCategory: Record<string, StatusCategory> = {
@@ -154,12 +126,6 @@ export const docTypeCategory: Record<string, StatusCategory> = {
   other: "neutral",
 };
 
-/** Scorecard goal status → status category */
-export const scorecardGoalCategory: Record<string, StatusCategory> = {
-  met: "positive",
-  missed: "negative",
-  pending: "neutral",
-};
 
 /** Recurring invoice status → status category */
 export const recurringStatusCategory: Record<string, StatusCategory> = {
@@ -183,12 +149,6 @@ export const serviceStatusCategory: Record<string, StatusCategory> = {
   draft: "neutral",
 };
 
-/** Webhook status → status category */
-export const webhookStatusCategory: Record<string, StatusCategory> = {
-  active: "positive",
-  inactive: "negative",
-  error: "negative",
-};
 
 /** Email status → status category */
 export const emailStatusCategory: Record<string, StatusCategory> = {
@@ -203,29 +163,6 @@ export const emailStatusCategory: Record<string, StatusCategory> = {
   ready: "info",
 };
 
-/** Sprint status → status category */
-export const sprintStatusCategory: Record<string, StatusCategory> = {
-  planning: "neutral",
-  active: "positive",
-  completed: "positive",
-  cancelled: "negative",
-};
-
-/** Engagement status → status category */
-export const engagementStatusCategory: Record<string, StatusCategory> = {
-  active: "positive",
-  completed: "positive",
-  paused: "warning",
-  cancelled: "negative",
-};
-
-/** Alert severity → status category */
-export const alertSeverityCategory: Record<string, StatusCategory> = {
-  critical: "negative",
-  warning: "warning",
-  info: "info",
-  success: "positive",
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -238,11 +175,3 @@ export function getStatusBadge(
   return statusBadge[category];
 }
 
-/** Get text classes for a status value using a domain mapping */
-export function getStatusText(
-  status: string,
-  mapping: Record<string, StatusCategory>
-): string {
-  const category = mapping[status] ?? "neutral";
-  return statusText[category];
-}
