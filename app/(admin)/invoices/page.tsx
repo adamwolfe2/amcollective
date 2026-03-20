@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
+import { unstable_cache } from "next/cache";
 
 export const metadata: Metadata = {
   title: "Invoices | AM Collective",
@@ -39,6 +40,24 @@ function formatCents(cents: number): string {
   })}`;
 }
 
+const getCachedBillingKpis = unstable_cache(
+  getBillingKpis,
+  ["invoices-billing-kpis"],
+  { revalidate: 300, tags: ["invoices"] }
+);
+
+const getCachedClients = unstable_cache(
+  getClients,
+  ["invoices-clients-list"],
+  { revalidate: 300, tags: ["invoices"] }
+);
+
+const getCachedInvoices = unstable_cache(
+  async (status: string | undefined) => getInvoices({ status }),
+  ["invoices-list"],
+  { revalidate: 300, tags: ["invoices"] }
+);
+
 export default async function InvoicesPage({
   searchParams,
 }: {
@@ -46,9 +65,9 @@ export default async function InvoicesPage({
 }) {
   const { status } = await searchParams;
   const [invoiceRows, clients, kpis] = await Promise.all([
-    getInvoices({ status: status || undefined }),
-    getClients(),
-    getBillingKpis(),
+    getCachedInvoices(status || undefined),
+    getCachedClients(),
+    getCachedBillingKpis(),
   ]);
 
   // Prepare CSV data for the export button

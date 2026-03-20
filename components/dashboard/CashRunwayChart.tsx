@@ -108,3 +108,5 @@ export function CashRunwayChart({ snapshots }: Props) {
     </div>
   );
 }
+
+export default CashRunwayChart;

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { unstable_cache } from "next/cache";
 import { getProjects } from "@/lib/db/repositories/projects";
 
 export const metadata: Metadata = {
@@ -70,22 +71,32 @@ interface ProjectRow {
   syncedAt: Date | null;
 }
 
+const getCachedProjectsData = unstable_cache(
+  async () => {
+    const [projects, vercelResult, snapshots, teamCountRows, clientCountRows] =
+      await Promise.all([
+        getProjects(),
+        vercelConnector.getProjects(),
+        db.select().from(schema.projectMetricSnapshots),
+        db
+          .select({ projectId: schema.teamAssignments.projectId, cnt: count() })
+          .from(schema.teamAssignments)
+          .groupBy(schema.teamAssignments.projectId),
+        db
+          .select({ projectId: schema.clientProjects.projectId, cnt: count() })
+          .from(schema.clientProjects)
+          .groupBy(schema.clientProjects.projectId),
+      ]);
+    return { projects, vercelResult, snapshots, teamCountRows, clientCountRows };
+  },
+  ["projects-page-data"],
+  { revalidate: 300, tags: ["projects"] }
+);
+
 export default async function ProjectsPage() {
   // Fetch everything in parallel — including batch stats (no N+1)
-  const [projects, vercelResult, snapshots, teamCountRows, clientCountRows] =
-    await Promise.all([
-      getProjects(),
-      vercelConnector.getProjects(),
-      db.select().from(schema.projectMetricSnapshots),
-      db
-        .select({ projectId: schema.teamAssignments.projectId, cnt: count() })
-        .from(schema.teamAssignments)
-        .groupBy(schema.teamAssignments.projectId),
-      db
-        .select({ projectId: schema.clientProjects.projectId, cnt: count() })
-        .from(schema.clientProjects)
-        .groupBy(schema.clientProjects.projectId),
-    ]);
+  const { projects, vercelResult, snapshots, teamCountRows, clientCountRows } =
+    await getCachedProjectsData();
 
   const vercelProjects =
     vercelResult.success && vercelResult.data ? vercelResult.data : [];

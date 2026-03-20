@@ -3,6 +3,7 @@
  */
 
 import type { Metadata } from "next";
+import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 
 export const metadata: Metadata = {
@@ -35,13 +36,20 @@ function fmtDollars(cents: number | null) {
   return "$" + (cents / 100).toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
+const getCachedLeads = unstable_cache(
+  async () =>
+    db
+      .select()
+      .from(schema.leads)
+      .where(eq(schema.leads.isArchived, false))
+      .orderBy(desc(schema.leads.updatedAt))
+      .limit(200),
+  ["leads-list"],
+  { revalidate: 60, tags: ["leads"] }
+);
+
 export default async function LeadsPage() {
-  const leads = await db
-    .select()
-    .from(schema.leads)
-    .where(eq(schema.leads.isArchived, false))
-    .orderBy(desc(schema.leads.updatedAt))
-    .limit(200);
+  const leads = await getCachedLeads();
 
   // Weighted pipeline (consideration + intent)
   const weightedValue = leads

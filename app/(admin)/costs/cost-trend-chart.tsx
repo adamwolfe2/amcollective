@@ -44,3 +44,5 @@ export function CostTrendChart({ data }: CostTrendChartProps) {
     </ResponsiveContainer>
   );
 }
+
+export default CostTrendChart;

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, eq, sql, and, gte, asc, lte, isNotNull } from "drizzle-orm";
@@ -13,7 +14,7 @@ import { SubscriptionManager, type ProjectOption } from "./subscription-manager"
 import * as stripeConnector from "@/lib/connectors/stripe";
 import Link from "next/link";
 
-// ─── Data Fetchers ────────────────────────────────────────────────────────────
+// ─── Data Fetchers (cached 5 min) ────────────────────────────────────────────
 
 async function getCommandCenterMetrics() {
   try {
@@ -322,6 +323,62 @@ async function getCostTrend() {
   }
 }
 
+// ─── Cached Wrappers ──────────────────────────────────────────────────────────
+
+const getCachedCommandCenterMetrics = unstable_cache(
+  getCommandCenterMetrics,
+  ["cost-command-center-metrics"],
+  { revalidate: 300, tags: ["costs"] }
+);
+
+const getCachedAiUsageBreakdown = unstable_cache(
+  getAiUsageBreakdown,
+  ["cost-ai-usage-breakdown"],
+  { revalidate: 300, tags: ["costs"] }
+);
+
+const getCachedUpcomingCharges = unstable_cache(
+  getUpcomingCharges,
+  ["cost-upcoming-charges"],
+  { revalidate: 300, tags: ["costs"] }
+);
+
+const getCachedSubscriptions = unstable_cache(
+  getSubscriptions,
+  ["cost-subscriptions"],
+  { revalidate: 300, tags: ["costs"] }
+);
+
+const getCachedCostSummary = unstable_cache(
+  getCostSummary,
+  ["cost-summary"],
+  { revalidate: 300, tags: ["costs"] }
+);
+
+const getCachedPerProjectCosts = unstable_cache(
+  getPerProjectCosts,
+  ["cost-per-project"],
+  { revalidate: 300, tags: ["costs"] }
+);
+
+const getCachedPortfolioProjectsList = unstable_cache(
+  getPortfolioProjectsList,
+  ["cost-portfolio-projects"],
+  { revalidate: 300, tags: ["costs"] }
+);
+
+const getCachedClientMargins = unstable_cache(
+  getClientMargins,
+  ["cost-client-margins"],
+  { revalidate: 300, tags: ["costs"] }
+);
+
+const getCachedCostTrend = unstable_cache(
+  getCostTrend,
+  ["cost-trend"],
+  { revalidate: 300, tags: ["costs"] }
+);
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default async function CostsPage() {
@@ -336,15 +393,15 @@ export default async function CostsPage() {
     aiUsage,
     portfolioProjects,
   ] = await Promise.all([
-    getCommandCenterMetrics(),
-    getUpcomingCharges(),
-    getSubscriptions(),
-    getCostSummary(),
-    getPerProjectCosts(),
-    getClientMargins(),
-    getCostTrend(),
-    getAiUsageBreakdown(),
-    getPortfolioProjectsList(),
+    getCachedCommandCenterMetrics(),
+    getCachedUpcomingCharges(),
+    getCachedSubscriptions(),
+    getCachedCostSummary(),
+    getCachedPerProjectCosts(),
+    getCachedClientMargins(),
+    getCachedCostTrend(),
+    getCachedAiUsageBreakdown(),
+    getCachedPortfolioProjectsList(),
   ]);
 
   // Serialize subscriptions for client component (dates → ISO strings)
