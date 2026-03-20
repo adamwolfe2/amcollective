@@ -2,7 +2,7 @@
  * Logo paths for portfolio products.
  * Used across dashboard, products page, and any product card component.
  */
-export const productLogos: Record<string, string> = {
+const productLogos: Record<string, string> = {
   taskspace: "/logos/taskspace.png",
   trackr: "/logos/trackr.jpg",
   wholesail: "/logos/wholesail.png",
