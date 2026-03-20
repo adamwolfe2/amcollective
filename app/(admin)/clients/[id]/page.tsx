@@ -359,7 +359,7 @@ export default async function ClientDetailPage({
             {subs.length === 0 ? (
               <div className="border border-[#0A0A0A]/10 py-8 text-center">
                 <p className="text-[#0A0A0A]/30 font-mono text-xs">
-                  No subscriptions found
+                  No subscriptions found.
                 </p>
               </div>
             ) : (
@@ -423,7 +423,7 @@ export default async function ClientDetailPage({
             {invoices.length === 0 ? (
               <div className="border border-[#0A0A0A]/10 py-8 text-center">
                 <p className="text-[#0A0A0A]/30 font-mono text-xs">
-                  No invoices found
+                  No invoices found.
                 </p>
               </div>
             ) : (

@@ -135,7 +135,7 @@ export function AddClientDialog() {
               disabled={pending}
               className="font-mono text-xs uppercase tracking-wider rounded-none bg-[#0A0A0A] text-white hover:bg-[#0A0A0A]/80"
             >
-              {pending ? "Creating..." : "Create Client"}
+              {pending ? "Adding..." : "Add Client"}
             </Button>
           </div>
         </form>

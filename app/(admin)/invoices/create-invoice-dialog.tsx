@@ -108,8 +108,8 @@ export function CreateInvoiceDialog({ clients }: { clients: Client[] }) {
       setLineItems([{ description: "", quantity: 1, unitPrice: 0 }]);
       router.refresh();
     } else {
-      setError(result.error || "Failed to create invoice");
-      toast.error(result.error || "Failed to create invoice");
+      setError(result.error || "Failed to create invoice.");
+      toast.error(result.error || "Failed to create invoice.");
     }
   }
 

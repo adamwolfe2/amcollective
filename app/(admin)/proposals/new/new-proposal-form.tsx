@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 type LineItem = {
   description: string;
@@ -133,6 +134,8 @@ export function NewProposalForm({
       if (res.ok) {
         router.push("/proposals");
       }
+    } catch {
+      toast.error("Failed to create proposal.");
     } finally {
       setLoading(false);
     }

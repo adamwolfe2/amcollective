@@ -2,6 +2,14 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 export function CreateContractDialog({
   clients,
@@ -38,21 +46,17 @@ export function CreateContractDialog({
     }
   }
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="px-4 py-2 bg-[#0A0A0A] text-white font-mono text-sm hover:bg-[#0A0A0A]/80 transition-colors"
-      >
-        New Contract
-      </button>
-    );
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A0A0A]/40">
-      <div className="bg-white border border-[#0A0A0A] p-6 w-full max-w-md">
-        <h2 className="text-lg font-bold font-serif mb-4">New Contract</h2>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button className="px-4 py-2 bg-[#0A0A0A] text-white font-mono text-sm hover:bg-[#0A0A0A]/80 transition-colors">
+          New Contract
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-bold font-serif">New Contract</DialogTitle>
+        </DialogHeader>
 
         <div className="space-y-4">
           <div>
@@ -100,7 +104,7 @@ export function CreateContractDialog({
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-2 mt-6">
+        <DialogFooter>
           <button
             onClick={() => setOpen(false)}
             className="px-4 py-2 border border-[#0A0A0A]/20 font-mono text-sm hover:bg-[#0A0A0A]/5 transition-colors"
@@ -114,8 +118,8 @@ export function CreateContractDialog({
           >
             {loading ? "Creating..." : "Create Contract"}
           </button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

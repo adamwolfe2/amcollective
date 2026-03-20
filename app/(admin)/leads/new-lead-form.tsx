@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
+import { toast } from "sonner";
 
 export function NewLeadForm() {
   const router = useRouter();
@@ -37,6 +38,8 @@ export function NewLeadForm() {
         setOpen(false);
         router.refresh();
       }
+    } catch {
+      toast.error("Failed to create lead.");
     } finally {
       setLoading(false);
     }

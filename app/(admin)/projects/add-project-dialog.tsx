@@ -126,7 +126,7 @@ export function AddProjectDialog() {
               disabled={loading}
               className="rounded-none bg-[#0A0A0A] text-white font-mono text-xs uppercase tracking-wider hover:bg-[#0A0A0A]/80"
             >
-              {loading ? "Creating..." : "Create Project"}
+              {loading ? "Adding..." : "Add Project"}
             </Button>
           </div>
         </form>

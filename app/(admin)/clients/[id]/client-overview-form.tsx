@@ -201,7 +201,7 @@ export function ClientOverviewForm({ client }: { client: ClientData }) {
         </Button>
         {success && (
           <span className="font-mono text-xs text-[#0A0A0A]/40">
-            Saved successfully.
+            Client updated.
           </span>
         )}
         {error && (

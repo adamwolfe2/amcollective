@@ -3,6 +3,14 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 type Props = {
   teamMembers: { id: string; name: string }[];
@@ -54,21 +62,17 @@ export function CreateTaskDialog({ teamMembers, projects }: Props) {
     }
   }
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="px-4 py-2 bg-[#0A0A0A] text-white font-mono text-sm hover:bg-[#0A0A0A]/80 transition-colors"
-      >
-        New Task
-      </button>
-    );
-  }
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0A0A0A]/40">
-      <div className="bg-white border border-[#0A0A0A] p-4 sm:p-6 w-full max-w-[calc(100vw-2rem)] sm:max-w-lg mx-4 sm:mx-0">
-        <h2 className="text-lg font-bold font-serif mb-4">New Task</h2>
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <button className="px-4 py-2 bg-[#0A0A0A] text-white font-mono text-sm hover:bg-[#0A0A0A]/80 transition-colors">
+          New Task
+        </button>
+      </DialogTrigger>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-lg font-bold font-serif">New Task</DialogTitle>
+        </DialogHeader>
 
         <div className="space-y-3">
           <div>
@@ -163,7 +167,7 @@ export function CreateTaskDialog({ teamMembers, projects }: Props) {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2 mt-6">
+        <DialogFooter>
           <button
             onClick={() => setOpen(false)}
             className="px-4 py-2 border border-[#0A0A0A]/20 font-mono text-sm hover:bg-[#0A0A0A]/5 transition-colors"
@@ -177,8 +181,8 @@ export function CreateTaskDialog({ teamMembers, projects }: Props) {
           >
             {loading ? "Creating..." : "Create Task"}
           </button>
-        </div>
-      </div>
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

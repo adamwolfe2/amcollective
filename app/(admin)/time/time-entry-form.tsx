@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export function TimeEntryForm({
   clients,
@@ -57,6 +58,8 @@ export function TimeEntryForm({
         setDescription("");
         router.refresh();
       }
+    } catch {
+      toast.error("Failed to save time entry.");
     } finally {
       setLoading(false);
     }

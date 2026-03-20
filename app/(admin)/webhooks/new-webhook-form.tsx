@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export function NewWebhookForm() {
   const router = useRouter();
@@ -32,6 +33,8 @@ export function NewWebhookForm() {
         setEvents("");
         router.refresh();
       }
+    } catch {
+      toast.error("Failed to create webhook.");
     } finally {
       setLoading(false);
     }

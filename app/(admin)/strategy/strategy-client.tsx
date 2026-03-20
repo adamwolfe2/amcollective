@@ -442,7 +442,7 @@ export function StrategyClient({
                   {Object.entries(productMargins)
                     .sort((a, b) => b[1].mrrCents - a[1].mrrCents)
                     .map(([tag, m]) => (
-                      <tr key={tag} className="hover:bg-[#0A0A0A]/5">
+                      <tr key={tag} className="hover:bg-[#0A0A0A]/[0.02]">
                         <td className="px-4 py-2 text-xs font-medium text-[#0A0A0A]/70 capitalize">{tag}</td>
                         <td className="px-2 py-2 text-xs text-right font-mono text-[#0A0A0A]/70">{fmtCents(m.mrrCents)}</td>
                         <td className="px-2 py-2 text-xs text-right font-mono text-[#0A0A0A]/50">{fmtCents(m.costCents)}</td>

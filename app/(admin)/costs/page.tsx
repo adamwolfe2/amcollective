@@ -609,7 +609,7 @@ export default async function CostsPage() {
                 </tr>
               ) : (
                 projectCosts.map((p) => (
-                  <tr key={p.projectId} className="group hover:bg-[#F3F3EF]/50">
+                  <tr key={p.projectId} className="group hover:bg-[#0A0A0A]/[0.02]">
                     <td className="px-5 py-3">
                       <Link
                         href={`/projects/${p.projectId}`}
@@ -746,7 +746,7 @@ export default async function CostsPage() {
                 </tr>
               ) : (
                 aiUsage.map((row, i) => (
-                  <tr key={i} className="hover:bg-[#F3F3EF]/50">
+                  <tr key={i} className="hover:bg-[#0A0A0A]/[0.02]">
                     <td className="px-5 py-3 font-serif text-sm">{row.agent}</td>
                     <td className="px-5 py-3 font-mono text-xs text-[#0A0A0A]/50">
                       {row.model.replace("claude-", "").replace(/-\d{8}$/, "")}
