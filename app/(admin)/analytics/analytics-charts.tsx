@@ -467,3 +467,5 @@ export function AnalyticsCharts() {
     </div>
   );
 }
+
+export default AnalyticsCharts;

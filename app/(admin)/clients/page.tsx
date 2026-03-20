@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
+import { unstable_cache } from "next/cache";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc, ilike, or, sql, and } from "drizzle-orm";
@@ -17,6 +18,55 @@ import { ClientSearch } from "./client-search";
 import { ClientFilter } from "./client-filter";
 import { AddClientDialog } from "./add-client-dialog";
 
+const getCachedClientCount = unstable_cache(
+  () => clientsRepo.getClientCount(),
+  ["clients-total-count"],
+  { revalidate: 300, tags: ["clients"] }
+);
+
+const getCachedClients = unstable_cache(
+  async (search: string | undefined, filter: string) => {
+    const conditions = [];
+    if (search) {
+      conditions.push(
+        or(
+          ilike(schema.clients.name, `%${search}%`),
+          ilike(schema.clients.companyName, `%${search}%`),
+          ilike(schema.clients.email, `%${search}%`)
+        )
+      );
+    }
+    if (filter === "active") {
+      conditions.push(
+        or(
+          eq(schema.clients.paymentStatus, "healthy"),
+          sql`${schema.clients.currentMrr} > 0`
+        )
+      );
+    } else if (filter === "at_risk") {
+      conditions.push(eq(schema.clients.paymentStatus, "at_risk"));
+    } else if (filter === "churned") {
+      conditions.push(eq(schema.clients.paymentStatus, "churned"));
+    }
+
+    const whereClause =
+      conditions.length > 1
+        ? and(...conditions)
+        : conditions.length === 1
+          ? conditions[0]
+          : undefined;
+
+    return db
+      .select()
+      .from(schema.clients)
+      .where(whereClause)
+      .orderBy(desc(schema.clients.currentMrr))
+      .limit(50);
+  },
+  ["clients-list"],
+  { revalidate: 300, tags: ["clients"] }
+);
+
 export default async function ClientsPage({
   searchParams,
 }: {
@@ -26,49 +76,13 @@ export default async function ClientsPage({
   const search = params.search || undefined;
   const filter = params.filter || "all";
 
-  // Build filter conditions
-  const conditions = [];
-  if (search) {
-    conditions.push(
-      or(
-        ilike(schema.clients.name, `%${search}%`),
-        ilike(schema.clients.companyName, `%${search}%`),
-        ilike(schema.clients.email, `%${search}%`)
-      )
-    );
-  }
-  if (filter === "active") {
-    conditions.push(
-      or(
-        eq(schema.clients.paymentStatus, "healthy"),
-        sql`${schema.clients.currentMrr} > 0`
-      )
-    );
-  } else if (filter === "at_risk") {
-    conditions.push(eq(schema.clients.paymentStatus, "at_risk"));
-  } else if (filter === "churned") {
-    conditions.push(eq(schema.clients.paymentStatus, "churned"));
-  }
-
-  const whereClause =
-    conditions.length > 1
-      ? and(...conditions)
-      : conditions.length === 1
-        ? conditions[0]
-        : undefined;
-
   let clientsList: (typeof schema.clients.$inferSelect)[] = [];
   let totalCount = 0;
 
   try {
     [clientsList, totalCount] = await Promise.all([
-      db
-        .select()
-        .from(schema.clients)
-        .where(whereClause)
-        .orderBy(desc(schema.clients.currentMrr))
-        .limit(50),
-      clientsRepo.getClientCount(),
+      getCachedClients(search, filter),
+      getCachedClientCount(),
     ]);
   } catch (error) {
     console.error("[clients-list] Failed to fetch clients:", error);
