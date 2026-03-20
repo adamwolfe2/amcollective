@@ -308,21 +308,25 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
     []
   );
 
+  // Transport must be stable — customFetch already injects conversationId from convIdRef
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/ai/chat",
-        body: { conversationId: activeConvId },
         fetch: customFetch,
       }),
-    [activeConvId, customFetch]
+    [customFetch]
   );
 
+  // Use a stable chat ID ref so useChat doesn't reinitialize when the server
+  // returns a new conversation ID mid-stream
+  const chatIdRef = useRef<string>("default");
+
   const { messages, setMessages, sendMessage, status, stop } = useChat({
-    id: activeConvId ?? undefined,
+    id: chatIdRef.current,
     transport,
-    onError: (err) => {
-      console.error("[AI Chat]", err);
+    onError: () => {
+      // Error is displayed as a failed message bubble
     },
   });
 
@@ -366,6 +370,8 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
 
   const handleNewChat = useCallback(() => {
     setActiveConvId(null);
+    convIdRef.current = null;
+    chatIdRef.current = `new-${Date.now()}`;
     setMessages([]);
     setSources([]);
     setShowHistory(false);
@@ -375,6 +381,8 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
   const handleSelectConversation = useCallback(
     async (convId: string) => {
       setActiveConvId(convId);
+      convIdRef.current = convId;
+      chatIdRef.current = convId;
       setSources([]);
       setShowHistory(false);
       try {
