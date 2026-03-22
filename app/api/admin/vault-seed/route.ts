@@ -12,6 +12,7 @@ import { checkAdmin } from "@/lib/auth";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { encryptPassword } from "@/lib/vault/crypto";
+import { captureError } from "@/lib/errors";
 
 // ─── Credential Map ───────────────────────────────────────────────────────────
 // Each entry: { label, service, envVar, url?, notes? }
@@ -158,7 +159,7 @@ export async function POST() {
       message: `Seeded ${seeded} credentials into vault. Skipped ${skipped}.`,
     });
   } catch (error) {
-    console.error("[admin-vault-seed]", error);
+    captureError(error, { tags: { component: "admin-vault-seed" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

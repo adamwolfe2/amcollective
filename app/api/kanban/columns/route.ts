@@ -93,7 +93,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(column, { status: 201 });
   } catch (err) {
-    console.error("[kanban/columns] Error:", err);
     captureError(err, { tags: { route: "POST /api/kanban/columns" } });
     return NextResponse.json(
       { error: "Internal server error" },

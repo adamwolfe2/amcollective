@@ -13,7 +13,7 @@
 
 import { auth, currentUser, clerkClient } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
-import { SUPER_ADMIN_EMAILS, isSuperAdmin } from "@/lib/auth/require-admin";
+import { isSuperAdmin } from "@/lib/auth/require-admin";
 import { captureError } from "@/lib/errors";
 
 export async function POST() {

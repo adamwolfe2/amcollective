@@ -80,7 +80,6 @@ export async function PATCH(
 
     return NextResponse.json({ success: true, id: updated.id, tag });
   } catch (err) {
-    console.error("[finance/tag] Error:", err);
     captureError(err, { tags: { route: "PATCH /api/finance/transactions/[id]/tag" } });
     return NextResponse.json(
       {

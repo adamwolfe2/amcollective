@@ -11,6 +11,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { checkAdmin } from "@/lib/auth";
 import { syncCampaigns } from "@/lib/connectors/emailbison";
+import { captureError } from "@/lib/errors";
 
 export async function POST() {
   try {
@@ -75,7 +76,7 @@ export async function POST() {
 
     return NextResponse.json({ success: true, synced });
   } catch (error) {
-    console.error("[Outreach Sync Error]", error);
+    captureError(error, { tags: { component: "Outreach Sync Error" } });
     const msg = error instanceof Error ? error.message : "Sync failed";
     return NextResponse.json({ error: msg }, { status: 500 });
   }

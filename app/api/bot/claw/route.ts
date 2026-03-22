@@ -28,6 +28,7 @@ import { runCeoAgent } from "@/lib/ai/agents/ceo-agent";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { sanitizeUserInput } from "@/lib/ai/sanitize";
 import { ajWebhook } from "@/lib/middleware/arcjet";
+import { captureError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // CEO agent tool chains can take up to 60s
@@ -163,7 +164,7 @@ export async function POST(request: NextRequest) {
       conversationId: result.conversationId,
     });
   } catch (error) {
-    console.error("[OpenClaw] CEO agent error:", error);
+    captureError(error, { tags: { component: "OpenClaw" } });
     return NextResponse.json(
       { error: "Internal server error — CEO agent failed" },
       { status: 500 }

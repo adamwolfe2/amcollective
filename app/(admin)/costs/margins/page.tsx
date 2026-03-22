@@ -7,6 +7,7 @@ export const metadata: Metadata = {
   title: "Margins | AM Collective",
 };
 import { formatCents } from "@/lib/stripe/format";
+import { captureError } from "@/lib/errors";
 
 export default async function MarginsPage() {
   const now = new Date();
@@ -68,7 +69,7 @@ export default async function MarginsPage() {
     totalCosts = margins.reduce((s, m) => s + m.costs, 0);
     overallMargin = totalRevenue > 0 ? Math.round(((totalRevenue - totalCosts) / totalRevenue) * 1000) / 10 : 0;
   } catch (error) {
-    console.error("[margins] Failed to fetch margin data:", error);
+    captureError(error, { tags: { component: "margins" } });
   }
 
   return (

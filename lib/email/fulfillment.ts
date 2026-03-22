@@ -1,4 +1,5 @@
 import { getResend, FROM_EMAIL, APP_URL, buildBaseHtml, type DistributorOrderItem } from "./shared";
+import { captureError } from "@/lib/errors";
 
 // ---------------------------------------------------------------------------
 // sendDistributorOrderNotification
@@ -118,7 +119,7 @@ View your fulfillment queue: ${portalUrl}`;
     });
     return { success: true };
   } catch (error) {
-    console.error('Failed to send distributor order notification:', error);
+    captureError(error, { tags: { component: "unknown" } });
     return { success: false, error };
   }
 }

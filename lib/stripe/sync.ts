@@ -13,6 +13,7 @@ import { getStripeClient } from "@/lib/stripe/config";
 import { STRIPE_ACCOUNTS } from "@/lib/stripe/constants";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
+import { captureError } from "@/lib/errors";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -598,7 +599,7 @@ export async function syncEverything(): Promise<SyncResult> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     result.errors.push(`Customer sync failed: ${message}`);
-    console.error("[Stripe Sync] Customer sync failed:", message);
+    captureError(err, { tags: { component: "stripe-sync" } });
   }
 
   // 2. Subscriptions — depends on customers being linked
@@ -607,7 +608,7 @@ export async function syncEverything(): Promise<SyncResult> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     result.errors.push(`Subscription sync failed: ${message}`);
-    console.error("[Stripe Sync] Subscription sync failed:", message);
+    captureError(err, { tags: { component: "stripe-sync" } });
   }
 
   // 3. Invoices — depends on customers being linked
@@ -616,7 +617,7 @@ export async function syncEverything(): Promise<SyncResult> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     result.errors.push(`Invoice sync failed: ${message}`);
-    console.error("[Stripe Sync] Invoice sync failed:", message);
+    captureError(err, { tags: { component: "stripe-sync" } });
   }
 
   // 4. Charges — depends on customers and invoices being linked
@@ -625,9 +626,9 @@ export async function syncEverything(): Promise<SyncResult> {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     result.errors.push(`Charge sync failed: ${message}`);
-    console.error("[Stripe Sync] Charge sync failed:", message);
+    captureError(err, { tags: { component: "stripe-sync" } });
   }
 
-  console.info("[Stripe Sync] Full sync complete:", result);
+  // Sync complete — result tracked by caller
   return result;
 }

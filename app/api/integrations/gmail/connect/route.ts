@@ -10,6 +10,7 @@ import { initiateGmailConnection, isComposioConfigured } from "@/lib/integration
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
+import { captureError } from "@/lib/errors";
 
 export async function POST(request: Request) {
   const { userId, error } = await requireAdmin();
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ redirectUrl: result.redirectUrl });
   } catch (err) {
-    console.error("[gmail/connect] Composio error:", err);
+    captureError(err, { tags: { component: "gmail/connect" } });
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Failed to initiate Gmail connection" },
       { status: 500 }

@@ -29,6 +29,7 @@ import { eq, and } from "drizzle-orm";
 import { createAlert } from "@/lib/db/repositories/alerts";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { ajWebhook } from "@/lib/middleware/arcjet";
+import { captureError } from "@/lib/errors";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -295,7 +296,7 @@ export async function POST(request: NextRequest) {
       .where(eq(schema.webhookRegistrations.id, registration.id))
       .catch(() => {});
 
-    console.error("[webhook/projects] Processing error:", err);
+    captureError(err, { tags: { component: "webhook/projects" } });
     return NextResponse.json(
       { error: "Internal processing error" },
       { status: 500 }

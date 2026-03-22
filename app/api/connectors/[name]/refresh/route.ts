@@ -11,6 +11,7 @@
 import { NextResponse } from "next/server";
 import { checkAdmin } from "@/lib/auth";
 import { invalidateCache } from "@/lib/connectors/base";
+import { captureError } from "@/lib/errors";
 
 // Known connector cache keys — invalidate all keys for the given connector name
 const CONNECTOR_KEYS: Record<string, string[]> = {
@@ -51,7 +52,7 @@ export async function POST(
       refreshedAt: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("[connector-refresh]", error);
+    captureError(error, { tags: { component: "connector-refresh" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -10,6 +10,7 @@ import { isComposioConfigured } from "@/lib/integrations/composio";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
+import { captureError } from "@/lib/errors";
 
 export async function GET() {
   const { userId, error } = await requireAdmin();
@@ -43,7 +44,7 @@ export async function GET() {
       accountId: account?.id ?? null,
     });
   } catch (error) {
-    console.error("[gmail-status]", error);
+    captureError(error, { tags: { component: "gmail-status" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

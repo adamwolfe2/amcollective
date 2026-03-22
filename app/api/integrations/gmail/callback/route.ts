@@ -13,6 +13,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { captureError } from "@/lib/errors";
 
 export async function GET(request: Request) {
   const { userId, error } = await requireAdmin();
@@ -73,7 +74,7 @@ export async function GET(request: Request) {
       `${origin}/settings/integrations?success=gmail_connected`
     );
   } catch (error) {
-    console.error("[gmail-callback]", error);
+    captureError(error, { tags: { component: "gmail-callback" } });
     return NextResponse.redirect(
       `${origin}/settings/integrations?error=internal_error`
     );

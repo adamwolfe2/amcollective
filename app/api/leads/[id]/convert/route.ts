@@ -98,7 +98,7 @@ export async function POST(_request: NextRequest, ctx: RouteContext) {
             redirectUrl: portalUrl,
           });
         } catch (err) {
-          console.error("[convert] Clerk invite failed:", err);
+          captureError(err, { tags: { component: "convert" } });
         }
         try {
           await sendClientWelcomeEmail({
@@ -107,7 +107,7 @@ export async function POST(_request: NextRequest, ctx: RouteContext) {
             portalUrl,
           });
         } catch (err) {
-          console.error("[convert] Welcome email failed:", err);
+          captureError(err, { tags: { component: "convert" } });
         }
       });
     }

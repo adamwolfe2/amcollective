@@ -1,4 +1,5 @@
 import { getResend, FROM_EMAIL, APP_URL, buildBaseHtml, type OrderEmailData } from "./shared";
+import { captureError } from "@/lib/errors";
 
 // ---------------------------------------------------------------------------
 // sendOrderConfirmation
@@ -98,7 +99,7 @@ Have questions? Reply to this email.
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send order confirmation email:", error);
+    captureError(error, { tags: { component: "email-orders" } });
     return { success: false, error };
   }
 }
@@ -158,7 +159,7 @@ Track your order: ${orderUrl}
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send shipped email:", error);
+    captureError(error, { tags: { component: "email-orders" } });
     return { success: false, error };
   }
 }
@@ -212,7 +213,7 @@ P.S. Leave feedback or message us anytime through your portal.
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send delivered email:", error);
+    captureError(error, { tags: { component: "email-orders" } });
     return { success: false, error };
   }
 }

@@ -24,7 +24,6 @@ export async function POST(req: NextRequest) {
     await inngest.send({ name: "sync-posthog-analytics", data: {} });
     return NextResponse.json({ success: true, message: "PostHog sync triggered" });
   } catch (err) {
-    console.error("[posthog-sync] Error:", err);
     captureError(err, { tags: { route: "POST /api/admin/posthog-sync" } });
     return NextResponse.json(
       {

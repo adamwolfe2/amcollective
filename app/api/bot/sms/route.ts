@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[bot/sms] Error:", error);
+    captureError(error, { tags: { component: "bot/sms" } });
 
     // Send error reply
     await sendMessage({

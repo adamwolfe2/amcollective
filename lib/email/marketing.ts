@@ -1,4 +1,5 @@
 import { getResend, FROM_EMAIL, APP_URL, buildBaseHtml } from "./shared";
+import { captureError } from "@/lib/errors";
 
 // ---------------------------------------------------------------------------
 // sendDropAlertEmail
@@ -61,7 +62,7 @@ Shop now: ${APP_URL}
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send drop alert email:", error);
+    captureError(error, { tags: { component: "email-marketing" } });
     return { success: false, error };
   }
 }
@@ -155,7 +156,7 @@ truffleboys.com/drops
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send drop blast email:", error);
+    captureError(error, { tags: { component: "email-marketing" } });
     return { success: false, error };
   }
 }
@@ -252,7 +253,7 @@ P.S. Reply to this email if you have any questions about pricing, delivery, or y
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send abandoned cart email:", error);
+    captureError(error, { tags: { component: "email-marketing" } });
     return { success: false, error };
   }
 }

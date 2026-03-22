@@ -1,4 +1,5 @@
 import { getResend, FROM_EMAIL, APP_URL, OPS_NAME, buildBaseHtml } from "./shared";
+import { captureError } from "@/lib/errors";
 
 // ---------------------------------------------------------------------------
 // sendWelcomePartnerEmail
@@ -97,7 +98,7 @@ Browse the catalog: ${catalogUrl}
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send welcome email:", error);
+    captureError(error, { tags: { component: "email-onboarding" } });
     return { success: false, error };
   }
 }
@@ -179,7 +180,7 @@ Questions? Reply to this email or reach us at orders@truffleboys.com.
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send partner day-3 email:", error);
+    captureError(error, { tags: { component: "email-onboarding" } });
     return { success: false, error };
   }
 }
@@ -231,7 +232,7 @@ As always, reply here if you have questions about availability, pricing, or deli
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send partner day-7 email:", error);
+    captureError(error, { tags: { component: "email-onboarding" } });
     return { success: false, error };
   }
 }
@@ -329,7 +330,7 @@ We appreciate your interest and hope to have the opportunity to work together in
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send application status email:", error);
+    captureError(error, { tags: { component: "email-onboarding" } });
     return { success: false, error };
   }
 }
@@ -449,7 +450,7 @@ We appreciate your interest and hope to have the opportunity to work together in
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send wholesale rejection email:", error);
+    captureError(error, { tags: { component: "email-onboarding" } });
     return { success: false, error };
   }
 }

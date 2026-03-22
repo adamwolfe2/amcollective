@@ -169,7 +169,6 @@ export async function GET() {
     await cache.set("finance:summary", summary, 300); // 5 min
     return NextResponse.json(summary);
   } catch (err) {
-    console.error("[finance/summary] Error:", err);
     captureError(err, { tags: { route: "GET /api/finance/summary" } });
     return NextResponse.json(
       {

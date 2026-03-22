@@ -24,7 +24,6 @@ export async function POST(req: NextRequest) {
     await inngest.send({ name: "sync-mercury", data: {} });
     return NextResponse.json({ success: true, message: "Mercury sync triggered" });
   } catch (err) {
-    console.error("[mercury-sync] Error:", err);
     captureError(err, { tags: { route: "POST /api/admin/mercury-sync" } });
     return NextResponse.json(
       {

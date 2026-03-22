@@ -1,4 +1,5 @@
 import { getResend, FROM_EMAIL, APP_URL, buildBaseHtml, type OrderEmailData } from "./shared";
+import { captureError } from "@/lib/errors";
 
 // ---------------------------------------------------------------------------
 // sendContractEmail — send contract signing link to client
@@ -303,7 +304,7 @@ View in admin: ${adminUrl}`;
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send internal notification:", error);
+    captureError(error, { tags: { component: "email-notifications" } });
     return { success: false, error };
   }
 }

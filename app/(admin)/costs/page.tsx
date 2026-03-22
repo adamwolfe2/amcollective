@@ -13,6 +13,7 @@ import { SyncButton } from "./sync-button";
 import { SubscriptionManager, type ProjectOption } from "./subscription-manager";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import Link from "next/link";
+import { captureError } from "@/lib/errors";
 
 // ─── Data Fetchers (cached 5 min) ────────────────────────────────────────────
 
@@ -77,7 +78,7 @@ async function getCommandCenterMetrics() {
       monthlySpend,
     };
   } catch (err) {
-    console.error("[Costs] getCommandCenterMetrics failed:", err);
+    captureError(err, { tags: { component: "Costs" } });
     return { totalCash: 0, mrr: 0, subscriptionBurn: 0, toolBurn: 0, aiApiBurn: 0, totalMonthlyBurn: 0, net: 0, runway: null, monthlySpend: 0 };
   }
 }
@@ -103,7 +104,7 @@ async function getAiUsageBreakdown() {
       )
       .orderBy(desc(sql`COALESCE(SUM(${schema.apiUsage.cost}), 0)`));
   } catch (err) {
-    console.error("[Costs] getAiUsageBreakdown failed:", err);
+    captureError(err, { tags: { component: "Costs" } });
     return [];
   }
 }
@@ -123,7 +124,7 @@ async function getUpcomingCharges() {
       )
       .orderBy(asc(schema.subscriptionCosts.nextRenewal));
   } catch (err) {
-    console.error("[Costs] getUpcomingCharges failed:", err);
+    captureError(err, { tags: { component: "Costs" } });
     return [];
   }
 }
@@ -136,7 +137,7 @@ async function getSubscriptions() {
       .where(eq(schema.subscriptionCosts.isActive, true))
       .orderBy(asc(schema.subscriptionCosts.nextRenewal));
   } catch (err) {
-    console.error("[Costs] getSubscriptions failed:", err);
+    captureError(err, { tags: { component: "Costs" } });
     return [];
   }
 }
@@ -163,7 +164,7 @@ async function getCostSummary() {
       )
       .groupBy(schema.toolAccounts.id);
   } catch (err) {
-    console.error("[Costs] getCostSummary failed:", err);
+    captureError(err, { tags: { component: "Costs" } });
     return [];
   }
 }
@@ -228,7 +229,7 @@ async function getPerProjectCosts() {
     rows.sort((a, b) => b.totalCost - a.totalCost);
     return rows;
   } catch (err) {
-    console.error("[Costs] getPerProjectCosts failed:", err);
+    captureError(err, { tags: { component: "Costs" } });
     return [];
   }
 }
@@ -240,7 +241,7 @@ async function getPortfolioProjectsList(): Promise<ProjectOption[]> {
       .from(schema.portfolioProjects)
       .orderBy(asc(schema.portfolioProjects.name));
   } catch (err) {
-    console.error("[Costs] getPortfolioProjectsList failed:", err);
+    captureError(err, { tags: { component: "Costs" } });
     return [];
   }
 }
@@ -298,7 +299,7 @@ async function getClientMargins() {
       };
     });
   } catch (err) {
-    console.error("[Costs] getClientMargins failed:", err);
+    captureError(err, { tags: { component: "Costs" } });
     return [];
   }
 }
@@ -318,7 +319,7 @@ async function getCostTrend() {
       .groupBy(sql`TO_CHAR(${schema.toolCosts.createdAt}, 'YYYY-MM')`)
       .orderBy(sql`month`);
   } catch (err) {
-    console.error("[Costs] getCostTrend failed:", err);
+    captureError(err, { tags: { component: "Costs" } });
     return [];
   }
 }

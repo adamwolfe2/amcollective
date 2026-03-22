@@ -76,7 +76,6 @@ export async function POST(
 
     return NextResponse.json(comment, { status: 201 });
   } catch (err) {
-    console.error("[kanban/comments] Error:", err);
     captureError(err, { tags: { route: "POST /api/kanban/cards/[cardId]/comments" } });
     return NextResponse.json(
       { error: "Internal server error" },

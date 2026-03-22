@@ -11,6 +11,7 @@ import { emailbisonReplies } from "@/lib/db/schema";
 import { markReplyRead, markReplyInterested } from "@/lib/connectors/emailbison";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { desc, eq, count } from "drizzle-orm";
+import { captureError } from "@/lib/errors";
 
 export async function GET(req: NextRequest) {
   const userId = await checkAdmin();
@@ -38,7 +39,7 @@ export async function GET(req: NextRequest) {
       unreadCount: unreadRow?.count ?? 0,
     });
   } catch (error) {
-    console.error("[outreach-inbox-get]", error);
+    captureError(error, { tags: { component: "outreach-inbox-get" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[outreach-inbox-post]", error);
+    captureError(error, { tags: { component: "outreach-inbox-post" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

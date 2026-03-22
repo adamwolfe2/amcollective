@@ -20,6 +20,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClientOverviewForm } from "./client-overview-form";
 import { DeleteClientButton } from "./delete-client-button";
+import { captureError } from "@/lib/errors";
 
 export default async function ClientDetailPage({
   params,
@@ -54,7 +55,7 @@ export default async function ClientDetailPage({
   } catch (error) {
     // Re-throw Next.js navigation errors (notFound, redirect)
     if (error && typeof error === "object" && "digest" in error) throw error;
-    console.error("[client-detail] Failed to fetch client data:", error);
+    captureError(error, { tags: { component: "client-detail" } });
     if (!client) notFound();
   }
 

@@ -13,6 +13,7 @@ import type { MercuryAccount } from "@/lib/connectors/mercury";
 import { CashFlowChart } from "./cash-flow-chart";
 import { TransactionFeed } from "./transaction-feed";
 import { MercurySyncButton } from "./sync-button";
+import { captureError } from "@/lib/errors";
 
 const PAGE_SIZE = 50;
 
@@ -44,7 +45,7 @@ async function getMetrics() {
 
     return { totalCash, mrr, arr, runway, monthlySpend, accounts };
   } catch (err) {
-    console.error("[Finance] getMetrics failed:", err);
+    captureError(err, { tags: { component: "Finance" } });
     return { totalCash: 0, mrr: 0, arr: 0, runway: null, monthlySpend: 0, accounts: [] as MercuryAccount[] };
   }
 }
@@ -83,7 +84,7 @@ async function getCashFlowData() {
       };
     });
   } catch (err) {
-    console.error("[Finance] getCashFlowData failed:", err);
+    captureError(err, { tags: { component: "Finance" } });
     return [];
   }
 }
@@ -127,7 +128,7 @@ async function getTransactions(page: number) {
       totalCount: totalRows[0]?.total ?? 0,
     };
   } catch (err) {
-    console.error("[Finance] getTransactions failed:", err);
+    captureError(err, { tags: { component: "Finance" } });
     return { transactions: [], totalCount: 0 };
   }
 }
@@ -141,7 +142,7 @@ async function getRevenueTrend() {
       revenue: p.revenue / 100,
     }));
   } catch (err) {
-    console.error("[Finance] getRevenueTrend failed:", err);
+    captureError(err, { tags: { component: "Finance" } });
     return [];
   }
 }
@@ -187,7 +188,7 @@ async function getCostData() {
         .sort((a, b) => b.amount - a.amount),
     };
   } catch (err) {
-    console.error("[Finance] getCostData failed:", err);
+    captureError(err, { tags: { component: "Finance" } });
     return { activeCosts: [], upcomingRenewals: [], totalMonthlyBurn: 0, burnByCompany: [] };
   }
 }

@@ -1,4 +1,5 @@
 import { getResend, FROM_EMAIL, APP_URL } from "./shared";
+import { captureError } from "@/lib/errors";
 
 // ---------------------------------------------------------------------------
 // sendWeeklyDigestEmail — premium weekly summary sent to active clients
@@ -231,7 +232,7 @@ Manage preferences: ${settingsUrl}
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send weekly digest email:", error);
+    captureError(error, { tags: { component: "email-digests" } });
     return { success: false, error };
   }
 }

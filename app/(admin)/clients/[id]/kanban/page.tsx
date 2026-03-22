@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { KanbanBoard } from "./kanban-board";
+import { captureError } from "@/lib/errors";
 
 export default async function ClientKanbanPage({
   params,
@@ -117,7 +118,7 @@ export default async function ClientKanbanPage({
   } catch (error) {
     // Re-throw Next.js navigation errors (notFound, redirect)
     if (error && typeof error === "object" && "digest" in error) throw error;
-    console.error("[client-kanban] Failed to fetch kanban data:", error);
+    captureError(error, { tags: { component: "client-kanban" } });
     notFound();
   }
 }

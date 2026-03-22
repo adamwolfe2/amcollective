@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, gte, count, sql } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
+import { captureError } from "@/lib/errors";
 
 export async function GET() {
   try {
@@ -113,7 +114,7 @@ export async function GET() {
       dailyActivity,
     });
   } catch (error) {
-    console.error("[Outreach API Error]", error);
+    captureError(error, { tags: { component: "Outreach API Error" } });
     return NextResponse.json(
       { error: "Failed to fetch outreach data" },
       { status: 500 }

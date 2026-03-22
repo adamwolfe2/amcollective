@@ -25,6 +25,7 @@ import * as schema from "@/lib/db/schema";
 import { eq, and, sql } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { ajWebhook } from "@/lib/middleware/arcjet";
+import { captureError } from "@/lib/errors";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -78,10 +79,7 @@ export async function POST(request: NextRequest) {
       "svix-signature": svixSignature,
     }) as ClerkWebhookEvent;
   } catch (err) {
-    console.error(
-      "[webhook/clerk] Signature verification failed:",
-      err instanceof Error ? err.message : err
-    );
+    captureError(err instanceof Error ? err.message : err, { tags: { component: "webhook/clerk" } });
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
@@ -249,7 +247,7 @@ export async function POST(request: NextRequest) {
         // Last-resort fallback — nothing more we can do.
       });
 
-    console.error("[webhook/clerk] Processing error:", err);
+    captureError(err, { tags: { component: "webhook/clerk" } });
     return NextResponse.json(
       { error: "Internal processing error" },
       { status: 500 }

@@ -122,7 +122,6 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (err) {
-    console.error("[documents] Error:", err);
     captureError(err, { tags: { route: "PATCH /api/documents/[id]" } });
     return NextResponse.json(
       { error: "Internal server error" },
@@ -190,8 +189,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[documents] Error:", err);
-    captureError(err, { tags: { route: "DELETE /api/documents/[id]" } });
+    captureError(err, { tags: { component: "documents" } });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

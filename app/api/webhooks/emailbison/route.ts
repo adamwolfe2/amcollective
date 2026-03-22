@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("[EmailBison Webhook Error]", error);
+    captureError(error, { tags: { component: "EmailBison Webhook Error" } });
     // Return 200 to prevent EmailBison retry storms
     return NextResponse.json({ received: true });
   }

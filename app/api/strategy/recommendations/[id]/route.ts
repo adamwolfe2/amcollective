@@ -9,6 +9,7 @@ import { requireAdmin } from "@/lib/auth/require-admin";
 import { db } from "@/lib/db";
 import { strategyRecommendations } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { captureError } from "@/lib/errors";
 
 type Status = "active" | "in_progress" | "done" | "dismissed";
 
@@ -38,7 +39,7 @@ export async function PATCH(
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("[strategy-recommendations-patch]", error);
+    captureError(error, { tags: { component: "strategy-recommendations-patch" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

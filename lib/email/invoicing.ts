@@ -1,4 +1,5 @@
 import { getResend, FROM_EMAIL, APP_URL, buildBaseHtml } from "./shared";
+import { captureError } from "@/lib/errors";
 
 // ---------------------------------------------------------------------------
 // sendInvoiceEmail
@@ -77,7 +78,7 @@ Questions? Reply here or message us in your portal.
     });
     return { success: true };
   } catch (error) {
-    console.error("Failed to send invoice email:", error);
+    captureError(error, { tags: { component: "email-invoicing" } });
     return { success: false, error };
   }
 }

@@ -44,7 +44,6 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (err) {
-    console.error("[kanban/columns] Error:", err);
     captureError(err, { tags: { route: "PATCH /api/kanban/columns/[columnId]" } });
     return NextResponse.json(
       { error: "Internal server error" },
@@ -85,8 +84,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[kanban/columns] Error:", err);
-    captureError(err, { tags: { route: "DELETE /api/kanban/columns/[columnId]" } });
+    captureError(err, { tags: { component: "kanban/columns" } });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

@@ -10,6 +10,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { captureError } from "@/lib/errors";
 
 export async function DELETE() {
   const { userId, error } = await requireAdmin();
@@ -54,7 +55,7 @@ export async function DELETE() {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("[gmail-disconnect]", error);
+    captureError(error, { tags: { component: "gmail-disconnect" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

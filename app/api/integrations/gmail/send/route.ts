@@ -11,6 +11,7 @@ import { createMessage } from "@/lib/db/repositories/messages";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
+import { captureError } from "@/lib/errors";
 
 export async function POST(request: Request) {
   const { userId, error } = await requireAdmin();
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, messageId: msg.id });
   } catch (error) {
-    console.error("[gmail-send]", error);
+    captureError(error, { tags: { component: "gmail-send" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

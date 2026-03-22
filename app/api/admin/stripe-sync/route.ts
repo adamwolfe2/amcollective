@@ -26,7 +26,6 @@ export async function POST(req: NextRequest) {
     const result = await syncEverything();
     return NextResponse.json({ success: true, ...result });
   } catch (err) {
-    console.error("[stripe-sync] Error:", err);
     captureError(err, { tags: { route: "POST /api/admin/stripe-sync" } });
     return NextResponse.json(
       {

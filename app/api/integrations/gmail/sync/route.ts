@@ -8,6 +8,7 @@
 import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { inngest } from "@/lib/inngest/client";
+import { captureError } from "@/lib/errors";
 
 export async function POST() {
   const { userId, error } = await requireAdmin();
@@ -21,7 +22,7 @@ export async function POST() {
 
     return NextResponse.json({ success: true, message: "Gmail sync triggered" });
   } catch (error) {
-    console.error("[gmail-sync]", error);
+    captureError(error, { tags: { component: "gmail-sync" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

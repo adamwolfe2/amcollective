@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { ClientSearch } from "./client-search";
 import { ClientFilter } from "./client-filter";
 import { AddClientDialog } from "./add-client-dialog";
+import { captureError } from "@/lib/errors";
 
 const getCachedClientCount = unstable_cache(
   () => clientsRepo.getClientCount(),
@@ -85,7 +86,7 @@ export default async function ClientsPage({
       getCachedClientCount(),
     ]);
   } catch (error) {
-    console.error("[clients-list] Failed to fetch clients:", error);
+    captureError(error, { tags: { component: "clients-list" } });
   }
 
   return (

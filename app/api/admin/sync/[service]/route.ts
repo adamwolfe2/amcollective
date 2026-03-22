@@ -169,7 +169,6 @@ export async function POST(
       })
       .where(eq(schema.syncRuns.id, run.id));
 
-    console.error(`[sync/${service}] Error:`, err);
     captureError(err, { tags: { route: `POST /api/admin/sync/${service}` } });
 
     return NextResponse.json(

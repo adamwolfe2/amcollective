@@ -22,6 +22,7 @@ import { createAuditLog } from "@/lib/db/repositories/audit";
 import { notifySlack } from "@/lib/webhooks/slack";
 import { ajWebhook } from "@/lib/middleware/arcjet";
 import type Stripe from "stripe";
+import { captureError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -1338,7 +1339,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Signature verification failed";
-    console.error("[stripe-webhook] Signature verification failed:", message);
+    captureError(message, { tags: { component: "stripe-webhook" } });
     return json({ error: message }, 400);
   }
 
@@ -1368,7 +1369,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     // If the idempotency insert fails, log but continue processing.
     // Better to risk a duplicate than to drop the event entirely.
-    console.error("[stripe-webhook] Idempotency insert failed:", err);
+    captureError(err, { tags: { component: "stripe-webhook" } });
   }
 
   // ── 5. Dispatch to handler ─────────────────────────────────────────────────
@@ -1394,10 +1395,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : "Unknown processing error";
-    console.error(
-      `[stripe-webhook] Error processing ${event.type} (${event.id}):`,
-      message
-    );
+    captureError(err, { tags: { component: "stripe-webhook", eventType: event.type, eventId: event.id } });
 
     // Record the error on the already-inserted event row
     try {
@@ -1411,10 +1409,7 @@ export async function POST(req: NextRequest) {
           )
         );
     } catch (recordErr) {
-      console.error(
-        "[stripe-webhook] Failed to record webhook error:",
-        recordErr
-      );
+      captureError(recordErr, { tags: { component: "stripe-webhook" } });
     }
 
     return json({ error: "Webhook processing failed" }, 500);

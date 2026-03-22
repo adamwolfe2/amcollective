@@ -41,6 +41,7 @@ import { gatherBriefingData } from "@/lib/ai/agents/morning-briefing";
 import * as mercuryConnector from "@/lib/connectors/mercury";
 import { detectAnomalies } from "@/lib/ai/agents/anomaly-detection";
 import { getAlerts } from "@/lib/db/repositories/alerts";
+import { captureError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -125,7 +126,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(snapshot);
   } catch (error) {
-    console.error("[bot-claw-status]", error);
+    captureError(error, { tags: { component: "bot-claw-status" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

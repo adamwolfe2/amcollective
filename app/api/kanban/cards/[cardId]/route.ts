@@ -93,7 +93,6 @@ export async function PATCH(
 
     return NextResponse.json(updated);
   } catch (err) {
-    console.error("[kanban/cards] Error:", err);
     captureError(err, { tags: { route: "PATCH /api/kanban/cards/[cardId]" } });
     return NextResponse.json(
       { error: "Internal server error" },
@@ -134,8 +133,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("[kanban/cards] Error:", err);
-    captureError(err, { tags: { route: "DELETE /api/kanban/cards/[cardId]" } });
+    captureError(err, { tags: { component: "kanban/cards" } });
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }

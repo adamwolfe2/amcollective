@@ -149,7 +149,6 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json(document, { status: 201 });
   } catch (err) {
-    console.error("[documents/upload] Error:", err);
     captureError(err, { tags: { route: "POST /api/documents/upload" } });
     return NextResponse.json(
       {

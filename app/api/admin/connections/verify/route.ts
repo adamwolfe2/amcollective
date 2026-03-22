@@ -40,7 +40,7 @@ async function pingService(
       latencyMs: Date.now() - start,
       error: null,
     };
-  } catch (err) {
+  } catch {
     return {
       service: name,
       configured: true,

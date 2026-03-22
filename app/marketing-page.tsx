@@ -338,7 +338,7 @@ function VenturesTab() {
                     alt={`${venture.name} logo`}
                     width={36}
                     height={36}
-                    className="object-contain rounded-sm"
+                    className="object-contain rounded-none"
                     unoptimized
                   />
                 </div>
@@ -354,7 +354,7 @@ function VenturesTab() {
                   href={venture.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 font-serif text-sm text-[#0A0A0A] border border-[#0A0A0A]/15 rounded px-5 py-2 hover:border-[#0A0A0A]/40 transition-colors group"
+                  className="inline-flex items-center gap-2 font-serif text-sm text-[#0A0A0A] border border-[#0A0A0A]/15 rounded-none px-5 py-2 hover:border-[#0A0A0A]/40 transition-colors group"
                 >
                   Visit site
                   <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -363,7 +363,7 @@ function VenturesTab() {
             </div>
 
             {/* Right: Screenshot */}
-            <div className="relative overflow-hidden rounded-sm border border-[#0A0A0A]/5">
+            <div className="relative overflow-hidden rounded-none border border-[#0A0A0A]/5">
               <Image
                 src={venture.social}
                 alt={`${venture.name} screenshot`}
@@ -452,7 +452,7 @@ function TeamTab() {
               alt={person.name}
               width={56}
               height={56}
-              className="rounded object-cover w-14 h-14"
+              className="rounded-none object-cover w-14 h-14"
               unoptimized
             />
           </div>

@@ -354,7 +354,7 @@ export async function POST(req: NextRequest) {
       return postSlackMessage(channel, result.response, threadTs);
     })
     .catch(async (error) => {
-      console.error("[bot/slack] Error:", error);
+      captureError(error, { tags: { component: "bot/slack" } });
       const msg = (error as Error)?.message ?? "";
       const reply = msg.includes("Rate limited") || msg.includes("overloaded")
         ? msg

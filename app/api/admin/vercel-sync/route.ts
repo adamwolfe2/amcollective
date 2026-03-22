@@ -24,7 +24,6 @@ export async function POST(req: NextRequest) {
     await inngest.send({ name: "sync-vercel-full", data: {} });
     return NextResponse.json({ success: true, message: "Vercel sync triggered" });
   } catch (err) {
-    console.error("[vercel-sync] Error:", err);
     captureError(err, { tags: { route: "POST /api/admin/vercel-sync" } });
     return NextResponse.json(
       {

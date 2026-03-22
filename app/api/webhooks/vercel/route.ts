@@ -28,6 +28,7 @@ import { eq, and } from "drizzle-orm";
 import { createAlert } from "@/lib/db/repositories/alerts";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { ajWebhook } from "@/lib/middleware/arcjet";
+import { captureError } from "@/lib/errors";
 
 // ---------------------------------------------------------------------------
 // Signature verification
@@ -458,7 +459,7 @@ export async function POST(request: NextRequest) {
         // If even recording fails, there's nothing else we can do.
       });
 
-    console.error("[webhook/vercel] Processing error:", err);
+    captureError(err, { tags: { component: "webhook/vercel" } });
     return NextResponse.json(
       { error: "Internal processing error" },
       { status: 500 }

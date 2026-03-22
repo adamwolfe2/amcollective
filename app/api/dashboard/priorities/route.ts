@@ -16,6 +16,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, and, sql, desc, lte, gte, isNull } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
+import { captureError } from "@/lib/errors";
 
 export type PriorityUrgency = "critical" | "high" | "normal";
 
@@ -186,7 +187,7 @@ export async function GET() {
 
     return NextResponse.json({ items: items.slice(0, 5) });
   } catch (error) {
-    console.error("[dashboard-priorities]", error);
+    captureError(error, { tags: { component: "dashboard-priorities" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

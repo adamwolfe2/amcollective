@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { inngest } from "@/lib/inngest/client";
 import { aj } from "@/lib/middleware/arcjet";
+import { captureError } from "@/lib/errors";
 
 export async function POST(req: NextRequest) {
   if (aj) {
@@ -30,7 +31,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, message: "Strategy analysis triggered. Results will appear in ~30 seconds." });
   } catch (error) {
-    console.error("[strategy-run-analysis]", error);
+    captureError(error, { tags: { component: "strategy-run-analysis" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
