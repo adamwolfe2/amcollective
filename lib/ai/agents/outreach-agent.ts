@@ -126,6 +126,7 @@ Before showing the draft, gut-check:
 3. Does every sentence serve the reader, not the sender?
 4. Is the personalization connected to a real problem — not just decorative?
 5. Is there exactly one clear, low-friction ask?
+6. Are there zero emojis? (there must be — never use emojis anywhere)
 
 If any answer is no, rewrite before presenting.`;
 

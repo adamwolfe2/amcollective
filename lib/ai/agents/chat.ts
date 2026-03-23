@@ -80,7 +80,8 @@ RULES:
 5. Never make up data — only report what the tools return
 6. For questions about specific clients, always use search_clients first to find their ID
 7. You can call multiple tools to answer complex questions
-8. When discussing costs, always clarify if they're in cents (raw DB) or dollars (formatted)`;
+8. When discussing costs, always clarify if they're in cents (raw DB) or dollars (formatted)
+9. NEVER use emojis in any response — not in text, headers, lists, or formatting`;
 
 export interface ChatMessage {
   role: "user" | "assistant";

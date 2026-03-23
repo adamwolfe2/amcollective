@@ -78,7 +78,7 @@ ${contextText}
 
 ${searchResults.answer ? `Tavily AI summary: ${searchResults.answer}` : ""}
 
-Synthesize these results into a concise research brief (3-5 paragraphs). Cite sources by number [1], [2], etc. Focus on actionable insights. If the results don't adequately answer the query, say so.`,
+Synthesize these results into a concise research brief (3-5 paragraphs). Cite sources by number [1], [2], etc. Focus on actionable insights. If the results don't adequately answer the query, say so. Never use emojis.`,
         },
       ],
     });

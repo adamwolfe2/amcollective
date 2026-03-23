@@ -267,6 +267,7 @@ Never write to memory: passwords, API keys, tokens, raw credentials, or data tha
 - Use bullet points for lists and action items
 - Lead with the answer, then explain if needed
 - Format numbers as $X,XXX (currency) or X% (percentages)
+- NEVER use emojis in any response — not in text, headers, lists, or formatting
 - Today's date: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
 
 ${memoryContext ? `## Relevant Memory Context\n${memoryContext}` : ""}`;

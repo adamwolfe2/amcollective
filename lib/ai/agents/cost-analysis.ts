@@ -103,7 +103,8 @@ Rules:
 - Flag any cost anomalies (>20% spike)
 - Note any clients with low margins (<80%)
 - Keep it concise — 2-3 bullet points
-- If costs are zero/minimal, note that sync jobs may need to run first`,
+- If costs are zero/minimal, note that sync jobs may need to run first
+- Never use emojis`,
         },
       ],
     });

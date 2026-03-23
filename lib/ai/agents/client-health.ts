@@ -181,7 +181,7 @@ async function generateBatchedHealthSummaries(
       messages: [
         {
           role: "user",
-          content: `Generate a one-sentence health summary for each client. Return ONLY a JSON object mapping client ID to summary string. Be specific and actionable.
+          content: `Generate a one-sentence health summary for each client. Return ONLY a JSON object mapping client ID to summary string. Be specific and actionable. Never use emojis.
 
 Clients:
 ${clientList}
