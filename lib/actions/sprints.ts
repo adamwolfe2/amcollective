@@ -3,6 +3,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { db } from "@/lib/db";
 import {
   weeklySprints,
@@ -15,6 +16,7 @@ import {
 import { eq, isNull, and } from "drizzle-orm";
 import { getAnthropicClient, MODEL_HAIKU, trackAIUsage } from "@/lib/ai/client";
 import { inngest } from "@/lib/inngest/client";
+import { createAuditLog } from "@/lib/db/repositories/audit";
 
 type ActionResult<T = unknown> = {
   success: boolean;
@@ -46,6 +48,17 @@ export async function createSprint(formData: FormData): Promise<void> {
     .insert(weeklySprints)
     .values({ title, weeklyFocus: weeklyFocus || null, weekOf })
     .returning({ id: weeklySprints.id });
+
+  after(async () => {
+    await createAuditLog({
+      actorId: userId,
+      actorType: "user",
+      action: "create",
+      entityType: "sprint",
+      entityId: sprint.id,
+      metadata: { title, weekOf: weekOf.toISOString() },
+    });
+  });
 
   redirect(`/sprints/${sprint.id}`);
 }
@@ -80,6 +93,15 @@ export async function deleteSprint(id: string): Promise<ActionResult> {
 
   try {
     await db.delete(weeklySprints).where(eq(weeklySprints.id, id));
+    after(async () => {
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: "delete",
+        entityType: "sprint",
+        entityId: id,
+      });
+    });
     revalidatePath("/sprints");
     return { success: true };
   } catch (e) {
@@ -112,6 +134,17 @@ export async function updateSprint(
       })
       .where(eq(weeklySprints.id, id));
 
+    after(async () => {
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: "update",
+        entityType: "sprint",
+        entityId: id,
+        metadata: { fields: Object.keys(data) },
+      });
+    });
+
     revalidatePath(`/sprints/${id}`);
     revalidatePath("/sprints");
     return { success: true };
@@ -133,6 +166,16 @@ export async function closeSprint(id: string): Promise<ActionResult> {
     await inngest.send({
       name: "sprint/snapshot.requested",
       data: { sprintId: id },
+    });
+
+    after(async () => {
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: "close",
+        entityType: "sprint",
+        entityId: id,
+      });
     });
 
     revalidatePath(`/sprints/${id}`);
@@ -210,6 +253,17 @@ export async function createSection(
       })
       .returning({ id: sprintSections.id });
 
+    after(async () => {
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: "create",
+        entityType: "sprint_section",
+        entityId: section.id,
+        metadata: { sprintId, projectName: data.projectName },
+      });
+    });
+
     revalidatePath(`/sprints/${sprintId}`);
     return { success: true, data: { id: section.id } };
   } catch (e) {
@@ -252,6 +306,17 @@ export async function updateSection(
       })
       .where(eq(sprintSections.id, id));
 
+    after(async () => {
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: "update",
+        entityType: "sprint_section",
+        entityId: id,
+        metadata: { sprintId, fields: Object.keys(data) },
+      });
+    });
+
     revalidatePath(`/sprints/${sprintId}`);
     return { success: true };
   } catch (e) {
@@ -268,6 +333,16 @@ export async function deleteSection(
 
   try {
     await db.delete(sprintSections).where(eq(sprintSections.id, id));
+    after(async () => {
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: "delete",
+        entityType: "sprint_section",
+        entityId: id,
+        metadata: { sprintId },
+      });
+    });
     revalidatePath(`/sprints/${sprintId}`);
     return { success: true };
   } catch (e) {
@@ -324,6 +399,17 @@ export async function createTask(
       data: { taskId: task.id, sprintId },
     });
 
+    after(async () => {
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: "create",
+        entityType: "task",
+        entityId: task.id,
+        metadata: { sprintId, sectionId, content },
+      });
+    });
+
     revalidatePath(`/sprints/${sprintId}`);
     return { success: true, data: { id: task.id } };
   } catch (e) {
@@ -353,6 +439,17 @@ export async function toggleTask(
       data: { taskId: id, sprintId },
     });
 
+    after(async () => {
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: isCompleted ? "complete" : "reopen",
+        entityType: "task",
+        entityId: id,
+        metadata: { sprintId },
+      });
+    });
+
     revalidatePath(`/sprints/${sprintId}`);
     revalidatePath("/dashboard");
     return { success: true };
@@ -374,6 +471,17 @@ export async function updateTask(
       .update(tasks)
       .set({ title: content })
       .where(eq(tasks.id, id));
+
+    after(async () => {
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: "update",
+        entityType: "task",
+        entityId: id,
+        metadata: { sprintId, content },
+      });
+    });
 
     revalidatePath(`/sprints/${sprintId}`);
     return { success: true };
@@ -418,6 +526,17 @@ export async function deleteTask(
         .set({ isArchived: true })
         .where(eq(tasks.id, id));
     }
+
+    after(async () => {
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: "delete",
+        entityType: "task",
+        entityId: id,
+        metadata: { sprintId },
+      });
+    });
 
     revalidatePath(`/sprints/${sprintId}`);
     return { success: true };
@@ -603,50 +722,90 @@ export async function importParsedSections(
       );
     }
 
-    for (let i = 0; i < sections.length; i++) {
-      const sec = sections[i];
-      const resolvedProjectId = matchProject(sec.projectName);
-      const resolvedAssigneeId = matchMember(sec.assigneeName);
+    // Resolve all project/assignee IDs upfront — no per-row queries
+    const resolved = sections.map((sec, i) => ({
+      sec,
+      index: i,
+      projectId: matchProject(sec.projectName),
+      assigneeId: matchMember(sec.assigneeName),
+    }));
 
-      const [newSection] = await db
-        .insert(sprintSections)
-        .values({
+    // Batch insert all sections in one round-trip
+    const insertedSections = await db
+      .insert(sprintSections)
+      .values(
+        resolved.map(({ sec, index, projectId, assigneeId }) => ({
           sprintId,
           projectName: sec.projectName,
-          projectId: resolvedProjectId,
+          projectId,
           assigneeName: sec.assigneeName || null,
-          assigneeId: resolvedAssigneeId,
+          assigneeId,
           goal: sec.goal || null,
-          sortOrder: startSortOrder + i,
-        })
-        .returning({ id: sprintSections.id });
+          sortOrder: startSortOrder + index,
+        }))
+      )
+      .returning({ id: sprintSections.id });
 
-      if (sec.tasks.length > 0) {
-        for (let j = 0; j < sec.tasks.length; j++) {
-          const content = sec.tasks[j];
+    // Build all task rows, tracking which section index each task belongs to
+    type TaskMeta = { sectionIdx: number; sortOrder: number };
+    const taskMeta: TaskMeta[] = [];
+    const taskValues: {
+      title: string;
+      status: "todo";
+      source: "sprint";
+      projectId: string | null;
+      assigneeId: string | null;
+      position: number;
+      subtasks: never[];
+    }[] = [];
 
-          const [newTask] = await db
-            .insert(tasks)
-            .values({
-              title: content,
-              status: "todo",
-              source: "sprint",
-              projectId: resolvedProjectId,
-              assigneeId: resolvedAssigneeId,
-              position: j,
-              subtasks: [],
-            })
-            .returning({ id: tasks.id });
-
-          await db.insert(taskSprintAssignments).values({
-            taskId: newTask.id,
-            sprintId,
-            sectionId: newSection.id,
-            sortOrder: j,
-          });
-        }
+    for (let i = 0; i < resolved.length; i++) {
+      const { sec, projectId, assigneeId } = resolved[i];
+      for (let j = 0; j < sec.tasks.length; j++) {
+        taskValues.push({
+          title: sec.tasks[j],
+          status: "todo",
+          source: "sprint",
+          projectId,
+          assigneeId,
+          position: j,
+          subtasks: [],
+        });
+        taskMeta.push({ sectionIdx: i, sortOrder: j });
       }
     }
+
+    if (taskValues.length > 0) {
+      // Batch insert all tasks in one round-trip
+      const insertedTasks = await db
+        .insert(tasks)
+        .values(taskValues)
+        .returning({ id: tasks.id });
+
+      // Batch insert all task-sprint assignments in one round-trip
+      await db.insert(taskSprintAssignments).values(
+        insertedTasks.map((t, idx) => ({
+          taskId: t.id,
+          sprintId,
+          sectionId: insertedSections[taskMeta[idx].sectionIdx].id,
+          sortOrder: taskMeta[idx].sortOrder,
+        }))
+      );
+    }
+
+    after(async () => {
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: "import",
+        entityType: "sprint",
+        entityId: sprintId,
+        metadata: {
+          sectionCount: sections.length,
+          taskCount: taskValues.length,
+        },
+      });
+    });
 
     revalidatePath(`/sprints/${sprintId}`);
     revalidatePath("/dashboard");

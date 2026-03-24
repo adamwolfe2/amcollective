@@ -381,9 +381,9 @@ export async function redeployProject(
       throw new Error(`Vercel API ${res.status}: ${body.slice(0, 200)}`);
     }
     const deployment = (await res.json()) as VercelDeployment;
-    // Invalidate deploy caches
-    invalidateCache(`vercel:deploys:${projectId}`);
-    invalidateCache("vercel:recent-deploys");
+    // Invalidate deploy caches — keys must match the write-side key patterns
+    invalidateCache(`vercel:deploys:${projectId}:1`);
+    invalidateCache(`vercel:recent-deploys:10`);
     return { success: true, data: deployment, fetchedAt: new Date() };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Redeploy failed";

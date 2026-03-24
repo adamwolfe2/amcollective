@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, and, desc, sql, or, ilike } from "drizzle-orm";
@@ -11,6 +12,13 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { aj } from "@/lib/middleware/arcjet";
+
+const createKnowledgeSchema = z.object({
+  title: z.string().min(1).max(500),
+  content: z.string().max(100000).optional().nullable(),
+  docType: z.enum(["contract", "proposal", "note", "sop", "invoice", "brief", "other"]).default("sop"),
+  tags: z.array(z.string().min(1).max(100)).max(50).optional(),
+});
 
 export async function GET(request: NextRequest) {
   try {
@@ -128,22 +136,32 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
+    const parsed = createKnowledgeSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const { title, content, docType, tags } = parsed.data;
+
     const [doc] = await db
       .insert(schema.documents)
       .values({
-        title: body.title,
-        content: body.content ?? null,
-        docType: body.docType ?? "sop",
-        companyTag: body.companyTag ?? "am_collective",
+        title,
+        content: content ?? null,
+        docType,
+        companyTag: "am_collective",
         createdById: userId,
         isClientVisible: false,
       })
       .returning();
 
     // Add tags
-    if (body.tags && body.tags.length > 0) {
+    if (tags && tags.length > 0) {
       await db.insert(schema.documentTags).values(
-        body.tags.map((tag: string) => ({
+        tags.map((tag) => ({
           documentId: doc.id,
           tag,
         }))
@@ -156,7 +174,7 @@ export async function POST(request: NextRequest) {
       action: "knowledge.created",
       entityType: "document",
       entityId: doc.id,
-      metadata: { title: body.title, docType: body.docType },
+      metadata: { title, docType },
     });
 
     return NextResponse.json(doc, { status: 201 });

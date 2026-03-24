@@ -13,12 +13,11 @@ import * as schema from "@/lib/db/schema";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
-
-const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
+import { COMPANY_TAGS } from "@/lib/db/schema";
 
 const uploadMetadataSchema = z.object({
   title: z.string().min(1, "title is required").max(500).trim(),
-  companyTag: z.enum(companyTags).default("am_collective"),
+  companyTag: z.enum(COMPANY_TAGS).default("am_collective"),
   docType: z.enum(["contract", "proposal", "note", "sop", "invoice", "brief", "other"]).default("other"),
   clientId: z.string().uuid().nullable().default(null),
   isClientVisible: z.enum(["true", "false"]).default("false").transform(v => v === "true"),

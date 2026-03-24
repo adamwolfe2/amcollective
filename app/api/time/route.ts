@@ -7,8 +7,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 import { aj } from "@/lib/middleware/arcjet";
-
-const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
+import { COMPANY_TAGS } from "@/lib/db/schema";
 
 const timeEntrySchema = z.object({
   clientId: z.string().uuid("Invalid client ID"),
@@ -19,7 +18,7 @@ const timeEntrySchema = z.object({
   description: z.string().max(2000).optional().nullable(),
   billable: z.boolean().optional(),
   hourlyRate: z.number().min(0).max(10_000).optional().nullable(),
-  companyTag: z.enum(companyTags).optional(),
+  companyTag: z.enum(COMPANY_TAGS).optional(),
 });
 
 /**

@@ -148,7 +148,7 @@ export default async function ProductsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold font-serif tracking-tight">Products</h1>
+          <h1 className="text-2xl font-bold font-serif tracking-tight">Products</h1>
           <p className="font-mono text-[10px] text-[#0A0A0A]/40 mt-0.5">
             {productRows.length} portfolio products — {totalMrr > 0 ? `$${Math.round(totalMrr / 100).toLocaleString()} combined MRR` : "platform building phase"}
           </p>

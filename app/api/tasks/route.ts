@@ -12,8 +12,7 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { aj } from "@/lib/middleware/arcjet";
-
-const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
+import { COMPANY_TAGS } from "@/lib/db/schema";
 
 const taskSchema = z.object({
   title: z.string().min(1, "Title is required").max(500).trim(),
@@ -24,7 +23,7 @@ const taskSchema = z.object({
   assigneeId: z.string().uuid().optional().nullable(),
   projectId: z.string().uuid().optional().nullable(),
   clientId: z.string().uuid().optional().nullable(),
-  companyTag: z.enum(companyTags).optional(),
+  companyTag: z.enum(COMPANY_TAGS).optional(),
   labels: z.unknown().optional().nullable(),
   source: z.enum(["manual", "linear", "voice", "webhook", "sprint"]).optional(),
 });

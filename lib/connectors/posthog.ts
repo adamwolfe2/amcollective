@@ -6,7 +6,7 @@
  * Falls back gracefully when not configured.
  */
 
-import { cached, safeCall, type ConnectorResult } from "./base";
+import { cached, safeCall, CACHE_TTL, type ConnectorResult } from "./base";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -96,7 +96,7 @@ export async function getActiveUsersForProject(
         const [dau, wau, mau] = res.results?.[0] ?? [0, 0, 0];
         return { dau, wau, mau };
       },
-      60 * 60 * 1000 // 60 min — analytics data doesn't need sub-hour freshness
+      CACHE_TTL.SLOW_MOVING // 60 min — analytics data doesn't need sub-hour freshness
     )
   );
 }
@@ -240,7 +240,7 @@ export async function getActiveUsers(): Promise<ConnectorResult<ActiveUsersData>
         const [dau, wau, mau] = res.results?.[0] ?? [0, 0, 0];
         return { dau, wau, mau };
       },
-      60 * 60 * 1000 // 60 min — analytics data doesn't need sub-hour freshness
+      CACHE_TTL.SLOW_MOVING // 60 min — analytics data doesn't need sub-hour freshness
     )
   );
 }

@@ -18,7 +18,7 @@ import { portfolioProjects } from "./projects";
 
 // ─── Enums ──────────────────────────────────────────────────────────────────
 
-export const companyTagEnum = pgEnum("company_tag", [
+export const COMPANY_TAGS = [
   "trackr",
   "wholesail",
   "taskspace",
@@ -29,7 +29,11 @@ export const companyTagEnum = pgEnum("company_tag", [
   "am_collective",
   "personal",
   "untagged",
-]);
+] as const;
+
+export type CompanyTag = (typeof COMPANY_TAGS)[number];
+
+export const companyTagEnum = pgEnum("company_tag", COMPANY_TAGS);
 
 export const mercuryAccountTypeEnum = pgEnum("mercury_account_type", [
   "checking",

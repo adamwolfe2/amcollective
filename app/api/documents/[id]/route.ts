@@ -17,14 +17,13 @@ import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { checkAdmin } from "@/lib/auth";
 import { aj } from "@/lib/middleware/arcjet";
-
-const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
+import { COMPANY_TAGS } from "@/lib/db/schema";
 
 const documentUpdateSchema = z.object({
   title: z.string().min(1).max(500).trim(),
   content: z.string().max(100000).nullable(),
   docType: z.enum(["contract", "proposal", "note", "sop", "invoice", "brief", "other"]),
-  companyTag: z.enum(companyTags),
+  companyTag: z.enum(COMPANY_TAGS),
   isClientVisible: z.boolean(),
   clientId: z.string().uuid().nullable(),
 }).partial().refine(data => Object.keys(data).length > 0, "At least one field required");

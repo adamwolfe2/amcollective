@@ -13,8 +13,7 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { aj } from "@/lib/middleware/arcjet";
-
-const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
+import { COMPANY_TAGS } from "@/lib/db/schema";
 
 const leadUpdateSchema = z.object({
   contactName: z.string().min(1).max(200).trim(),
@@ -33,7 +32,7 @@ const leadUpdateSchema = z.object({
   companySize: z.string().max(100).nullable(),
   notes: z.string().max(10000).nullable(),
   tags: z.array(z.string()).nullable(),
-  companyTag: z.enum(companyTags),
+  companyTag: z.enum(COMPANY_TAGS),
   lastContactedAt: z.string().nullable(),
   nextFollowUpAt: z.string().nullable(),
 }).partial().refine(data => Object.keys(data).length > 0, "At least one field required");

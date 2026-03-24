@@ -12,12 +12,11 @@ import * as schema from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { aj } from "@/lib/middleware/arcjet";
-
-const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
+import { COMPANY_TAGS } from "@/lib/db/schema";
 
 const recurringSchema = z.object({
   clientId: z.string().uuid("Invalid client ID"),
-  companyTag: z.enum(companyTags).optional(),
+  companyTag: z.enum(COMPANY_TAGS).optional(),
   lineItems: z.unknown(),
   subtotal: z.number().min(0).max(10_000_000),
   taxRate: z.number().min(0).max(100).optional(),

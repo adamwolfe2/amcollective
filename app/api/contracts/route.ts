@@ -15,13 +15,12 @@ import { generateContractNumber } from "@/lib/invoices/number";
 import { buildSectionsFromProposal, DEFAULT_CONTRACT_SECTIONS } from "@/lib/contracts/templates";
 import crypto from "crypto";
 import { aj } from "@/lib/middleware/arcjet";
-
-const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
+import { COMPANY_TAGS } from "@/lib/db/schema";
 
 const contractSchema = z.object({
   clientId: z.string().uuid("Invalid client ID"),
   proposalId: z.string().uuid().optional().nullable(),
-  companyTag: z.enum(companyTags).optional(),
+  companyTag: z.enum(COMPANY_TAGS).optional(),
   title: z.string().min(1).max(500).trim().optional(),
   sections: z.unknown().optional(),
   terms: z.string().max(50000).optional().nullable(),

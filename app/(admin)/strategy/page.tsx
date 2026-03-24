@@ -96,7 +96,7 @@ export default async function StrategyPage() {
   }));
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       <StrategyClient metrics={metricsData} recommendations={recsData} />
     </div>
   );

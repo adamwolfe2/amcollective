@@ -15,13 +15,12 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { aj } from "@/lib/middleware/arcjet";
-
-const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
+import { COMPANY_TAGS } from "@/lib/db/schema";
 
 const costSchema = z.object({
   name: z.string().min(1).max(200).trim(),
   vendor: z.string().min(1).max(200).trim(),
-  companyTag: z.enum(companyTags).optional(),
+  companyTag: z.enum(COMPANY_TAGS).optional(),
   amount: z.number().min(0).max(10_000_000),
   billingCycle: z.enum(["monthly", "quarterly", "annually", "one-time"]).optional(),
   nextRenewal: z.string().optional().nullable(),

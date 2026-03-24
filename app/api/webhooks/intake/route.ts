@@ -56,15 +56,17 @@ export async function POST(request: NextRequest) {
     const rawBody = await request.text();
     const secret = process.env.INTAKE_WEBHOOK_SECRET;
 
-    // Verify HMAC signature if secret is configured
-    if (secret) {
-      const signature =
-        request.headers.get("x-webhook-signature") ??
-        request.headers.get("x-hub-signature-256") ??
-        "";
-      if (!verifyHmac(rawBody, signature, secret)) {
-        return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
-      }
+    if (!secret) {
+      captureError(new Error("INTAKE_WEBHOOK_SECRET is not configured"), { level: "error", tags: { source: "intake-webhook" } });
+      return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
+    }
+
+    const signature =
+      request.headers.get("x-webhook-signature") ??
+      request.headers.get("x-hub-signature-256") ??
+      "";
+    if (!verifyHmac(rawBody, signature, secret)) {
+      return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
     }
 
     let payload: Record<string, unknown>;

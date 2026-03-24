@@ -12,8 +12,7 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { aj } from "@/lib/middleware/arcjet";
-
-const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
+import { COMPANY_TAGS } from "@/lib/db/schema";
 
 const leadSchema = z.object({
   contactName: z.string().min(1, "Contact name is required").max(200).trim(),
@@ -32,7 +31,7 @@ const leadSchema = z.object({
   companySize: z.string().max(100).optional().nullable(),
   notes: z.string().max(10000).optional().nullable(),
   tags: z.unknown().optional().nullable(),
-  companyTag: z.enum(companyTags).optional(),
+  companyTag: z.enum(COMPANY_TAGS).optional(),
   nextFollowUpAt: z.string().optional().nullable(),
 });
 

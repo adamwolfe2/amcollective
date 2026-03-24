@@ -174,7 +174,7 @@ export async function getTransactions(
         const res = await mercuryFetch<{ transactions: MercuryTransactionRaw[] }>(path);
         return res.transactions.map(mapTransaction);
       },
-      3 * 60 * 1000 // 3 min cache for transactions
+      3 * 60 // 3 min cache for transactions
     )
   );
 }

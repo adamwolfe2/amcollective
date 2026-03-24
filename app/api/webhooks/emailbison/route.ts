@@ -6,6 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
@@ -17,7 +18,13 @@ export async function POST(request: NextRequest) {
     // Verify shared secret via X-API-Key header (fail closed if env var missing)
     const expectedKey = process.env.EMAILBISON_API_KEY;
     const providedKey = request.headers.get("x-api-key");
-    if (!expectedKey || providedKey !== expectedKey) {
+    if (!expectedKey || !providedKey) {
+      captureError(new Error("Invalid or missing X-API-Key header"), { level: "warning", tags: { source: "emailbison-webhook" } });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const expectedBuf = Buffer.from(expectedKey);
+    const providedBuf = Buffer.from(providedKey);
+    if (expectedBuf.length !== providedBuf.length || !timingSafeEqual(expectedBuf, providedBuf)) {
       captureError(new Error("Invalid or missing X-API-Key header"), { level: "warning", tags: { source: "emailbison-webhook" } });
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

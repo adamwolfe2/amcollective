@@ -7,8 +7,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { aj } from "@/lib/middleware/arcjet";
-
-const companyTags = ["trackr", "wholesail", "taskspace", "cursive", "tbgc", "hook", "myvsl", "am_collective", "personal", "untagged"] as const;
+import { COMPANY_TAGS } from "@/lib/db/schema";
 
 const timeEntryUpdateSchema = z.object({
   clientId: z.string().uuid(),
@@ -19,7 +18,7 @@ const timeEntryUpdateSchema = z.object({
   description: z.string().max(5000).nullable(),
   billable: z.boolean(),
   hourlyRate: z.number().int().min(0),
-  companyTag: z.enum(companyTags),
+  companyTag: z.enum(COMPANY_TAGS),
 }).partial().refine(data => Object.keys(data).length > 0, "At least one field required");
 
 type RouteContext = { params: Promise<{ id: string }> };

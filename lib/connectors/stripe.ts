@@ -256,7 +256,7 @@ export async function getRevenueTrend(
         }
         return points;
       },
-      15 * 60 * 1000 // 15 min cache for trend data
+      15 * 60 // 15 min cache for trend data
     )
   );
 }
