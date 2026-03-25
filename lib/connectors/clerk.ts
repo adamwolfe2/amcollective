@@ -39,7 +39,10 @@ function getHeaders(): HeadersInit {
 }
 
 async function clerkFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${CLERK_API}${path}`, { headers: getHeaders() });
+  const res = await fetch(`${CLERK_API}${path}`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Clerk API ${res.status}: ${body.slice(0, 200)}`);

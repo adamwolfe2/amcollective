@@ -52,7 +52,10 @@ function getHeaders(): HeadersInit {
 
 async function mercuryFetch<T>(path: string): Promise<T> {
   const url = `${getBaseUrl()}${path}`;
-  const res = await fetch(url, { headers: getHeaders() });
+  const res = await fetch(url, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Mercury API ${res.status}: ${body.slice(0, 200)}`);

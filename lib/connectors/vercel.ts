@@ -81,7 +81,10 @@ function teamParam(): string {
 async function vercelFetch<T>(path: string): Promise<T> {
   const sep = path.includes("?") ? "&" : "?";
   const url = `${VERCEL_API}${path}${sep}${teamParam()}`;
-  const res = await fetch(url, { headers: getHeaders() });
+  const res = await fetch(url, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Vercel API ${res.status}: ${body.slice(0, 200)}`);
@@ -375,6 +378,7 @@ export async function redeployProject(
         name: latestDeploy.name,
         deploymentId: latestDeploy.uid,
       }),
+      signal: AbortSignal.timeout(10_000),
     });
     if (!res.ok) {
       const body = await res.text();

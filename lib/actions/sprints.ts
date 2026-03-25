@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -71,9 +72,7 @@ export async function toggleSprintShare(
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
-    const newToken = currentToken
-      ? null
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+    const newToken = currentToken ? null : randomUUID();
 
     await db
       .update(weeklySprints)

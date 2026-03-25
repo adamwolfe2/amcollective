@@ -75,6 +75,7 @@ async function postSlackMessage(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(10_000),
   }).catch(() => {});
 }
 
@@ -114,6 +115,7 @@ async function transcribeSlackAudio(
     // Download file from Slack (requires auth)
     const fileRes = await fetch(urlPrivate, {
       headers: { Authorization: `Bearer ${slackToken}` },
+      signal: AbortSignal.timeout(10_000),
     });
     if (!fileRes.ok) return null;
 
@@ -130,6 +132,7 @@ async function transcribeSlackAudio(
       method: "POST",
       headers: { Authorization: `Bearer ${openaiKey}` },
       body: form,
+      signal: AbortSignal.timeout(30_000),
     });
     if (!whisperRes.ok) return null;
 

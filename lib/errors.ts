@@ -21,8 +21,10 @@ export function captureError(
 ): void {
   const err = error instanceof Error ? error : new Error(String(error));
 
-  // Always log to console in development
-  console.error(`[Error]`, err.message, context?.tags ?? {});
+  // Only log to console outside production
+  if (process.env.NODE_ENV !== "production") {
+    console.error(`[Error]`, err.message, context?.tags ?? {});
+  }
 
   try {
     Sentry.withScope((scope) => {

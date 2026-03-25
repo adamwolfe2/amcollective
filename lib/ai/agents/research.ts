@@ -37,6 +37,7 @@ async function tavilySearch(
       max_results: maxResults,
       include_answer: true,
     }),
+    signal: AbortSignal.timeout(10_000),
   });
 
   if (!res.ok) {

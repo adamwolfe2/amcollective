@@ -45,7 +45,10 @@ function getHeaders(): HeadersInit {
 }
 
 async function neonFetch<T>(path: string): Promise<T> {
-  const res = await fetch(`${NEON_API}${path}`, { headers: getHeaders() });
+  const res = await fetch(`${NEON_API}${path}`, {
+    headers: getHeaders(),
+    signal: AbortSignal.timeout(10_000),
+  });
   if (!res.ok) {
     const body = await res.text();
     throw new Error(`Neon API ${res.status}: ${body.slice(0, 200)}`);

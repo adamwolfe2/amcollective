@@ -52,6 +52,7 @@ async function posthogQueryForProject<T>(
       "Content-Type": "application/json",
     },
     body: JSON.stringify({ query: { kind: "HogQLQuery", query } }),
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) {
     const body = await res.text();

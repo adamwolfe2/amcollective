@@ -44,7 +44,7 @@ export async function readMemory(path: string): Promise<string | null> {
   try {
     const res = await fetch(
       `${GITHUB_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}`,
-      { headers: githubHeaders(cfg.token) }
+      { headers: githubHeaders(cfg.token), signal: AbortSignal.timeout(10_000) }
     );
     if (!res.ok) return null;
 
@@ -71,7 +71,7 @@ export async function writeMemory(
     let sha: string | undefined;
     const existing = await fetch(
       `${GITHUB_API}/repos/${cfg.owner}/${cfg.repo}/contents/${path}`,
-      { headers: githubHeaders(cfg.token) }
+      { headers: githubHeaders(cfg.token), signal: AbortSignal.timeout(10_000) }
     );
     if (existing.ok) {
       const data = await existing.json();
@@ -90,6 +90,7 @@ export async function writeMemory(
         method: "PUT",
         headers: githubHeaders(cfg.token),
         body: JSON.stringify(body),
+        signal: AbortSignal.timeout(10_000),
       }
     );
 
@@ -114,7 +115,7 @@ export async function listMemory(prefix = ""): Promise<string[]> {
       ? `${GITHUB_API}/repos/${cfg.owner}/${cfg.repo}/contents/${prefix}`
       : `${GITHUB_API}/repos/${cfg.owner}/${cfg.repo}/contents`;
 
-    const res = await fetch(url, { headers: githubHeaders(cfg.token) });
+    const res = await fetch(url, { headers: githubHeaders(cfg.token), signal: AbortSignal.timeout(10_000) });
     if (!res.ok) return [];
 
     const data = await res.json();

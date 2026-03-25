@@ -218,7 +218,8 @@ async function CashRunwaySection() {
         <CashRunwayChart snapshots={snapshots} />
       </div>
     );
-  } catch {
+  } catch (err) {
+    captureError(err instanceof Error ? err : new Error("CashRunwaySection failed"), { tags: { component: "dashboard" } });
     return null;
   }
 }

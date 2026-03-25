@@ -22,6 +22,8 @@ import {
   Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
+import { captureError } from "@/lib/errors";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -325,8 +327,9 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
   const { messages, setMessages, sendMessage, status, stop } = useChat({
     id: chatIdRef.current,
     transport,
-    onError: () => {
-      // Error is displayed as a failed message bubble
+    onError: (error) => {
+      toast.error("AI response failed. Try again.");
+      captureError(error instanceof Error ? error : new Error("AI stream error"), { tags: { component: "ai-chat" } });
     },
   });
 
@@ -340,8 +343,8 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
         const data = await res.json();
         setConversations(data.conversations ?? []);
       }
-    } catch {
-      // Ignore
+    } catch (err) {
+      captureError(err instanceof Error ? err : new Error("Failed to load conversations"), { tags: { component: "ai-chat" } });
     }
   }, []);
 
@@ -407,8 +410,9 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
           );
           setMessages(uiMessages);
         }
-      } catch {
-        // Ignore
+      } catch (err) {
+        captureError(err instanceof Error ? err : new Error("Failed to load conversation"), { tags: { component: "ai-chat" } });
+        toast.error("Failed to load conversation. Please try again.");
       }
     },
     [setMessages]

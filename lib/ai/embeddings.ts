@@ -74,6 +74,7 @@ async function generateOpenAIEmbedding(text: string): Promise<number[]> {
       model: "text-embedding-3-small",
       input: text.slice(0, 8000), // Token limit safety
     }),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!res.ok) {

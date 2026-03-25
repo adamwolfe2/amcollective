@@ -30,6 +30,7 @@ async function bisonFetch<T>(path: string): Promise<T> {
       Accept: "application/json",
     },
     next: { revalidate: 0 },
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`EmailBison API ${res.status}: ${path}`);
   return res.json() as Promise<T>;
@@ -46,6 +47,7 @@ async function bisonPost<T>(path: string, body: Record<string, unknown>): Promis
     },
     body: JSON.stringify(body),
     next: { revalidate: 0 },
+    signal: AbortSignal.timeout(10_000),
   });
   if (!res.ok) throw new Error(`EmailBison API ${res.status}: POST ${path}`);
   return res.json() as Promise<T>;

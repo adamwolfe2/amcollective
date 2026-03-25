@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { captureError } from "@/lib/errors";
 
 type ForecastData = {
   summary: {
@@ -36,12 +37,21 @@ function formatCents(cents: number): string {
 export function ForecastDashboard() {
   const [data, setData] = useState<ForecastData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   useEffect(() => {
     fetch("/api/forecast")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error(`Forecast API returned ${r.status}`);
+        return r.json();
+      })
       .then(setData)
-      .catch(() => {})
+      .catch((err: unknown) => {
+        captureError(err instanceof Error ? err : new Error("Forecast fetch failed"), {
+          tags: { component: "forecast-dashboard" },
+        });
+        setFetchError(true);
+      })
       .finally(() => setLoading(false));
   }, []);
 
@@ -59,7 +69,9 @@ export function ForecastDashboard() {
     return (
       <div className="text-center py-20">
         <p className="font-mono text-sm text-[#0A0A0A]/70">
-          Failed to load forecast data.
+          {fetchError
+            ? "Failed to load forecast data. Please refresh the page."
+            : "No forecast data available."}
         </p>
       </div>
     );

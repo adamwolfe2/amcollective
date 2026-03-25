@@ -165,10 +165,8 @@ export async function syncAllCustomers(): Promise<number> {
       count++;
     }
 
-    console.info(`[Stripe Sync] Synced customers from ${account.name} (${account.accountId})`);
   }
 
-  console.info(`[Stripe Sync] Synced ${count} customers total across ${STRIPE_ACCOUNTS.length} accounts`);
   return count;
 }
 
@@ -267,7 +265,6 @@ export async function syncAllSubscriptions(): Promise<number> {
       count++;
     }
 
-    console.info(`[Stripe Sync] Synced subscriptions from ${account.name} (${account.accountId})`);
   }
 
   // ── Recalculate MRR and payment status per client ──
@@ -313,7 +310,6 @@ export async function syncAllSubscriptions(): Promise<number> {
       .where(eq(schema.clients.id, clientId));
   }
 
-  console.info(`[Stripe Sync] Synced ${count} subscriptions, recalculated MRR for ${clientsWithSubs.length} clients`);
   return count;
 }
 
@@ -418,7 +414,6 @@ export async function syncAllInvoices(): Promise<number> {
       count++;
     }
 
-    console.info(`[Stripe Sync] Synced invoices from ${account.name} (${account.accountId})`);
   }
 
   // ── Recalculate lifetimeValue and lastPaymentDate per client ──
@@ -461,7 +456,6 @@ export async function syncAllInvoices(): Promise<number> {
       .where(eq(schema.clients.id, clientId));
   }
 
-  console.info(`[Stripe Sync] Synced ${count} invoices, recalculated LTV for ${clientsWithPaidInvoices.length} clients`);
   return count;
 }
 
@@ -551,10 +545,8 @@ export async function syncAllCharges(): Promise<number> {
       count++;
     }
 
-    console.info(`[Stripe Sync] Synced charges from ${account.name} (${account.accountId})`);
   }
 
-  console.info(`[Stripe Sync] Synced ${count} new charges total across ${STRIPE_ACCOUNTS.length} accounts`);
   return count;
 }
 
