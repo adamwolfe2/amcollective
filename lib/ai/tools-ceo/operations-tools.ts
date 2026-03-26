@@ -8,7 +8,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, desc, and, ilike } from "drizzle-orm";
+import { eq, desc, and, ilike, inArray } from "drizzle-orm";
 import { sql, count } from "drizzle-orm";
 
 export const definitions: Anthropic.Tool[] = [
@@ -98,8 +98,8 @@ export const definitions: Anthropic.Tool[] = [
       properties: {
         platform: {
           type: "string",
-          enum: ["all", "wholesail", "trackr", "cursive", "taskspace"],
-          description: "Which platform to fetch. 'all' returns all 4 connected platforms in parallel.",
+          enum: ["all", "wholesail", "trackr", "cursive", "taskspace", "tbgc", "hook"],
+          description: "Which platform to fetch. 'all' returns all connected platforms in parallel.",
         },
       },
       required: [],
@@ -188,7 +188,7 @@ export const definitions: Anthropic.Tool[] = [
         rockId: { type: "string", description: "Exact rock UUID (use if you have it)" },
         status: {
           type: "string",
-          enum: ["on_track", "at_risk", "off_track"],
+          enum: ["on_track", "at_risk", "off_track", "done"],
           description: "New status",
         },
       },
@@ -436,7 +436,7 @@ export async function handler(
         const doneTasks = await db
           .select({ id: schema.tasks.id })
           .from(schema.tasks)
-          .where(and(eq(schema.tasks.status, "done"), sql`${schema.tasks.id} = ANY(ARRAY[${sql.raw(taskIds.map(id => `'${id}'::uuid`).join(","))}])`));
+          .where(and(eq(schema.tasks.status, "done"), inArray(schema.tasks.id, taskIds)));
         doneCount = doneTasks.length;
       }
 
@@ -890,7 +890,7 @@ export async function handler(
       if (!rock) return JSON.stringify({ error: "Rock not found. Try a different title." });
       await db
         .update(schema.rocks)
-        .set({ status: input.status as "on_track" | "at_risk" | "off_track" })
+        .set({ status: input.status as "on_track" | "at_risk" | "off_track" | "done" })
         .where(eq(schema.rocks.id, rock.id));
       return JSON.stringify({ updated: true, rockId: rock.id, title: rock.title, newStatus: input.status });
     }

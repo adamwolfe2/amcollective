@@ -219,3 +219,43 @@ export async function markReplyRead(replyId: number): Promise<void> {
 export async function markReplyInterested(replyId: number): Promise<void> {
   await bisonPost(`/unibox/${replyId}/interested`, {});
 }
+
+// ─── Lead Upload ─────────────────────────────────────────────────────────────
+
+export interface EmailBisonLead {
+  email: string;
+  first_name?: string;
+  last_name?: string;
+  company?: string;
+  custom_fields?: Record<string, string>;
+}
+
+export interface AddLeadsResult {
+  added: number;
+  duplicates: number;
+  errors: string[];
+}
+
+export async function addLeadsToCampaign(
+  campaignId: number,
+  leads: EmailBisonLead[]
+): Promise<AddLeadsResult> {
+  const response = await bisonPost<{
+    data?: {
+      added?: number;
+      duplicates?: number;
+      errors?: string[];
+    };
+    added?: number;
+    duplicates?: number;
+    errors?: string[];
+  }>(`/campaigns/${campaignId}/leads`, { leads });
+
+  // EmailBison may nest under `data` or return top-level
+  const payload = response.data ?? response;
+  return {
+    added: payload.added ?? 0,
+    duplicates: payload.duplicates ?? 0,
+    errors: payload.errors ?? [],
+  };
+}

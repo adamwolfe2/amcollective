@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { LeadUploadDialog } from "./lead-upload-dialog";
 
 type Campaign = {
   id: string;
@@ -132,6 +133,9 @@ export function OutreachDashboard() {
   const [inbox, setInbox] = useState<InboxData | null>(null);
   const [inboxLoading, setInboxLoading] = useState(false);
   const [actingOn, setActingOn] = useState<number | null>(null);
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [convertingEmail, setConvertingEmail] = useState<string | null>(null);
+  const [convertedEmails, setConvertedEmails] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetch("/api/outreach")
@@ -208,6 +212,25 @@ export function OutreachDashboard() {
     }
   }
 
+  async function handleConvertToCRM(reply: InboxReply) {
+    setConvertingEmail(reply.leadEmail);
+    try {
+      const res = await fetch("/api/outreach/convert", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          leadEmail: reply.leadEmail,
+          campaignId: reply.campaignId ?? undefined,
+        }),
+      });
+      if (res.ok) {
+        setConvertedEmails((prev) => new Set(prev).add(reply.leadEmail));
+      }
+    } finally {
+      setConvertingEmail(null);
+    }
+  }
+
   if (loading) {
     return (
       <div className="py-12 text-center">
@@ -236,6 +259,12 @@ export function OutreachDashboard() {
 
   return (
     <div className="space-y-6">
+      {showUploadDialog && (
+        <LeadUploadDialog
+          campaigns={data.campaigns}
+          onClose={() => setShowUploadDialog(false)}
+        />
+      )}
       {/* Tabs + Sync */}
       <div className="flex items-center justify-between">
         <div className="flex gap-0 border border-[#0A0A0A]">
@@ -264,6 +293,12 @@ export function OutreachDashboard() {
               {syncStatus}
             </span>
           )}
+          <button
+            onClick={() => setShowUploadDialog(true)}
+            className="px-4 py-2 text-xs font-mono uppercase tracking-wider border border-[#0A0A0A] bg-white text-[#0A0A0A] hover:bg-[#0A0A0A]/5 transition-colors"
+          >
+            Upload Leads
+          </button>
           <button
             onClick={handleSync}
             disabled={syncing}
@@ -674,7 +709,7 @@ export function OutreachDashboard() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex gap-2 shrink-0 flex-wrap justify-end">
                       {!reply.isRead && (
                         <button
                           onClick={() => handleInboxAction(reply.externalId, "mark_read")}
@@ -691,6 +726,19 @@ export function OutreachDashboard() {
                           className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider border border-[#0A0A0A] text-[#0A0A0A] hover:bg-[#0A0A0A]/5 transition-colors disabled:opacity-50"
                         >
                           Interested
+                        </button>
+                      )}
+                      {convertedEmails.has(reply.leadEmail) ? (
+                        <span className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider border border-[#0A0A0A]/20 text-[#0A0A0A]/40">
+                          In CRM
+                        </span>
+                      ) : (
+                        <button
+                          onClick={() => handleConvertToCRM(reply)}
+                          disabled={convertingEmail === reply.leadEmail}
+                          className="px-2 py-1 font-mono text-[10px] uppercase tracking-wider border border-[#0A0A0A] bg-[#0A0A0A] text-white hover:bg-[#0A0A0A]/80 transition-colors disabled:opacity-50"
+                        >
+                          {convertingEmail === reply.leadEmail ? "Converting..." : "Convert to CRM Lead"}
                         </button>
                       )}
                     </div>

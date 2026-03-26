@@ -1121,26 +1121,6 @@ export async function executeTool(
         });
       }
 
-      default: {
-        // Check Vercel tools
-        if (name.startsWith("list_vercel_") || name.startsWith("get_vercel_") || name.startsWith("redeploy_vercel_") || name.startsWith("check_vercel_")) {
-          return executeVercelTool(name, input);
-        }
-        // Check PostHog tools
-        if (name.startsWith("get_posthog_")) {
-          return executePosthogTool(name, input);
-        }
-        // Check Mercury tools
-        if (name.startsWith("get_mercury_") || name.startsWith("get_cash_") || name.startsWith("search_mercury_")) {
-          return executeMercuryTool(name, input);
-        }
-        // Check Linear tools
-        if (name.startsWith("get_linear_")) {
-          return executeLinearTool(name, input);
-        }
-        return JSON.stringify({ error: `Unknown tool: ${name}` });
-      }
-
       case "get_taskspace_data": {
         const tsUrl = process.env.TASKSPACE_DATABASE_URL;
         if (!tsUrl) return JSON.stringify({ error: "TASKSPACE_DATABASE_URL not configured" });
@@ -1226,6 +1206,26 @@ export async function executeTool(
         }
 
         return JSON.stringify({ error: `Unknown query type: ${tsQuery}` });
+      }
+
+      default: {
+        // Check Vercel tools
+        if (name.startsWith("list_vercel_") || name.startsWith("get_vercel_") || name.startsWith("redeploy_vercel_") || name.startsWith("check_vercel_")) {
+          return executeVercelTool(name, input);
+        }
+        // Check PostHog tools
+        if (name.startsWith("get_posthog_")) {
+          return executePosthogTool(name, input);
+        }
+        // Check Mercury tools
+        if (name.startsWith("get_mercury_") || name.startsWith("get_cash_") || name.startsWith("search_mercury_")) {
+          return executeMercuryTool(name, input);
+        }
+        // Check Linear tools
+        if (name.startsWith("get_linear_")) {
+          return executeLinearTool(name, input);
+        }
+        return JSON.stringify({ error: `Unknown tool: ${name}` });
       }
     }
   } catch (error) {
