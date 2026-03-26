@@ -1,23 +1,13 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc, ilike, or } from "drizzle-orm";
 import { encryptPassword } from "@/lib/vault/crypto";
+import { requireAuth } from "@/lib/auth";
 
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 // ─── Schemas ─────────────────────────────────────────────────────────────────
 
@@ -39,7 +29,7 @@ type ActionResult<T = unknown> = { success: boolean; data?: T; error?: string };
 export async function listCredentials(
   search?: string
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const rows = await db
@@ -75,7 +65,7 @@ export async function listCredentials(
 export async function createCredential(
   input: z.infer<typeof credentialSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = credentialSchema.safeParse(input);
@@ -100,7 +90,7 @@ export async function updateCredential(
   id: string,
   input: z.infer<typeof credentialSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = credentialSchema.safeParse(input);
@@ -124,7 +114,7 @@ export async function updateCredential(
 }
 
 export async function deleteCredential(id: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   await db.delete(schema.credentials).where(eq(schema.credentials.id, id));

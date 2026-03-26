@@ -1,9 +1,9 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as servicesRepo from "@/lib/db/repositories/services";
+import { requireAuth } from "@/lib/auth";
 
 const createServiceSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -23,17 +23,9 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 export async function getServices(): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await servicesRepo.getServices();
@@ -43,7 +35,7 @@ export async function getServices(): Promise<ActionResult> {
 export async function createService(
   formData: z.infer<typeof createServiceSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = createServiceSchema.safeParse(formData);
@@ -72,7 +64,7 @@ export async function updateService(
   id: string,
   formData: z.infer<typeof updateServiceSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = updateServiceSchema.safeParse(formData);
@@ -88,7 +80,7 @@ export async function updateService(
 }
 
 export async function deleteService(id: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   await servicesRepo.deleteService(id, userId);

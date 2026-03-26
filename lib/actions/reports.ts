@@ -1,9 +1,9 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as reportsRepo from "@/lib/db/repositories/reports";
+import { requireAuth } from "@/lib/auth";
 
 const createReportSchema = z.object({
   authorId: z.string().uuid(),
@@ -23,21 +23,13 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 export async function getReports(filters?: {
   authorId?: string;
   startDate?: string;
   endDate?: string;
 }): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await reportsRepo.getReports({
@@ -51,7 +43,7 @@ export async function getReports(filters?: {
 export async function createReport(
   formData: z.infer<typeof createReportSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = createReportSchema.safeParse(formData);

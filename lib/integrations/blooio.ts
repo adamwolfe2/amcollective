@@ -1,7 +1,7 @@
 /**
  * Bloo.io Messaging API v2 Integration
  *
- * Sole iMessage/SMS/RCS provider for TBGC.
+ * iMessage/SMS/RCS provider for AM Collective.
  * API Docs: https://backend.blooio.com/v2/api/openapi.json
  * Dashboard: https://blooio.com
  *
@@ -16,6 +16,7 @@
  */
 
 import crypto from "crypto";
+import { getSiteUrl } from "@/lib/get-site-url";
 
 const BLOOIO_BASE = "https://backend.blooio.com/v2/api";
 
@@ -163,19 +164,19 @@ export function verifyWebhookSignature(
 }
 
 // ============================================================
-// TBGC message templates
+// AM Collective message templates
 // ============================================================
 
 export function orderConfirmationMessage(orderNumber: string, businessName: string): string {
-  return `Hi ${businessName} — your TBGC order #${orderNumber} has been confirmed. We'll be in touch shortly with delivery details. Questions? Reply here.`;
+  return `Hi ${businessName} — your order #${orderNumber} has been confirmed. We'll be in touch shortly with delivery details. Questions? Reply here.`;
 }
 
 export function orderShippedMessage(orderNumber: string, businessName: string): string {
-  return `${businessName} — TBGC order #${orderNumber} is on its way. Expect delivery within your confirmed window. Reply here if you need anything.`;
+  return `${businessName} — order #${orderNumber} is on its way. Expect delivery within your confirmed window. Reply here if you need anything.`;
 }
 
 export function orderDeliveredMessage(orderNumber: string, businessName: string): string {
-  return `${businessName} — TBGC order #${orderNumber} has been delivered. Enjoy! Reply here if anything is missing or needs attention.`;
+  return `${businessName} — order #${orderNumber} has been delivered. Enjoy! Reply here if anything is missing or needs attention.`;
 }
 
 export function invoiceReminderMessage(
@@ -183,12 +184,12 @@ export function invoiceReminderMessage(
   amount: string,
   dueDate: string
 ): string {
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://truffleboys.com'
-  return `TBGC Invoice #${invoiceNumber} for $${amount} is due on ${dueDate}. Log in at ${siteUrl} to pay or view details. Questions? Reply here.`;
+  const siteUrl = getSiteUrl();
+  return `AM Collective Invoice #${invoiceNumber} for $${amount} is due on ${dueDate}. Log in at ${siteUrl} to pay or view details. Questions? Reply here.`;
 }
 
 export function welcomePartnerMessage(businessName: string, contactName: string | null): string {
   const name = contactName ?? businessName;
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://truffleboys.com'
-  return `Welcome to TBGC, ${name}! Your wholesale account is ready. Browse our full catalog at ${siteUrl}. Your account rep will reach out shortly. — The TBGC Team`;
+  const siteUrl = getSiteUrl();
+  return `Welcome to AM Collective, ${name}! Your client portal is ready at ${siteUrl}. Your account rep will reach out shortly. — The AM Collective Team`;
 }

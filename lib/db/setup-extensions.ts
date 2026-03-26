@@ -10,6 +10,7 @@
 
 import { db } from "@/lib/db";
 import { sql } from "drizzle-orm";
+import { captureError } from "@/lib/errors";
 
 export async function enableExtensions() {
   await db.execute(sql`CREATE EXTENSION IF NOT EXISTS pg_trgm`);
@@ -21,7 +22,7 @@ if (require.main === module) {
   enableExtensions()
     .then(() => process.exit(0))
     .catch((err) => {
-      console.error(err);
+      captureError(err);
       process.exit(1);
     });
 }

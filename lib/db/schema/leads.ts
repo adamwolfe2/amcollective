@@ -96,6 +96,7 @@ export const leads = pgTable(
     index("leads_source_idx").on(table.source),
     index("leads_is_archived_idx").on(table.isArchived),
     index("leads_created_at_idx").on(table.createdAt),
+    index("leads_updated_at_idx").on(table.updatedAt),
   ]
 );
 

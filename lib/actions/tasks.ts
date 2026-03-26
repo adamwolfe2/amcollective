@@ -1,11 +1,11 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { tasks } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import type { SubtaskItem } from "@/lib/db/schema";
+import { requireAuth } from "@/lib/auth";
 
 type ActionResult<T = unknown> = {
   success: boolean;
@@ -13,14 +13,6 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 /**
  * Update the subtasks JSONB array for a task.
@@ -31,7 +23,7 @@ export async function updateSubtasks(
   sprintId: string,
   subtasks: SubtaskItem[]
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {

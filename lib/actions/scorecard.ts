@@ -1,9 +1,9 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as scorecardRepo from "@/lib/db/repositories/scorecard";
+import { requireAuth } from "@/lib/auth";
 
 const createMetricSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -28,19 +28,11 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 export async function createMetric(
   formData: z.infer<typeof createMetricSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = createMetricSchema.safeParse(formData);
@@ -56,7 +48,7 @@ export async function createMetric(
 export async function recordValue(
   formData: z.infer<typeof recordValueSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = recordValueSchema.safeParse(formData);

@@ -36,10 +36,11 @@ export async function POST(request: NextRequest) {
 
     const sigResult = verifySignature(rawBody, signature);
     if (sigResult === "unconfigured") {
-      return NextResponse.json(
-        { error: "Webhook secret not configured" },
-        { status: 503 }
-      );
+      captureError(new Error("Composio webhook secret not configured"), {
+        tags: { route: "POST /api/webhooks/composio" },
+      });
+      // Return 200 to prevent Composio retry storms while secret is unconfigured
+      return NextResponse.json({ received: true });
     }
     if (!sigResult) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });

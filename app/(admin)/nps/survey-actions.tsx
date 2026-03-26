@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export function SurveyActions({
   clients,
@@ -22,13 +23,20 @@ export function SurveyActions({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ clientId, type }),
       });
-      if (res.ok) {
-        const survey = await res.json();
-        // Auto-send immediately
-        await fetch(`/api/surveys/${survey.id}/send`, { method: "POST" });
-        setClientId("");
-        router.refresh();
+      if (!res.ok) {
+        toast.error("Failed to create survey");
+        return;
       }
+      const survey = await res.json();
+      // Auto-send immediately
+      const sendRes = await fetch(`/api/surveys/${survey.id}/send`, { method: "POST" });
+      if (!sendRes.ok) {
+        toast.error("Survey created but failed to send");
+      }
+      setClientId("");
+      router.refresh();
+    } catch {
+      toast.error("Something went wrong");
     } finally {
       setLoading(false);
     }

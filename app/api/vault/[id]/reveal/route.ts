@@ -13,11 +13,40 @@ import { eq } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { decryptPassword } from "@/lib/vault/crypto";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { captureError } from "@/lib/errors";
+import arcjet, { shield, tokenBucket } from "@arcjet/next";
+
+const key = process.env.ARCJET_KEY;
+
+/** Strict rate limiter for vault reveal: 10 req/hour per IP */
+const ajVaultReveal = key
+  ? arcjet({
+      key,
+      characteristics: ["ip.src"],
+      rules: [
+        shield({ mode: "LIVE" }),
+        tokenBucket({
+          mode: "LIVE",
+          refillRate: 10,
+          interval: 3600,
+          capacity: 10,
+        }),
+      ],
+    })
+  : null;
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Rate limit — strict because this reveals passwords
+  if (ajVaultReveal) {
+    const decision = await ajVaultReveal.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   // Auth — admin/owner only
   const userId = await checkAdmin();
   if (!userId) {
@@ -54,7 +83,8 @@ export async function GET(
     });
 
     return NextResponse.json({ password });
-  } catch {
+  } catch (error) {
+    captureError(error, { tags: { route: "GET /api/vault/[id]/reveal" } });
     return NextResponse.json(
       { error: "Decryption failed" },
       { status: 500 }

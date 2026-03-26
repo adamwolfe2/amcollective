@@ -58,13 +58,13 @@ export async function sendQuoteToClientEmail(data: {
     "",
     `Review your quote: ${quoteUrl}`,
     "",
-    "— Truffle Boys & Girls Club",
+    "— AM Collective Capital",
   ].filter(Boolean);
 
   await resend.emails.send({
     from: FROM_EMAIL,
     to: data.clientEmail,
-    subject: `New Quote from TBGC — ${data.quoteNumber}`,
+    subject: `New Quote from AM Collective — ${data.quoteNumber}`,
     html,
     text: textParts.join("\n"),
   });

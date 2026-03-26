@@ -8,12 +8,40 @@ import { NextRequest, NextResponse } from "next/server";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import Anthropic from "@anthropic-ai/sdk";
+import arcjet, { shield, tokenBucket } from "@arcjet/next";
 
 const client = new Anthropic();
 
 export const runtime = "nodejs";
 
+const key = process.env.ARCJET_KEY;
+
+/** Rate limiter for vault parse: 30 req/hour per IP (calls Anthropic API) */
+const ajVaultParse = key
+  ? arcjet({
+      key,
+      characteristics: ["ip.src"],
+      rules: [
+        shield({ mode: "LIVE" }),
+        tokenBucket({
+          mode: "LIVE",
+          refillRate: 30,
+          interval: 3600,
+          capacity: 30,
+        }),
+      ],
+    })
+  : null;
+
 export async function POST(req: NextRequest) {
+  // Rate limit — prevent runaway Anthropic API costs
+  if (ajVaultParse) {
+    const decision = await ajVaultParse.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   const userId = await checkAdmin();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

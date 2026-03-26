@@ -1,9 +1,9 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as messagesRepo from "@/lib/db/repositories/messages";
+import { requireAuth } from "@/lib/auth";
 
 const sendMessageSchema = z.object({
   channel: z.enum(["email", "sms", "blooio", "slack"]),
@@ -20,17 +20,9 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 export async function getMessageThreads(): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await messagesRepo.getMessageThreads();
@@ -38,7 +30,7 @@ export async function getMessageThreads(): Promise<ActionResult> {
 }
 
 export async function getThread(threadId: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await messagesRepo.getThread(threadId);
@@ -48,7 +40,7 @@ export async function getThread(threadId: string): Promise<ActionResult> {
 export async function sendMessage(
   formData: z.infer<typeof sendMessageSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = sendMessageSchema.safeParse(formData);
@@ -75,7 +67,7 @@ export async function sendMessage(
 }
 
 export async function markThreadRead(threadId: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   await messagesRepo.markThreadRead(threadId);

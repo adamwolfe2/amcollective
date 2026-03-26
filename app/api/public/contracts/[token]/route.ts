@@ -180,9 +180,7 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
     }
 
     // Notify admin
-    const SUPER_ADMIN_USER_IDS = (
-      process.env.SUPER_ADMIN_USER_IDS || "user_2vqM8MZ1z7MxvJRLjJolHJAGnXp"
-    )
+    const SUPER_ADMIN_USER_IDS = (process.env.SUPER_ADMIN_USER_IDS || "")
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);

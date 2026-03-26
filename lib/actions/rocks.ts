@@ -1,9 +1,9 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as rocksRepo from "@/lib/db/repositories/rocks";
+import { requireAuth } from "@/lib/auth";
 
 const createRockSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -29,21 +29,13 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 export async function getRocks(filters?: {
   quarter?: string;
   ownerId?: string;
   status?: string;
 }): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await rocksRepo.getRocks(filters);
@@ -53,7 +45,7 @@ export async function getRocks(filters?: {
 export async function createRock(
   formData: z.infer<typeof createRockSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = createRockSchema.safeParse(formData);
@@ -77,7 +69,7 @@ export async function updateRock(
   id: string,
   formData: z.infer<typeof updateRockSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = updateRockSchema.safeParse(formData);

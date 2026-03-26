@@ -169,7 +169,7 @@ export async function sendLowStockAlert(
 
         <!-- HEADER -->
         <tr><td style="background-color:#0A0A0A;padding:20px 28px;border-bottom:1px solid #2A2A2A;">
-          <p style="margin:0;color:#F9F7F4;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;">TBGC Ops &nbsp;&middot;&nbsp; Internal Alert</p>
+          <p style="margin:0;color:#F9F7F4;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;">AM Collective &nbsp;&middot;&nbsp; Internal Alert</p>
         </td></tr>
 
         <!-- CONTENT -->
@@ -192,7 +192,7 @@ export async function sendLowStockAlert(
 
         <!-- FOOTER -->
         <tr><td style="padding:16px 28px;border-top:1px solid #2A2A2A;">
-          <p style="margin:0;color:#C8C0B4;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">TBGC Ops &nbsp;&middot;&nbsp; truffleboys.com</p>
+          <p style="margin:0;color:#C8C0B4;font-size:11px;letter-spacing:0.08em;text-transform:uppercase;">AM Collective &nbsp;&middot;&nbsp; amcollectivecapital.com</p>
         </td></tr>
 
       </table>
@@ -210,7 +210,7 @@ export async function sendLowStockAlert(
     to,
     subject: `Low Stock Alert — ${items.length} item${items.length !== 1 ? "s" : ""} need restocking`,
     html,
-    text: `Low Stock Alert\n\n${items.length} product${items.length !== 1 ? "s are" : " is"} at or below the restock threshold:\n\n${textRows}\n\n— TBGC Ops`,
+    text: `Low Stock Alert\n\n${items.length} product${items.length !== 1 ? "s are" : " is"} at or below the restock threshold:\n\n${textRows}\n\n— AM Collective`,
   });
 }
 

@@ -119,6 +119,14 @@ export function UploadDocumentDialog({ clients }: { clients: Client[] }) {
             </Label>
             <div
               onClick={() => fileRef.current?.click()}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  fileRef.current?.click();
+                }
+              }}
               className="border border-dashed border-[#0A0A0A]/20 p-6 text-center cursor-pointer hover:border-[#0A0A0A]/40 transition-colors"
             >
               <input

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -36,11 +37,15 @@ export function CreateContractDialog({
           totalValue: totalValue ? Math.round(parseFloat(totalValue) * 100) : null,
         }),
       });
-      if (res.ok) {
-        const contract = await res.json();
-        setOpen(false);
-        router.push(`/contracts/${contract.id}`);
+      if (!res.ok) {
+        toast.error("Failed to create contract");
+        return;
       }
+      const contract = await res.json();
+      setOpen(false);
+      router.push(`/contracts/${contract.id}`);
+    } catch {
+      toast.error("Something went wrong");
     } finally {
       setLoading(false);
     }

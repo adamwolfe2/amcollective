@@ -37,6 +37,8 @@ export function NewLeadForm() {
       if (res.ok) {
         setOpen(false);
         router.refresh();
+      } else {
+        toast.error("Failed to create lead");
       }
     } catch {
       toast.error("Failed to create lead.");

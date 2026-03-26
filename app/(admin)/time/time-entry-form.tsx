@@ -57,6 +57,8 @@ export function TimeEntryForm({
         setHours("");
         setDescription("");
         router.refresh();
+      } else {
+        toast.error("Failed to save time entry");
       }
     } catch {
       toast.error("Failed to save time entry.");

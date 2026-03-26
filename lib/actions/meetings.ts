@@ -1,10 +1,10 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as meetingsRepo from "@/lib/db/repositories/meetings";
 import { captureError } from "@/lib/errors";
+import { requireAuth } from "@/lib/auth";
 
 const createMeetingSchema = z.object({
   title: z.string().optional(),
@@ -33,19 +33,11 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 export async function createMeeting(
   formData: z.infer<typeof createMeetingSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = createMeetingSchema.safeParse(formData);
@@ -76,7 +68,7 @@ export async function updateMeeting(
   id: string,
   formData: z.infer<typeof updateMeetingSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = updateMeetingSchema.safeParse(formData);

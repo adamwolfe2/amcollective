@@ -237,6 +237,7 @@ export const mercuryTransactions = pgTable(
     index("mercury_txns_company_tag_idx").on(table.companyTag),
     index("mercury_txns_posted_at_idx").on(table.postedAt),
     index("mercury_txns_created_at_idx").on(table.createdAt),
+    index("mercury_txn_direction_posted_idx").on(table.direction, table.postedAt),
   ]
 );
 

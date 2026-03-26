@@ -177,7 +177,7 @@ export function CredentialForm({
           <h2 className="font-serif font-bold text-lg">
             {editing ? "Edit Credential" : "Add Credential"}
           </h2>
-          <button onClick={onClose} className="p-1 hover:bg-[#0A0A0A]/10">
+          <button onClick={onClose} aria-label="Close" className="p-1 hover:bg-[#0A0A0A]/10">
             <X size={16} />
           </button>
         </div>
@@ -349,7 +349,7 @@ function AiParseModal({
             <Sparkles size={15} />
             <h2 className="font-serif font-bold text-lg">AI Parse Credential</h2>
           </div>
-          <button onClick={onClose} className="p-1 hover:bg-[#0A0A0A]/10">
+          <button onClick={onClose} aria-label="Close" className="p-1 hover:bg-[#0A0A0A]/10">
             <X size={16} />
           </button>
         </div>

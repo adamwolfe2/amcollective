@@ -1,9 +1,9 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as teamRepo from "@/lib/db/repositories/team";
+import { requireAuth } from "@/lib/auth";
 
 const createMemberSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -20,17 +20,9 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 export async function getTeam(): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await teamRepo.getTeam();
@@ -38,7 +30,7 @@ export async function getTeam(): Promise<ActionResult> {
 }
 
 export async function getTeamMember(id: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await teamRepo.getTeamMember(id);
@@ -49,7 +41,7 @@ export async function getTeamMember(id: string): Promise<ActionResult> {
 export async function inviteMember(
   formData: z.infer<typeof createMemberSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = createMemberSchema.safeParse(formData);
@@ -75,7 +67,7 @@ export async function updateMember(
   id: string,
   formData: z.infer<typeof updateMemberSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = updateMemberSchema.safeParse(formData);
@@ -92,7 +84,7 @@ export async function updateMember(
 }
 
 export async function removeMember(id: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   await teamRepo.removeTeamMember(id, userId);

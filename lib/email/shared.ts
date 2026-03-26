@@ -15,8 +15,8 @@ export const APP_URL = getSiteUrl();
 export const OPS_NAME = process.env.OPS_NAME || "our team";
 
 // ---------------------------------------------------------------------------
-// buildBaseHtml — private helper that wraps content in the TBGC branded
-// email shell. Used by every transactional email for consistent branding.
+// buildBaseHtml — private helper that wraps content in the AM Collective
+// branded email shell. Used by every transactional email for consistent branding.
 // ---------------------------------------------------------------------------
 
 export interface BaseHtmlOptions {
@@ -58,7 +58,7 @@ export function buildBaseHtml({
 
         <!-- HEADER: dark bar with brand name -->
         <tr><td style="background-color:#0A0A0A;padding:24px 32px;">
-          <p style="margin:0;color:#FFFFFF;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;">Truffle Boys &amp; Girls Club</p>
+          <p style="margin:0;color:#FFFFFF;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;">AM Collective Capital</p>
         </td></tr>
 
         <!-- OPTIONAL ALERT BANNER -->
@@ -75,8 +75,8 @@ export function buildBaseHtml({
 
         <!-- FOOTER -->
         <tr><td style="padding:20px 32px;border-top:1px solid #E5E1DB;background-color:#F9F7F4;">
-          <p style="margin:0;color:#0A0A0A;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;">Truffle Boys &amp; Girls Club</p>
-          <p style="margin:4px 0 0;color:#C8C0B4;font-size:12px;">truffleboys.com &nbsp;&middot;&nbsp; Los Angeles, CA</p>
+          <p style="margin:0;color:#0A0A0A;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;">AM Collective Capital</p>
+          <p style="margin:4px 0 0;color:#C8C0B4;font-size:12px;">amcollectivecapital.com</p>
         </td></tr>
 
       </table>

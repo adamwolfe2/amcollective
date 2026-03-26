@@ -1,10 +1,10 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import * as projectsRepo from "@/lib/db/repositories/projects";
 import * as teamRepo from "@/lib/db/repositories/team";
+import { requireAuth } from "@/lib/auth";
 
 const createProjectSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -24,17 +24,9 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 export async function getProjects(): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await projectsRepo.getProjects();
@@ -42,7 +34,7 @@ export async function getProjects(): Promise<ActionResult> {
 }
 
 export async function getProject(id: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await projectsRepo.getProject(id);
@@ -53,7 +45,7 @@ export async function getProject(id: string): Promise<ActionResult> {
 export async function createProject(
   formData: z.infer<typeof createProjectSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = createProjectSchema.safeParse(formData);
@@ -75,6 +67,7 @@ export async function createProject(
   );
 
   revalidatePath("/projects");
+  revalidateTag("projects", {});
   return { success: true, data: project };
 }
 
@@ -82,7 +75,7 @@ export async function updateProject(
   id: string,
   formData: z.infer<typeof updateProjectSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = updateProjectSchema.safeParse(formData);
@@ -95,6 +88,7 @@ export async function updateProject(
 
   revalidatePath("/projects");
   revalidatePath(`/projects/${id}`);
+  revalidateTag("projects", {});
   return { success: true, data: project };
 }
 
@@ -103,7 +97,7 @@ export async function assignTeamMember(
   teamMemberId: string,
   role?: string
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const assignment = await teamRepo.assignToProject(

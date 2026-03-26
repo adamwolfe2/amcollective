@@ -1,7 +1,7 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
+import { requireAuth } from "@/lib/auth";
 import { z } from "zod";
 import * as invoicesRepo from "@/lib/db/repositories/invoices";
 import { getClient } from "@/lib/db/repositories/clients";
@@ -38,20 +38,12 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 export async function getInvoices(opts?: {
   status?: string;
   clientId?: string;
 }): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await invoicesRepo.getInvoices(opts);
@@ -59,7 +51,7 @@ export async function getInvoices(opts?: {
 }
 
 export async function getInvoice(id: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await invoicesRepo.getInvoice(id);
@@ -70,7 +62,7 @@ export async function getInvoice(id: string): Promise<ActionResult> {
 export async function createInvoice(
   formData: z.infer<typeof createInvoiceSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = createInvoiceSchema.safeParse(formData);
@@ -160,6 +152,7 @@ export async function createInvoice(
   );
 
   revalidatePath("/invoices");
+  revalidateTag("invoices", {});
   return { success: true, data: invoice };
 }
 
@@ -167,7 +160,7 @@ export async function updateInvoice(
   id: string,
   formData: z.infer<typeof updateInvoiceSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = updateInvoiceSchema.safeParse(formData);
@@ -184,11 +177,12 @@ export async function updateInvoice(
 
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${id}`);
+  revalidateTag("invoices", {});
   return { success: true, data: invoice };
 }
 
 export async function sendInvoiceAction(id: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   // Fetch invoice + client
@@ -275,11 +269,12 @@ export async function sendInvoiceAction(id: string): Promise<ActionResult> {
 
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${id}`);
+  revalidateTag("invoices", {});
   return { success: true, data: { ...updated, paymentLinkUrl } };
 }
 
 export async function markPaid(id: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const invoice = await invoicesRepo.markInvoicePaid(id, userId);
@@ -287,5 +282,6 @@ export async function markPaid(id: string): Promise<ActionResult> {
 
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${id}`);
+  revalidateTag("invoices", {});
   return { success: true, data: invoice };
 }

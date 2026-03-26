@@ -164,9 +164,7 @@ export async function notifyAdmins(data: {
   link?: string;
   metadata?: Record<string, unknown>;
 }) {
-  const adminIds = (
-    process.env.SUPER_ADMIN_USER_IDS || "user_2vqM8MZ1z7MxvJRLjJolHJAGnXp"
-  )
+  const adminIds = (process.env.SUPER_ADMIN_USER_IDS || "")
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);

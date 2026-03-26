@@ -1,8 +1,8 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
+import { requireAuth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { db } from "@/lib/db";
@@ -25,19 +25,11 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 // ─── Sprint CRUD ──────────────────────────────────────────────────────────────
 
 export async function createSprint(formData: FormData): Promise<void> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) redirect("/sign-in");
 
   const title = (formData.get("title") as string) || getDefaultTitle();
@@ -68,7 +60,7 @@ export async function toggleSprintShare(
   id: string,
   currentToken: string | null
 ): Promise<ActionResult<{ shareToken: string | null }>> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
@@ -87,7 +79,7 @@ export async function toggleSprintShare(
 }
 
 export async function deleteSprint(id: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
@@ -116,7 +108,7 @@ export async function updateSprint(
     topOfMind?: string;
   }
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
@@ -153,7 +145,7 @@ export async function updateSprint(
 }
 
 export async function closeSprint(id: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
@@ -229,7 +221,7 @@ export async function createSection(
     sortOrder?: number;
   }
 ): Promise<ActionResult<{ id: string }>> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
@@ -279,7 +271,7 @@ export async function updateSection(
     goal?: string | null;
   }
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
@@ -327,7 +319,7 @@ export async function deleteSection(
   id: string,
   sprintId: string
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
@@ -357,7 +349,7 @@ export async function createTask(
   content: string,
   sortOrder = 0
 ): Promise<ActionResult<{ id: string }>> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
@@ -421,7 +413,7 @@ export async function toggleTask(
   sprintId: string,
   isCompleted: boolean
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
@@ -462,7 +454,7 @@ export async function updateTask(
   sprintId: string,
   content: string
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
@@ -493,7 +485,7 @@ export async function deleteTask(
   id: string,
   sprintId: string
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {
@@ -558,7 +550,7 @@ export async function parseSprintText(
   knownProjects: string[],
   knownTeamMembers: string[]
 ): Promise<ActionResult<ParsedSprintSection[]>> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const ai = getAnthropicClient();
@@ -683,7 +675,7 @@ export async function importParsedSections(
   }>,
   startSortOrder: number
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   try {

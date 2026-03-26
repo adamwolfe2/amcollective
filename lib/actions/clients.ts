@@ -1,9 +1,9 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 import * as clientsRepo from "@/lib/db/repositories/clients";
+import { requireAuth } from "@/lib/auth";
 
 const createClientSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -23,17 +23,9 @@ type ActionResult<T = unknown> = {
   error?: string;
 };
 
-async function getUserId() {
-  const { userId } = await auth();
-  if (!userId) {
-    if (process.env.NODE_ENV === "development") return "dev-admin";
-    throw new Error("Not authenticated");
-  }
-  return userId;
-}
 
 export async function getClients(search?: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await clientsRepo.getClients({ search: search || undefined });
@@ -41,7 +33,7 @@ export async function getClients(search?: string): Promise<ActionResult> {
 }
 
 export async function getClient(id: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const data = await clientsRepo.getClient(id);
@@ -52,7 +44,7 @@ export async function getClient(id: string): Promise<ActionResult> {
 export async function createClient(
   formData: z.infer<typeof createClientSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = createClientSchema.safeParse(formData);
@@ -74,6 +66,7 @@ export async function createClient(
   );
 
   revalidatePath("/clients");
+  revalidateTag("clients", {});
   return { success: true, data: client };
 }
 
@@ -81,7 +74,7 @@ export async function updateClient(
   id: string,
   formData: z.infer<typeof updateClientSchema>
 ): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   const parsed = updateClientSchema.safeParse(formData);
@@ -94,14 +87,16 @@ export async function updateClient(
 
   revalidatePath("/clients");
   revalidatePath(`/clients/${id}`);
+  revalidateTag("clients", {});
   return { success: true, data: client };
 }
 
 export async function deleteClient(id: string): Promise<ActionResult> {
-  const userId = await getUserId();
+  const userId = await requireAuth();
   if (!userId) return { success: false, error: "Unauthorized" };
 
   await clientsRepo.deleteClient(id, userId);
   revalidatePath("/clients");
+  revalidateTag("clients", {});
   return { success: true };
 }
