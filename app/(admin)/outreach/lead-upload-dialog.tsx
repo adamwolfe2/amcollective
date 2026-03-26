@@ -14,6 +14,7 @@ type ParsedLead = {
   lastName?: string;
   company?: string;
   school?: string;
+  phone?: string;
 };
 
 type ParseError = {
@@ -39,6 +40,7 @@ function parseCSV(text: string): { leads: ParsedLead[]; errors: ParseError[] } {
     lastName: header.indexOf("lastname"),
     company: header.indexOf("company"),
     school: header.indexOf("school"),
+    phone: header.indexOf("phone"),
   };
 
   const emailIdx = idx.email;
@@ -69,6 +71,7 @@ function parseCSV(text: string): { leads: ParsedLead[]; errors: ParseError[] } {
       lastName: lastNameIdx !== -1 ? cols[lastNameIdx]?.trim() || undefined : undefined,
       company: idx.company !== -1 ? cols[idx.company]?.trim() || undefined : undefined,
       school: idx.school !== -1 ? cols[idx.school]?.trim() || undefined : undefined,
+      phone: idx.phone !== -1 ? cols[idx.phone]?.trim() || undefined : undefined,
     });
   }
 

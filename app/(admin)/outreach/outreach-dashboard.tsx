@@ -158,11 +158,15 @@ export function OutreachDashboard() {
   async function handleInboxAction(replyId: number, action: "mark_read" | "mark_interested") {
     setActingOn(replyId);
     try {
-      await fetch("/api/outreach/inbox", {
+      const res = await fetch("/api/outreach/inbox", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ replyId, action }),
       });
+      if (!res.ok) {
+        alert(`Failed to ${action.replace("_", " ")}`);
+        return;
+      }
       // Optimistically update local state
       setInbox((prev) =>
         prev
@@ -184,6 +188,8 @@ export function OutreachDashboard() {
             }
           : prev
       );
+    } catch {
+      alert(`Network error — failed to ${action.replace("_", " ")}`);
     } finally {
       setActingOn(null);
     }
@@ -225,7 +231,12 @@ export function OutreachDashboard() {
       });
       if (res.ok) {
         setConvertedEmails((prev) => new Set(prev).add(reply.leadEmail));
+      } else {
+        const body = await res.json().catch(() => null);
+        alert(body?.error ?? "Failed to convert lead to CRM");
       }
+    } catch {
+      alert("Network error — failed to convert lead");
     } finally {
       setConvertingEmail(null);
     }

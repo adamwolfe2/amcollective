@@ -64,6 +64,21 @@ export async function POST(req: NextRequest) {
           .limit(1)
       : await replyQuery;
 
+    // Check for duplicate — don't create if email already exists in CRM
+    const [existing] = await db
+      .select({ id: leads.id })
+      .from(leads)
+      .where(eq(leads.email, leadEmail))
+      .limit(1);
+
+    if (existing) {
+      return NextResponse.json({
+        success: true,
+        leadId: existing.id,
+        duplicate: true,
+      });
+    }
+
     // Build contact name from reply data or fall back to email
     const contactName = reply?.leadName ?? leadEmail;
 
