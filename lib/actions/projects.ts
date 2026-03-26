@@ -107,5 +107,6 @@ export async function assignTeamMember(
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath(`/team/${teamMemberId}`);
+  revalidateTag("projects", {});
   return { success: true, data: assignment };
 }

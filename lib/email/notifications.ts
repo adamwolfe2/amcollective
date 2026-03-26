@@ -141,7 +141,7 @@ export async function sendLowStockAlert(
 ) {
   const r = getResend();
   if (!r) return null;
-  const from = process.env.RESEND_FROM_EMAIL || "team@amcollectivecapital.com";
+  const from = FROM_EMAIL;
   const to = process.env.OPS_NOTIFICATION_EMAIL || from;
 
   const itemRowsHtml = items
