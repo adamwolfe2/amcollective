@@ -4,12 +4,20 @@ import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { generatePandLRange } from "@/lib/export/p-and-l";
 import { buildCsv, csvResponse, fmtDollars } from "@/lib/export/csv";
+import { aj } from "@/lib/middleware/arcjet";
 
 /**
  * GET /api/export/p-and-l — Monthly P&L report
  * Query params: from (YYYY-MM), to (YYYY-MM), format (json|csv, default json)
  */
 export async function GET(request: NextRequest) {
+  if (aj) {
+    const decision = await aj.protect(request, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   const userId = await checkAdmin();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -90,7 +98,7 @@ export async function GET(request: NextRequest) {
             ? Math.round((totalProfit / totalRevenue) * 100)
             : 0,
       },
-    });
+    }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     captureError(error, { tags: { route: "GET /api/export/p-and-l" } });
     return NextResponse.json({ error: "Failed to generate P&L" }, { status: 500 });

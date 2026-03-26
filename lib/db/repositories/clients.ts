@@ -159,7 +159,8 @@ export async function getClientSubscriptions(clientId: string) {
     .select()
     .from(subscriptions)
     .where(eq(subscriptions.clientId, clientId))
-    .orderBy(desc(subscriptions.createdAt));
+    .orderBy(desc(subscriptions.createdAt))
+    .limit(100);
 }
 
 export async function getClientPayments(clientId: string, limit = 20) {

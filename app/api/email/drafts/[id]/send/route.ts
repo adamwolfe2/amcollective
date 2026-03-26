@@ -5,13 +5,10 @@ import { createAuditLog } from "@/lib/db/repositories/audit";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
-import { Resend } from "resend";
+import { getResend, FROM_EMAIL } from "@/lib/email/shared";
 import { aj } from "@/lib/middleware/arcjet";
 
 type RouteContext = { params: Promise<{ id: string }> };
-
-const FROM_EMAIL =
-  process.env.RESEND_FROM_EMAIL || "team@amcollectivecapital.com";
 
 /**
  * POST /api/email/drafts/:id/send — Send an email draft via Resend
@@ -46,14 +43,13 @@ export async function POST(_request: NextRequest, context: RouteContext) {
       );
     }
 
-    if (!process.env.RESEND_API_KEY) {
+    const resend = getResend();
+    if (!resend) {
       return NextResponse.json(
         { error: "RESEND_API_KEY not configured" },
         { status: 500 }
       );
     }
-
-    const resend = new Resend(process.env.RESEND_API_KEY);
 
     const { data, error } = await resend.emails.send({
       from: `AM Collective <${FROM_EMAIL}>`,

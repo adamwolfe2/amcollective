@@ -13,9 +13,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { trackAIUsage } from "@/lib/ai/client";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { getClients } from "@/lib/db/repositories/clients";
 import { sendClientStatusEmail } from "@/lib/email/client-status";
+import { FROM_EMAIL } from "@/lib/email/shared";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 
 function getAnthropicClient() {
@@ -47,31 +48,37 @@ export const sendClientReports = inngest.createFunction(
       return { success: true, message: "No clients to send reports to" };
     }
 
-    // Step 2: Fetch all client project data in one step
+    // Step 2: Fetch all client project data in a single batched query
     const clientContexts = await step.run("fetch-all-project-data", async () => {
-      return Promise.all(
-        clients.map(async (client) => {
-          const clientProjects = await db
-            .select({ project: schema.portfolioProjects })
-            .from(schema.clientProjects)
-            .innerJoin(
-              schema.portfolioProjects,
-              eq(schema.clientProjects.projectId, schema.portfolioProjects.id)
-            )
-            .where(eq(schema.clientProjects.clientId, client.id));
+      const clientIds = clients.map((c) => c.id);
 
-          return {
-            clientId: client.id,
-            name: client.name,
-            email: client.email,
-            companyName: client.companyName,
-            projects: clientProjects.map((cp) => ({
-              name: cp.project.name,
-              status: cp.project.status,
-            })),
-          };
+      const allClientProjects = await db
+        .select({
+          clientId: schema.clientProjects.clientId,
+          project: schema.portfolioProjects,
         })
-      );
+        .from(schema.clientProjects)
+        .innerJoin(
+          schema.portfolioProjects,
+          eq(schema.clientProjects.projectId, schema.portfolioProjects.id)
+        )
+        .where(inArray(schema.clientProjects.clientId, clientIds));
+
+      // Group by clientId in application code
+      const projectsByClient = new Map<string, Array<{ name: string; status: string }>>();
+      for (const row of allClientProjects) {
+        const list = projectsByClient.get(row.clientId) ?? [];
+        list.push({ name: row.project.name, status: row.project.status });
+        projectsByClient.set(row.clientId, list);
+      }
+
+      return clients.map((client) => ({
+        clientId: client.id,
+        name: client.name,
+        email: client.email,
+        companyName: client.companyName,
+        projects: projectsByClient.get(client.id) ?? [],
+      }));
     });
 
     const eligibleClients = clientContexts.filter((c) => c.projects.length > 0);
@@ -142,7 +149,7 @@ Return format: {"<CLIENT_ID>": "<html>", ...}`,
         await db.insert(schema.messages).values({
           direction: "outbound",
           channel: "email",
-          from: "team@amcollectivecapital.com",
+          from: FROM_EMAIL,
           to: client.email!,
           subject: `Project Status Update — ${today}`,
           body: bodyHtml,

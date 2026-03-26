@@ -8,7 +8,7 @@ import { getClient } from "@/lib/db/repositories/clients";
 import { createAndFinalizeInvoice } from "@/lib/stripe/stripe-service";
 import { generateInvoiceNumber } from "@/lib/invoices/number";
 import { buildInvoiceEmail } from "@/lib/invoices/email";
-import { Resend } from "resend";
+import { getResend, FROM_EMAIL } from "@/lib/email/shared";
 import { getStripeClient } from "@/lib/stripe/config";
 import { format } from "date-fns";
 import { captureError } from "@/lib/errors";
@@ -234,7 +234,7 @@ export async function sendInvoiceAction(id: string): Promise<ActionResult> {
   }
 
   // Send email via Resend
-  const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+  const resend = getResend();
   if (resend) {
     try {
       const emailHtml = buildInvoiceEmail({
@@ -251,9 +251,8 @@ export async function sendInvoiceAction(id: string): Promise<ActionResult> {
         paymentLinkUrl,
       });
 
-      const from = process.env.RESEND_FROM_EMAIL || "AM Collective <team@amcollectivecapital.com>";
       await resend.emails.send({
-        from,
+        from: FROM_EMAIL,
         to: clientEmail,
         subject: `Invoice ${invoice.number ?? id.slice(0, 8)} — $${(invoice.amount / 100).toFixed(2)} due ${invoice.dueDate ? format(invoice.dueDate, "MMM d, yyyy") : "upon receipt"}`,
         html: emailHtml,

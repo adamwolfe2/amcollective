@@ -10,7 +10,7 @@ import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { notifySlack } from "@/lib/webhooks/slack";
-import { Resend } from "resend";
+import { getResend, FROM_EMAIL } from "@/lib/email/shared";
 import { aj } from "@/lib/middleware/arcjet";
 
 export async function POST(
@@ -66,19 +66,13 @@ export async function POST(
       .where(eq(schema.proposals.id, id));
 
     // Send email
-    const resend = process.env.RESEND_API_KEY
-      ? new Resend(process.env.RESEND_API_KEY)
-      : null;
+    const resend = getResend();
 
     if (resend && clientEmail) {
-      const from =
-        process.env.RESEND_FROM_EMAIL ||
-        "AM Collective <team@amcollectivecapital.com>";
-
       const proposalUrl = `${process.env.NEXT_PUBLIC_APP_URL || "https://amcollective.vercel.app"}/p/${id}`;
 
       await resend.emails.send({
-        from,
+        from: FROM_EMAIL,
         to: clientEmail,
         subject: `Your proposal from AM Collective — ${proposal.proposalNumber}`,
         html: buildProposalEmail({

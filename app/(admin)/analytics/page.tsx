@@ -17,7 +17,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SyncButton } from "./sync-button";
-import { AnalyticsCharts } from "./analytics-charts";
+import dynamic from "next/dynamic";
+const AnalyticsCharts = dynamic(
+  () => import("./analytics-charts").then((mod) => mod.AnalyticsCharts)
+);
 
 async function getAnalyticsData() {
   // Fetch projects and all snapshots in parallel (eliminates N+1)

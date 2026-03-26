@@ -5,18 +5,27 @@
  * GET: Return recent snapshots for trend display.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { apiSuccess, apiError } from "@/lib/api/response";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, sql, count, desc } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { captureError } from "@/lib/errors";
+import { aj } from "@/lib/middleware/arcjet";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  if (aj) {
+    const decision = await aj.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return apiError("Rate limited", 429);
+    }
+  }
+
   const userId = await checkAdmin();
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   try {
@@ -105,8 +114,7 @@ export async function POST() {
       entityId: snapshot.id,
     });
 
-    return NextResponse.json({
-      success: true,
+    return apiSuccess({
       snapshot: {
         ...snapshot,
         mrr: snapshot.mrr / 100,
@@ -117,17 +125,21 @@ export async function POST() {
     });
   } catch (err) {
     captureError(err, { tags: { route: "POST /api/dashboard/snapshot" } });
-    return NextResponse.json(
-      { error: "Failed to create snapshot" },
-      { status: 500 }
-    );
+    return apiError("Failed to create snapshot", 500);
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (aj) {
+    const decision = await aj.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return apiError("Rate limited", 429);
+    }
+  }
+
   const userId = await checkAdmin();
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   const snapshots = await db
@@ -136,7 +148,7 @@ export async function GET() {
     .orderBy(desc(schema.dailyMetricsSnapshots.date))
     .limit(30);
 
-  return NextResponse.json({
+  return apiSuccess({
     snapshots: snapshots.map((s) => ({
       ...s,
       mrr: s.mrr / 100,

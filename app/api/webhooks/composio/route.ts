@@ -14,6 +14,9 @@ import { captureError } from "@/lib/errors";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { inngest } from "@/lib/inngest/client";
 import crypto from "crypto";
+import { db } from "@/lib/db";
+import * as schema from "@/lib/db/schema";
+import { eq, and } from "drizzle-orm";
 
 function verifySignature(rawBody: string, signature: string | null): boolean | "unconfigured" {
   const secret = process.env.COMPOSIO_WEBHOOK_SECRET;
@@ -49,6 +52,35 @@ export async function POST(request: NextRequest) {
     const body = JSON.parse(rawBody);
     const eventType: string = body?.event ?? body?.type ?? "unknown";
     const payload = body?.payload ?? body?.data ?? body;
+
+    // ── Idempotency ──────────────────────────────────────────────────────────
+    // Use body.id if present; otherwise hash the raw body.
+    const rawEventId: string =
+      body?.id?.toString() ??
+      crypto.createHash("sha256").update(rawBody).digest("hex");
+    const idempotencyKey = `${rawEventId}:${eventType}`;
+
+    const [existing] = await db
+      .select({ id: schema.webhookEvents.id })
+      .from(schema.webhookEvents)
+      .where(
+        and(
+          eq(schema.webhookEvents.source, "composio"),
+          eq(schema.webhookEvents.externalId, idempotencyKey)
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+
+    await db.insert(schema.webhookEvents).values({
+      source: "composio",
+      externalId: idempotencyKey,
+      eventType,
+      payload: body,
+    });
 
     // Log every composio event to the audit trail
     await createAuditLog({

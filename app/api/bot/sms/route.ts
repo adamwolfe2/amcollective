@@ -8,7 +8,7 @@
  *   https://app.amcollectivecapital.com/api/bot/sms
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { verifyWebhookSignature, sendMessage } from "@/lib/integrations/blooio";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -19,7 +19,7 @@ import { ajWebhook } from "@/lib/middleware/arcjet";
 import { captureError } from "@/lib/errors";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 30;
 
 const MAX_SMS_LENGTH = 10000;
 
@@ -89,32 +89,30 @@ export async function POST(req: NextRequest) {
   // Use recent conversation if it exists and is less than 24h old
   const conversationId = existingConv?.id;
 
-  try {
-    const result = await runCeoAgent({
-      userId: user.id,
-      userRole: user.role,
-      userFocus: user.focus,
-      userName: user.name,
-      message: messageText,
-      conversationId,
+  // Respond asynchronously — Bloo.io expects a fast 200 to avoid retries
+  const responsePromise = runCeoAgent({
+    userId: user.id,
+    userRole: user.role,
+    userFocus: user.focus,
+    userName: user.name,
+    message: messageText,
+    conversationId,
+  })
+    .then((result) => {
+      return sendMessage({
+        to: senderPhone,
+        message: result.response,
+      });
+    })
+    .catch(async (error) => {
+      captureError(error, { tags: { component: "bot/sms" } });
+      await sendMessage({
+        to: senderPhone,
+        message: "Sorry, I ran into an issue. Please try again.",
+      }).catch(() => {});
     });
 
-    // Reply via Bloo.io
-    await sendMessage({
-      to: senderPhone,
-      message: result.response,
-    });
+  after(responsePromise);
 
-    return NextResponse.json({ ok: true });
-  } catch (error) {
-    captureError(error, { tags: { component: "bot/sms" } });
-
-    // Send error reply
-    await sendMessage({
-      to: senderPhone,
-      message: "Sorry, I ran into an issue. Please try again.",
-    }).catch(() => {});
-
-    return NextResponse.json({ ok: true });
-  }
+  return NextResponse.json({ received: true });
 }

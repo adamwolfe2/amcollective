@@ -8,7 +8,10 @@ export const metadata: Metadata = {
   title: "Costs | AM Collective",
 };
 import { formatCents } from "@/lib/stripe/format";
-import { CostTrendChart } from "./cost-trend-chart";
+import dynamic from "next/dynamic";
+const CostTrendChart = dynamic(
+  () => import("./cost-trend-chart").then((mod) => mod.CostTrendChart)
+);
 import { SyncButton } from "./sync-button";
 import { SubscriptionManager, type ProjectOption } from "./subscription-manager";
 import * as stripeConnector from "@/lib/connectors/stripe";

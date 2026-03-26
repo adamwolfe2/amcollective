@@ -14,6 +14,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { inngest } from "@/lib/inngest/client";
+import { aj } from "@/lib/middleware/arcjet";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -105,6 +106,13 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ service: string }> }
 ) {
+  if (aj) {
+    const decision = await aj.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   const userId = await checkAdmin();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

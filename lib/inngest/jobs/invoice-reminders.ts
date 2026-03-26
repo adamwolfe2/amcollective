@@ -11,7 +11,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, and, gte, lte, or, isNull } from "drizzle-orm";
 import { buildInvoiceEmail } from "@/lib/invoices/email";
-import { Resend } from "resend";
+import { getResend, FROM_EMAIL } from "@/lib/email/shared";
 import { format } from "date-fns";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { notifySlack } from "@/lib/webhooks/slack";
@@ -78,17 +78,13 @@ export const invoiceReminders = inngest.createFunction(
 
     // Step 3: Send reminders via Resend
     let remindersSent = 0;
-    const resend = process.env.RESEND_API_KEY
-      ? new Resend(process.env.RESEND_API_KEY)
-      : null;
+    const resend = getResend();
 
     if (!resend) {
       return { remindersSent: 0, error: "RESEND_API_KEY not configured" };
     }
 
-    const from =
-      process.env.RESEND_FROM_EMAIL ||
-      "AM Collective <team@amcollectivecapital.com>";
+    const from = FROM_EMAIL;
 
     // Send due-soon reminders
     for (const row of dueSoon) {

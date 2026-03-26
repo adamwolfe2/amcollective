@@ -4,7 +4,8 @@
  * POST: { text: string } → { label, service, username, password, url, notes }
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { apiSuccess, apiError } from "@/lib/api/response";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import Anthropic from "@anthropic-ai/sdk";
@@ -38,25 +39,25 @@ export async function POST(req: NextRequest) {
   if (ajVaultParse) {
     const decision = await ajVaultParse.protect(req, { requested: 1 });
     if (decision.isDenied()) {
-      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+      return apiError("Rate limited", 429);
     }
   }
 
   const userId = await checkAdmin();
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   let body: Record<string, unknown>;
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+    return apiError("Invalid JSON", 400);
   }
   const { text } = body as { text?: string };
 
   if (!text || text.trim().length < 5) {
-    return NextResponse.json({ error: "Text required" }, { status: 400 });
+    return apiError("Text required", 400);
   }
 
   const response = await client.messages.create({
@@ -92,13 +93,10 @@ export async function POST(req: NextRequest) {
     captureError(new Error("Vault parse: AI returned invalid JSON"), {
       tags: { route: "vault/parse" },
     });
-    return NextResponse.json(
-      { error: "Could not parse AI response" },
-      { status: 422 }
-    );
+    return apiError("Could not parse AI response", 422);
   }
 
-  return NextResponse.json({
+  return apiSuccess({
     label: parsed.label ?? "",
     service: parsed.service ?? "",
     username: parsed.username ?? "",

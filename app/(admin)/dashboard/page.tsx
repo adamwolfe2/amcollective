@@ -16,7 +16,11 @@ import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { FloatingChatBar } from "@/components/floating-chat-bar";
 import { SprintWidgetClient } from "@/components/sprint-widget-client";
 import { PrioritiesWidget } from "@/components/dashboard/PrioritiesWidget";
-import { CashRunwayChart, type RunwaySnapshot } from "@/components/dashboard/CashRunwayChart";
+import dynamic from "next/dynamic";
+import type { RunwaySnapshot } from "@/components/dashboard/CashRunwayChart";
+const CashRunwayChart = dynamic(
+  () => import("@/components/dashboard/CashRunwayChart").then((mod) => mod.CashRunwayChart)
+);
 import { currentUser } from "@clerk/nextjs/server";
 
 import {

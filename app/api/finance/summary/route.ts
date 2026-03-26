@@ -162,12 +162,12 @@ export async function GET() {
     // Check cache first (5 minute TTL)
     const cached = await cache.get<FinanceSummary>("finance:summary");
     if (cached) {
-      return NextResponse.json(cached);
+      return NextResponse.json(cached, { headers: { "Cache-Control": "no-store" } });
     }
 
     const summary = await buildSummary();
     await cache.set("finance:summary", summary, 300); // 5 min
-    return NextResponse.json(summary);
+    return NextResponse.json(summary, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     captureError(err, { tags: { route: "GET /api/finance/summary" } });
     return NextResponse.json(

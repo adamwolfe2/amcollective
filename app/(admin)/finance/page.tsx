@@ -10,7 +10,10 @@ import { format } from "date-fns";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as mercuryConnector from "@/lib/connectors/mercury";
 import type { MercuryAccount } from "@/lib/connectors/mercury";
-import { CashFlowChart } from "./cash-flow-chart";
+import dynamic from "next/dynamic";
+const CashFlowChart = dynamic(
+  () => import("./cash-flow-chart").then((mod) => mod.CashFlowChart)
+);
 import { TransactionFeed } from "./transaction-feed";
 import { MercurySyncButton } from "./sync-button";
 import { captureError } from "@/lib/errors";

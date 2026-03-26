@@ -16,7 +16,8 @@ export async function getProjects() {
   return db
     .select()
     .from(portfolioProjects)
-    .orderBy(desc(portfolioProjects.createdAt));
+    .orderBy(desc(portfolioProjects.createdAt))
+    .limit(100);
 }
 
 export async function getProjectCount() {

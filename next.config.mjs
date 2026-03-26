@@ -1,4 +1,13 @@
 import { withSentryConfig } from "@sentry/nextjs";
+import withBundleAnalyzer from "@next/bundle-analyzer";
+
+const analyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
+
+// unsafe-eval is required by Next.js Turbopack in development for hot module
+// replacement (HMR). It is NOT included in production builds.
+const isDev = process.env.NODE_ENV === "development";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -28,7 +37,9 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://*.clerk.accounts.dev https://clerk.amcollectivecapital.com https://challenges.cloudflare.com https://vercel.live",
+              // unsafe-eval is only needed in dev (Turbopack HMR). Omitted in production.
+              `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://js.stripe.com https://*.clerk.accounts.dev https://clerk.amcollectivecapital.com https://challenges.cloudflare.com https://vercel.live`,
+              // unsafe-inline is required for styled-jsx and inline styles — do not remove.
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               "font-src 'self' https://fonts.gstatic.com",
               "img-src 'self' blob: data: https://img.clerk.com https://*.stripe.com https://clerk.amcollectivecapital.com",
@@ -53,12 +64,14 @@ const nextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT,
-  silent: !process.env.CI,
-  widenClientFileUpload: true,
-  webpack: {
-    treeshake: { removeDebugLogging: true },
-  },
-});
+export default analyzer(
+  withSentryConfig(nextConfig, {
+    org: process.env.SENTRY_ORG,
+    project: process.env.SENTRY_PROJECT,
+    silent: !process.env.CI,
+    widenClientFileUpload: true,
+    webpack: {
+      treeshake: { removeDebugLogging: true },
+    },
+  })
+);

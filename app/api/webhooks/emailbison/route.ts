@@ -6,10 +6,10 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
+import { timingSafeEqual, createHash } from "crypto";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { captureError } from "@/lib/errors";
 
@@ -33,6 +33,35 @@ export async function POST(request: NextRequest) {
 
     // EmailBison sends event_type at the top level
     const eventType: string = body.event_type ?? body.event ?? "unknown";
+
+    // ── Idempotency ──────────────────────────────────────────────────────────
+    // Use body.id or body.event_id if present; otherwise hash the payload.
+    const rawEventId: string =
+      body.id?.toString() ?? body.event_id?.toString() ??
+      createHash("sha256").update(JSON.stringify(body)).digest("hex");
+    const idempotencyKey = `${rawEventId}:${eventType}`;
+
+    const [existing] = await db
+      .select({ id: schema.webhookEvents.id })
+      .from(schema.webhookEvents)
+      .where(
+        and(
+          eq(schema.webhookEvents.source, "emailbison"),
+          eq(schema.webhookEvents.externalId, idempotencyKey)
+        )
+      )
+      .limit(1);
+
+    if (existing) {
+      return NextResponse.json({ received: true, duplicate: true });
+    }
+
+    await db.insert(schema.webhookEvents).values({
+      source: "emailbison",
+      externalId: idempotencyKey,
+      eventType,
+      payload: body,
+    });
 
     // Extract common fields from the webhook payload
     const campaignId: number | null = body.campaign_id ?? body.campaign?.id ?? null;

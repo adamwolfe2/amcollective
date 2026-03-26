@@ -6,6 +6,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { sendMessage as blooSendMessage } from "@/lib/integrations/blooio";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { getResend, FROM_EMAIL } from "@/lib/email/shared";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, ilike } from "drizzle-orm";
@@ -212,12 +213,9 @@ export async function handler(
     }
 
     case "send_email": {
-      const { Resend } = await import("resend");
-      const apiKey = process.env.RESEND_API_KEY;
-      if (!apiKey) return JSON.stringify({ error: "RESEND_API_KEY not configured" });
-
-      const resend = new Resend(apiKey);
-      const fromEmail = process.env.RESEND_FROM_EMAIL || "team@amcollectivecapital.com";
+      const resend = getResend();
+      if (!resend) return JSON.stringify({ error: "RESEND_API_KEY not configured" });
+      const fromEmail = FROM_EMAIL;
       const to = input.to as string;
       const subject = input.subject as string;
       const body = input.body as string;

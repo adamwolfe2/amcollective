@@ -4,15 +4,7 @@
  * Lightweight send function for client status report emails.
  */
 
-import { Resend } from "resend";
-
-function getResend() {
-  if (!process.env.RESEND_API_KEY) return null;
-  return new Resend(process.env.RESEND_API_KEY);
-}
-
-const FROM_EMAIL =
-  process.env.AM_COLLECTIVE_FROM_EMAIL || "team@amcollectivecapital.com";
+import { getResend, FROM_EMAIL } from "@/lib/email/shared";
 
 export async function sendClientStatusEmail(data: {
   to: string;

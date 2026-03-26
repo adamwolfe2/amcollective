@@ -16,14 +16,9 @@ import { eq, and, sql, desc, gte, count, isNull, lte } from "drizzle-orm";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import { buildDailyDigestHtml, buildDailyDigestSubject } from "@/lib/email/templates/daily-digest";
 import { captureError } from "@/lib/errors";
-import { Resend } from "resend";
+import { getResend, FROM_EMAIL } from "@/lib/email/shared";
 
 const DIGEST_RECIPIENT = process.env.DIGEST_EMAIL ?? "adamwolfe102@gmail.com";
-
-function getResend(): Resend | null {
-  if (!process.env.RESEND_API_KEY) return null;
-  return new Resend(process.env.RESEND_API_KEY);
-}
 
 export const dailyDigest = inngest.createFunction(
   {
@@ -249,7 +244,7 @@ export const dailyDigest = inngest.createFunction(
       const subject = buildDailyDigestSubject(data);
 
       await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL ?? "team@amcollectivecapital.com",
+        from: FROM_EMAIL,
         to: DIGEST_RECIPIENT,
         subject,
         html,

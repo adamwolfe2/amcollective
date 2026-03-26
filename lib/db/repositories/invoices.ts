@@ -78,12 +78,13 @@ export async function getInvoice(id: string) {
   return result[0] ?? null;
 }
 
-export async function getClientInvoices(clientId: string) {
+export async function getClientInvoices(clientId: string, limit = 200) {
   return db
     .select()
     .from(invoices)
     .where(eq(invoices.clientId, clientId))
-    .orderBy(desc(invoices.createdAt));
+    .orderBy(desc(invoices.createdAt))
+    .limit(limit);
 }
 
 export async function createInvoice(data: NewInvoice, actorId: string) {

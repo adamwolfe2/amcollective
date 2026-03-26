@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
+import { apiError } from "@/lib/api/response";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -43,14 +44,14 @@ export async function GET(
   if (ajVaultReveal) {
     const decision = await ajVaultReveal.protect(req, { requested: 1 });
     if (decision.isDenied()) {
-      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+      return apiError("Rate limited", 429);
     }
   }
 
   // Auth — admin/owner only
   const userId = await checkAdmin();
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return apiError("Unauthorized", 401);
   }
 
   const { id } = await params;
@@ -62,11 +63,11 @@ export async function GET(
     .limit(1);
 
   if (!row) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return apiError("Not found", 404);
   }
 
   if (!row.passwordEncrypted) {
-    return NextResponse.json({ password: null });
+    return NextResponse.json({ password: null }, { headers: { "Cache-Control": "no-store" } });
   }
 
   try {
@@ -82,12 +83,9 @@ export async function GET(
       });
     });
 
-    return NextResponse.json({ password });
+    return NextResponse.json({ password }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     captureError(error, { tags: { route: "GET /api/vault/[id]/reveal" } });
-    return NextResponse.json(
-      { error: "Decryption failed" },
-      { status: 500 }
-    );
+    return apiError("Decryption failed", 500);
   }
 }

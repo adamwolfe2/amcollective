@@ -8,12 +8,14 @@
  * Falls back to ilike if pg_trgm is not available.
  */
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { apiSuccess, apiError } from "@/lib/api/response";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { ilike, or, sql, eq } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
+import { aj } from "@/lib/middleware/arcjet";
 
 const TRGM_THRESHOLD = 0.15; // Minimum trigram similarity score
 
@@ -28,17 +30,24 @@ interface SearchResult {
 }
 
 export async function GET(req: NextRequest) {
+  if (aj) {
+    const decision = await aj.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return apiError("Rate limited", 429);
+    }
+  }
+
   try {
     const userId = await checkAdmin();
     if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return apiError("Unauthorized", 401);
     }
 
     const q = req.nextUrl.searchParams.get("q")?.trim();
     const semantic = req.nextUrl.searchParams.get("semantic") === "true";
 
     if (!q || q.length < 2) {
-      return NextResponse.json({ results: [] });
+      return apiSuccess({ results: [] });
     }
 
     const pattern = `%${q}%`;
@@ -66,16 +75,13 @@ export async function GET(req: NextRequest) {
     // Sort by score (highest first), then group by type
     results.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
-    return NextResponse.json({ results });
+    return apiSuccess({ results });
   } catch (error) {
     captureError(error, {
       tags: { source: "api", route: "search" },
       level: "error",
     });
-    return NextResponse.json(
-      { error: "Search failed" },
-      { status: 500 }
-    );
+    return apiError("Search failed", 500);
   }
 }
 
