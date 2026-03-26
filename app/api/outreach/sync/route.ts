@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { checkAdmin } from "@/lib/auth";
-import { syncCampaigns } from "@/lib/connectors/emailbison";
+import { syncCampaigns, syncAllWorkspaces, getWorkspaceKeys } from "@/lib/connectors/emailbison";
 import { captureError } from "@/lib/errors";
 
 export async function POST() {
@@ -20,11 +20,23 @@ export async function POST() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { campaigns } = await syncCampaigns();
+    // Use multi-workspace sync when EMAILBISON_API_KEYS is set; otherwise fall
+    // back to the single-key syncCampaigns() for backward compatibility.
+    const useMulti = !!process.env.EMAILBISON_API_KEYS || getWorkspaceKeys().length > 1;
+
+    let campaignsToSync: Array<{ id: number; name: string; status: string; total_leads: number; total_leads_contacted: number; opened: number; replied: number; interested: number; bounced: number; unsubscribed: number; unique_opens: number; unique_replies: number; emails_sent: number; max_emails_per_day: number; tags: Array<{ id: number; name: string }>; workspace: string }>;
+
+    if (useMulti) {
+      const { campaigns } = await syncAllWorkspaces();
+      campaignsToSync = campaigns;
+    } else {
+      const { campaigns } = await syncCampaigns();
+      campaignsToSync = campaigns.map((c) => ({ ...c, workspace: "default" }));
+    }
 
     let synced = 0;
 
-    for (const c of campaigns) {
+    for (const c of campaignsToSync) {
       await db
         .insert(schema.outreachCampaigns)
         .values({
@@ -46,6 +58,7 @@ export async function POST() {
             emailsSent: c.emails_sent,
             maxEmailsPerDay: c.max_emails_per_day,
             tags: c.tags,
+            workspace: c.workspace,
           },
         })
         .onConflictDoUpdate({
@@ -68,6 +81,7 @@ export async function POST() {
               emailsSent: c.emails_sent,
               maxEmailsPerDay: c.max_emails_per_day,
               tags: c.tags,
+              workspace: c.workspace,
             },
           },
         });

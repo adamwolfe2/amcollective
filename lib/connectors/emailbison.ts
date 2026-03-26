@@ -4,7 +4,10 @@
  * Read-only snapshot of campaign performance, sender health, and reply metrics.
  * Used by: dashboard cards, strategy engine, Inngest sync job.
  *
- * Auth: EMAILBISON_API_KEY + EMAILBISON_BASE_URL from env
+ * Auth:
+ *   Single workspace:  EMAILBISON_API_KEY + EMAILBISON_BASE_URL
+ *   Multi-workspace:   EMAILBISON_API_KEYS (comma-separated workspace:key pairs)
+ *                      e.g. "cursive:9|abc...,trackr:8|def...,campusgtm:7|ghi..."
  */
 
 import { safeCall, cached, type ConnectorResult } from "./base";
@@ -19,7 +22,33 @@ function getAuth() {
 }
 
 export function isConfigured() {
-  return !!(process.env.EMAILBISON_API_KEY && process.env.EMAILBISON_BASE_URL);
+  return !!(
+    (process.env.EMAILBISON_API_KEYS || process.env.EMAILBISON_API_KEY) &&
+    process.env.EMAILBISON_BASE_URL
+  );
+}
+
+// ─── Multi-workspace key management ──────────────────────────────────────────
+
+export function getWorkspaceKeys(): Array<{ workspace: string; apiKey: string }> {
+  const multi = process.env.EMAILBISON_API_KEYS;
+  if (multi) {
+    return multi
+      .split(",")
+      .map((entry) => {
+        const colonIdx = entry.indexOf(":");
+        if (colonIdx === -1) return { workspace: "default", apiKey: entry.trim() };
+        return {
+          workspace: entry.slice(0, colonIdx).trim(),
+          apiKey: entry.slice(colonIdx + 1).trim(),
+        };
+      })
+      .filter((e) => e.apiKey.length > 0);
+  }
+  // Fall back to single key
+  const single = process.env.EMAILBISON_API_KEY;
+  if (single) return [{ workspace: "default", apiKey: single }];
+  return [];
 }
 
 async function bisonFetch<T>(path: string): Promise<T> {
@@ -178,6 +207,44 @@ export async function syncCampaigns(): Promise<{
     fetchSenderAccounts(),
   ]);
   return { campaigns, senderAccounts };
+}
+
+// ─── Multi-workspace fetch helpers ───────────────────────────────────────────
+
+async function fetchCampaignsWithKey(apiKey: string): Promise<EmailBisonCampaign[]> {
+  const baseUrl = process.env.EMAILBISON_BASE_URL;
+  if (!baseUrl) throw new Error("EMAILBISON_BASE_URL not set");
+  const res = await fetch(`${baseUrl}/api/campaigns`, {
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      Accept: "application/json",
+    },
+    next: { revalidate: 0 },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!res.ok) throw new Error(`EmailBison API ${res.status}`);
+  const data = (await res.json()) as { data: EmailBisonCampaign[] };
+  return data.data ?? [];
+}
+
+export async function syncAllWorkspaces(): Promise<{
+  campaigns: Array<EmailBisonCampaign & { workspace: string }>;
+  workspaceCount: number;
+}> {
+  const keys = getWorkspaceKeys();
+  const results = await Promise.allSettled(
+    keys.map(async ({ workspace, apiKey }) => {
+      const campaigns = await fetchCampaignsWithKey(apiKey);
+      return campaigns.map((c) => ({ ...c, workspace }));
+    })
+  );
+  const campaigns = results
+    .filter(
+      (r): r is PromiseFulfilledResult<Array<EmailBisonCampaign & { workspace: string }>> =>
+        r.status === "fulfilled"
+    )
+    .flatMap((r) => r.value);
+  return { campaigns, workspaceCount: keys.length };
 }
 
 // ─── Inbox / Replies ──────────────────────────────────────────────────────────

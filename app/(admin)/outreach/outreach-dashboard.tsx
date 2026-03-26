@@ -4,6 +4,15 @@ import { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { LeadUploadDialog } from "./lead-upload-dialog";
 
+type CampaignMetadata = {
+  uniqueOpens?: number;
+  uniqueReplies?: number;
+  emailsSent?: number;
+  maxEmailsPerDay?: number;
+  tags?: Array<{ id: number; name: string }>;
+  workspace?: string;
+} | null;
+
 type Campaign = {
   id: string;
   externalId: number;
@@ -18,6 +27,7 @@ type Campaign = {
   unsubscribed: number | null;
   lastSyncedAt: string | null;
   updatedAt: string;
+  metadata: CampaignMetadata;
 };
 
 type OutreachEvent = {
@@ -475,6 +485,9 @@ export function OutreachDashboard() {
                   <th className="text-right p-3 font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50">
                     Bounced
                   </th>
+                  <th className="text-left p-3 font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 hidden lg:table-cell">
+                    Workspace
+                  </th>
                   <th className="text-right p-3 font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 hidden md:table-cell">
                     Status
                   </th>
@@ -483,7 +496,7 @@ export function OutreachDashboard() {
               <tbody className="divide-y divide-[#0A0A0A]/5">
                 {data.campaigns.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center">
+                    <td colSpan={8} className="py-12 text-center">
                       <span className="font-mono text-xs text-[#0A0A0A]/30">
                         No campaigns synced yet. Click &ldquo;Sync Campaigns&rdquo; to pull
                         from EmailBison.
@@ -526,6 +539,15 @@ export function OutreachDashboard() {
                       </td>
                       <td className="p-3 text-right font-mono text-sm text-[#0A0A0A]/70">
                         {c.bounced ?? 0}
+                      </td>
+                      <td className="p-3 font-mono text-[10px] text-[#0A0A0A]/50 hidden lg:table-cell">
+                        {c.metadata?.workspace && c.metadata.workspace !== "default" ? (
+                          <span className="px-1.5 py-0.5 border border-[#0A0A0A]/20 font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/60">
+                            {c.metadata.workspace}
+                          </span>
+                        ) : (
+                          <span className="text-[#0A0A0A]/20">--</span>
+                        )}
                       </td>
                       <td className="p-3 text-right font-mono text-xs text-[#0A0A0A]/50 capitalize hidden md:table-cell">
                         {c.status ?? "--"}
