@@ -61,6 +61,7 @@ type DailyActivity = {
 type OutreachData = {
   campaigns: Campaign[];
   recentEvents: OutreachEvent[];
+  campaignTotals?: Stats;
   stats30d: Stats;
   stats7d: Stats;
   dailyActivity: DailyActivity[];
@@ -449,10 +450,13 @@ export function OutreachDashboard() {
                 ))}
               </div>
             ) : (
-              <div className="py-12 text-center">
+              <div className="py-12 text-center space-y-2">
                 <p className="font-mono text-xs text-[#0A0A0A]/30">
-                  No events yet. Configure EmailBison webhook to start
-                  tracking.
+                  No real-time events yet.
+                </p>
+                <p className="font-mono text-[10px] text-[#0A0A0A]/20">
+                  Campaign stats above come from sync. For real-time event
+                  tracking, configure the EmailBison webhook in each workspace.
                 </p>
               </div>
             )}
