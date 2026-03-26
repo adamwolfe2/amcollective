@@ -35,15 +35,18 @@ export default async function DomainDetailPage({
 }) {
   const { id } = await params;
 
-  const [project] = await db
-    .select()
-    .from(schema.portfolioProjects)
-    .where(eq(schema.portfolioProjects.id, id))
-    .limit(1);
+  const [[project], vercelProjectsResult] = await Promise.all([
+    db
+      .select()
+      .from(schema.portfolioProjects)
+      .where(eq(schema.portfolioProjects.id, id))
+      .limit(1),
+    vercelConnector.getProjects().catch(() => ({ success: false as const, data: null })),
+  ]);
 
   if (!project) notFound();
 
-  // Fetch Vercel project data if linked
+  // Resolve Vercel project from prefetched list
   let vercelProject: {
     name: string;
     framework?: string | null;
@@ -55,12 +58,9 @@ export default async function DomainDetailPage({
     }>;
   } | null = null;
 
-  if (project.vercelProjectId) {
-    const result = await vercelConnector.getProjects();
-    if (result.success && result.data) {
-      vercelProject =
-        result.data.find((p) => p.id === project.vercelProjectId) ?? null;
-    }
+  if (project.vercelProjectId && vercelProjectsResult.success && vercelProjectsResult.data) {
+    vercelProject =
+      vercelProjectsResult.data.find((p) => p.id === project.vercelProjectId) ?? null;
   }
 
   const domainStatus = deriveDomainStatus(project);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { formatDistanceToNow } from "date-fns";
 
 type AuditEntry = {
@@ -40,12 +40,18 @@ export function ComplianceDashboard() {
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
+  // Debounced versions of text filters that actually trigger fetches
+  const [debouncedAction, setDebouncedAction] = useState("");
+  const [debouncedEntity, setDebouncedEntity] = useState("");
+  const actionDebounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+  const entityDebounceRef = useRef<ReturnType<typeof setTimeout>>(null);
+
   const fetchLogs = useCallback(async () => {
     const params = new URLSearchParams();
     params.set("limit", "50");
     params.set("offset", String(offset));
-    if (actionFilter) params.set("action", actionFilter);
-    if (entityFilter) params.set("entityType", entityFilter);
+    if (debouncedAction) params.set("action", debouncedAction);
+    if (debouncedEntity) params.set("entityType", debouncedEntity);
     if (actorFilter) params.set("actorType", actorFilter);
     if (dateFrom) params.set("dateFrom", dateFrom);
     if (dateTo) params.set("dateTo", dateTo);
@@ -54,7 +60,7 @@ export function ComplianceDashboard() {
     const data = await res.json();
     setEntries(data.entries ?? []);
     setTotal(data.total ?? 0);
-  }, [offset, actionFilter, entityFilter, actorFilter, dateFrom, dateTo]);
+  }, [offset, debouncedAction, debouncedEntity, actorFilter, dateFrom, dateTo]);
 
   useEffect(() => {
     fetch("/api/audit-logs/stats")
@@ -188,7 +194,15 @@ export function ComplianceDashboard() {
             </label>
             <input
               value={actionFilter}
-              onChange={(e) => { setActionFilter(e.target.value); setOffset(0); }}
+              onChange={(e) => {
+                const v = e.target.value;
+                setActionFilter(v);
+                if (actionDebounceRef.current) clearTimeout(actionDebounceRef.current);
+                actionDebounceRef.current = setTimeout(() => {
+                  setDebouncedAction(v);
+                  setOffset(0);
+                }, 300);
+              }}
               placeholder="e.g. created"
               className="border border-[#0A0A0A]/20 bg-white px-2 py-1.5 font-mono text-xs w-32 focus:border-[#0A0A0A] focus:outline-none"
             />
@@ -199,7 +213,15 @@ export function ComplianceDashboard() {
             </label>
             <input
               value={entityFilter}
-              onChange={(e) => { setEntityFilter(e.target.value); setOffset(0); }}
+              onChange={(e) => {
+                const v = e.target.value;
+                setEntityFilter(v);
+                if (entityDebounceRef.current) clearTimeout(entityDebounceRef.current);
+                entityDebounceRef.current = setTimeout(() => {
+                  setDebouncedEntity(v);
+                  setOffset(0);
+                }, 300);
+              }}
               placeholder="e.g. invoice"
               className="border border-[#0A0A0A]/20 bg-white px-2 py-1.5 font-mono text-xs w-32 focus:border-[#0A0A0A] focus:outline-none"
             />

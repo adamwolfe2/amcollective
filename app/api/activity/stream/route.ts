@@ -11,6 +11,7 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET() {
   try {
@@ -47,10 +48,7 @@ export async function GET() {
 
         // Poll for new entries every 5 seconds
         const interval = setInterval(async () => {
-          if (cancelled) {
-            clearInterval(interval);
-            return;
-          }
+          if (cancelled) return;
           try {
             if (!lastId) return;
             const newEntries = await db
@@ -76,31 +74,25 @@ export async function GET() {
           }
         }, 5000);
 
-        // Cleanup on cancel
-        const cleanup = () => {
-          cancelled = true;
-          clearInterval(interval);
-        };
-
         // Handle client disconnect
         controller.enqueue(encoder.encode(": connected\n\n"));
 
         // Auto-close after 5 minutes to prevent resource leaks
-        const maxDuration = setTimeout(() => {
+        const autoCloseTimer = setTimeout(() => {
           cancelled = true;
           clearInterval(interval);
           try { controller.close(); } catch {}
         }, 5 * 60 * 1000);
 
-        // Store cleanup for cancel
-        const originalCleanup = cleanup;
-        (controller as unknown as { _cleanup: () => void })._cleanup = () => {
-          originalCleanup();
-          clearTimeout(maxDuration);
-        };
+        // Store cleanup refs on controller for use in cancel()
+        (controller as unknown as { _interval: ReturnType<typeof setInterval>; _autoClose: ReturnType<typeof setTimeout> })._interval = interval;
+        (controller as unknown as { _interval: ReturnType<typeof setInterval>; _autoClose: ReturnType<typeof setTimeout> })._autoClose = autoCloseTimer;
       },
-      cancel() {
+      cancel(controller) {
         cancelled = true;
+        const c = controller as unknown as { _interval?: ReturnType<typeof setInterval>; _autoClose?: ReturnType<typeof setTimeout> };
+        if (c._interval) clearInterval(c._interval);
+        if (c._autoClose) clearTimeout(c._autoClose);
       },
     });
 

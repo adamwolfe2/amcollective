@@ -48,11 +48,27 @@ export function NotificationBell() {
     }
   }, []);
 
-  // Poll every 30 seconds
+  // Poll every 30 seconds, pause when tab is hidden
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      if (!document.hidden) {
+        fetchNotifications();
+      }
+    }, 30000);
+
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        // Resume: fetch immediately when tab becomes visible again
+        fetchNotifications();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
   }, [fetchNotifications]);
 
   // Close dropdown on outside click

@@ -13,14 +13,14 @@ export default async function ThreadDetailPage({
   const { threadId } = await params;
   const decodedThreadId = decodeURIComponent(threadId);
 
-  const messages = await getThread(decodedThreadId);
+  const [messages] = await Promise.all([
+    getThread(decodedThreadId),
+    markThreadRead(decodedThreadId),
+  ]);
 
   if (messages.length === 0) {
     notFound();
   }
-
-  // Mark all messages in thread as read
-  await markThreadRead(decodedThreadId);
 
   const channel = messages[0].channel;
   const subject = messages[0].subject ?? "No subject";

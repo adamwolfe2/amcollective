@@ -11,9 +11,17 @@ const isDev = process.env.NODE_ENV === "development";
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  poweredByHeader: false,
   images: {
-    remotePatterns: [
-      { protocol: "https", hostname: "img.clerk.com" },
+    remotePatterns: [{ protocol: "https", hostname: "img.clerk.com" }],
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 86400,
+  },
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "recharts",
+      "date-fns",
     ],
   },
   serverExternalPackages: ["@neondatabase/serverless"],
@@ -22,6 +30,7 @@ const nextConfig = {
       {
         source: "/(.*)",
         headers: [
+          { key: "X-DNS-Prefetch-Control", value: "on" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -40,8 +49,8 @@ const nextConfig = {
               // unsafe-eval is only needed in dev (Turbopack HMR). Omitted in production.
               `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""} https://js.stripe.com https://*.clerk.accounts.dev https://clerk.amcollectivecapital.com https://challenges.cloudflare.com https://vercel.live`,
               // unsafe-inline is required for styled-jsx and inline styles — do not remove.
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "font-src 'self' https://fonts.gstatic.com",
+              "style-src 'self' 'unsafe-inline'",
+              "font-src 'self'",
               "img-src 'self' blob: data: https://img.clerk.com https://*.stripe.com https://clerk.amcollectivecapital.com",
               "connect-src 'self' https://*.clerk.accounts.dev wss://*.clerk.accounts.dev https://clerk.amcollectivecapital.com wss://clerk.amcollectivecapital.com https://app.posthog.com https://eu.posthog.com https://vitals.vercel-insights.com https://*.sentry.io https://sentry.io https://api.stripe.com",
               "frame-src https://js.stripe.com https://hooks.stripe.com https://*.clerk.accounts.dev https://clerk.amcollectivecapital.com https://challenges.cloudflare.com",

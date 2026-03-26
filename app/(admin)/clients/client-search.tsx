@@ -1,25 +1,29 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useTransition } from "react";
+import { useCallback, useTransition, useRef } from "react";
 import { Input } from "@/components/ui/input";
 
 export function ClientSearch({ defaultValue }: { defaultValue?: string }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const handleSearch = useCallback(
     (value: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      if (value) {
-        params.set("search", value);
-      } else {
-        params.delete("search");
-      }
-      startTransition(() => {
-        router.push(`/clients?${params.toString()}`);
-      });
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = setTimeout(() => {
+        const params = new URLSearchParams(searchParams.toString());
+        if (value) {
+          params.set("search", value);
+        } else {
+          params.delete("search");
+        }
+        startTransition(() => {
+          router.push(`/clients?${params.toString()}`);
+        });
+      }, 300);
     },
     [router, searchParams]
   );

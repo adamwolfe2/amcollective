@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Newsreader, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -115,6 +116,7 @@ export default function RootLayout({
         <PostHogProvider>
           {children}
         </PostHogProvider>
+        <SpeedInsights />
       </body>
     </html>
   );

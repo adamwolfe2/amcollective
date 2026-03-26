@@ -166,41 +166,57 @@ export default async function ProductDetailPage({ params }: PageProps) {
   const mrrByCompany = mrrByCompanyResult.success ? (mrrByCompanyResult.data ?? []) : [];
   const stripeMrr = mrrByCompany.find((c) => c.companyTag === slug)?.mrr ?? 0;
 
-  // Get connector-specific MRR
+  // Get connector-specific MRR — run all connectors in parallel, use only the relevant one
   let mrrCents = stripeMrr;
   let connectorData: Record<string, unknown> | null = null;
 
+  const [
+    trackrResult,
+    taskspaceResult,
+    wholesailResult,
+    cursiveResult,
+    tbgcResult,
+    hookResult,
+  ] = await Promise.allSettled([
+    trackrConnector.getSnapshot().catch(() => null),
+    taskspaceConnector.getSnapshot().catch(() => null),
+    wholesailConnector.getSnapshot().catch(() => null),
+    cursiveConnector.getSnapshot().catch(() => null),
+    tbgcConnector.getSnapshot().catch(() => null),
+    hookConnector.getSnapshot().catch(() => null),
+  ]);
+
   if (slug === "trackr") {
-    const r = await trackrConnector.getSnapshot().catch(() => null);
+    const r = trackrResult.status === "fulfilled" ? trackrResult.value : null;
     if (r?.success && r.data) {
       mrrCents = r.data.mrrCents || stripeMrr;
       connectorData = r.data as unknown as Record<string, unknown>;
     }
   } else if (slug === "taskspace") {
-    const r = await taskspaceConnector.getSnapshot().catch(() => null);
+    const r = taskspaceResult.status === "fulfilled" ? taskspaceResult.value : null;
     if (r?.success && r.data) {
       mrrCents = r.data.mrrCents || stripeMrr;
       connectorData = r.data as unknown as Record<string, unknown>;
     }
   } else if (slug === "wholesail") {
-    const r = await wholesailConnector.getSnapshot().catch(() => null);
+    const r = wholesailResult.status === "fulfilled" ? wholesailResult.value : null;
     if (r?.success && r.data) {
       mrrCents = r.data.mrrFromRetainers > 0 ? r.data.mrrFromRetainers * 100 : stripeMrr;
       connectorData = r.data as unknown as Record<string, unknown>;
     }
   } else if (slug === "cursive") {
-    const r = await cursiveConnector.getSnapshot().catch(() => null);
+    const r = cursiveResult.status === "fulfilled" ? cursiveResult.value : null;
     if (r?.success && r.data) {
       connectorData = r.data as unknown as Record<string, unknown>;
     }
   } else if (slug === "tbgc") {
-    const r = await tbgcConnector.getSnapshot().catch(() => null);
+    const r = tbgcResult.status === "fulfilled" ? tbgcResult.value : null;
     if (r?.success && r.data) {
       mrrCents = r.data.mrrCents || stripeMrr;
       connectorData = r.data as unknown as Record<string, unknown>;
     }
   } else if (slug === "hook") {
-    const r = await hookConnector.getSnapshot().catch(() => null);
+    const r = hookResult.status === "fulfilled" ? hookResult.value : null;
     if (r?.success && r.data) {
       mrrCents = r.data.mrrCents || stripeMrr;
       connectorData = r.data as unknown as Record<string, unknown>;
