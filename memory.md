@@ -1,108 +1,78 @@
 # AM Collective Portal - Memory
 
-> This file is updated by Claude Code at the end of each session. Read this at the start of every session to restore context.
+> Updated 2026-03-26 after full-day production hardening + feature session.
 
 ## Current State
-- **Phase**: All build phases complete (1–48+). Platform is production-ready.
-- **Last Updated**: March 21, 2026
-- **Last Commit**: `c68962e` — fix: QA hardening — replace 70+ console.error with captureError, fix lint warnings, enforce brutalist design
-- **Build Status**: Clean (tsc 0 errors, lint 0 warnings, build passes, 209 routes)
-- **Production URL**: https://amcollective.vercel.app (auto-deploying)
-- **Vercel Project**: prj_pWERrQuAlX8doYVNcMl0LrsqQuRT (am-collective/amcollective)
-- **Scale**: 79 pages, 123 API routes, 27 schema files, 16 connectors, 41 Inngest jobs, 12 AI agents
+- **Phase**: All build phases complete. Platform in production with active hardening.
+- **Last Session**: March 26, 2026 — 15+ commits, ~400 files changed, ~5,000 lines
+- **Build Status**: tsc 0 errors, lint 0 warnings, build clean
+- **Production URL**: https://amcollective.vercel.app
+- **Scale**: 79 pages, 123 API routes, 27 schema files, 16 connectors, 41 Inngest jobs, 12 AI agents, 73 AI tools
 
-## Final QA Pass (March 21, 2026)
+## March 26 Session Summary
 
-### Code Quality (70+ fixes)
-- Replaced 70+ `console.error`/`console.warn` calls across 54 files with `captureError()` (Sentry)
-- Fixed broken import in dashboard page
-- Removed 18 duplicate captureError calls
-- Removed unused imports (SUPER_ADMIN_EMAILS, unused catch variables)
+### QA + Security
+- 70+ console.error -> captureError (Sentry)
+- Connector TTL bug fixed (4 connectors: ms -> seconds)
+- 3 security holes fixed (webhook fail-open, timing attack, missing validation)
+- 12 sprint audit logs added
+- getUserId extracted to shared requireAuth() across 15 action files
+- TBGC branding purged from all emails and templates
+- 7 dead email templates deleted
+- Resend/FROM_EMAIL consolidated to shared imports
 
-### Security Audit (verified clean)
-- All 123 API routes verified: every non-public route has auth guards
-- 20 legitimately public routes confirmed: webhooks (signature-verified), public proposals/contracts/surveys, contact form (rate-limited), inngest (signed), bot endpoints (bearer/HMAC)
-- All SQL uses Drizzle parameterized queries — no injection vectors
-- Stripe webhook has signature verification via constructEvent
-- Single dangerouslySetInnerHTML is safe (JSON-LD with JSON.stringify)
+### Performance
+- Fetch timeouts on 13 API calls
+- Env var startup validation (lib/env.ts)
+- crypto.randomUUID for sprint tokens
+- revalidateTag for cache invalidation
+- ArcJet rate limiting on 20+ routes
+- Dynamic recharts imports on 4 pages
+- Sprint import batched (65 -> 3 queries)
+- N+1 fix in send-client-reports
+- LIMIT on 3 unbounded queries
+- optimizePackageImports, AVIF/WebP, 24hr image cache
+- 12MB unused assets deleted from /public
+- 3 waterfall pages parallelized
+- ClientSearch + compliance debounced
+- Notification bell visibility pause
+- @vercel/speed-insights installed
 
-### TypeScript Hygiene (verified clean)
-- Only 1 @ts-expect-error (Sentry instrumentation — legitimate)
-- Only 1 `as any` (react-pdf render — legitimate)
-- No implicit any, no @ts-ignore
+### Features Built
+- CampusGTM: CSV lead upload, lead-to-CRM conversion, upload dialog
+- Multi-workspace EmailBison sync (EMAILBISON_API_KEYS)
+- Overview stats from campaign sync (not just webhooks)
+- Client portal: reports page + portal landing rewritten
+- AI tool fixes: 4 bugs (unreachable tool, SQL injection, missing enums)
+- Generate Now for Strategy + Intelligence
+- System health dashboard (14 integrations)
+- Manual sync triggers (7 Inngest jobs)
+- Client portal provisioning (one-click)
+- Actionable empty states on 11 pages
 
-### UI/UX Consistency (4 fixes)
-- Fixed 4 rounded corner classes in marketing page to rounded-none
+### Mobile (iPhone 375px/390px)
+- AI chat sidebar: hidden on mobile with overlay toggle
+- Signature canvas DPR coordinate fix
+- 18 total mobile fixes (touch targets, grids, overflow, safe areas)
 
-### Stripe Sync Fix (4 fixes)
-- Fixed captureError calls passing strings instead of error objects
-- Removed stray console.info
+## What's Next (Priority Order)
+1. **Test coverage** — ZERO unit/integration tests. Start with data isolation, billing, AI tools.
+2. **Drizzle migration tracking** — /drizzle directory doesn't exist, using manual scripts
+3. **Email template polish** — client-facing emails need professional design
+4. **Stripe webhook e2e verification** — confirm payment flow works
+5. **Sprint editor hardening** — keyboard shortcuts, mobile drag-drop
+6. **Dashboard morning experience** — verify all 7 sections with real data
+7. **Playwright improvements** — local testing, more flows, CI integration
 
-## Previous Work Summary
+## Key Architecture Notes
+- Auth: Clerk with publicMetadata.role, email-based super admin
+- DB: Neon PostgreSQL + pgvector, Drizzle ORM, `@neondatabase/serverless@0.10.4`
+- Design: Trackr Offset Brutalist (no rounded corners, #F3F3EF bg, Newsreader + Geist Mono)
+- Sentry for all error tracking
+- ArcJet rate limiting on all write + sensitive endpoints
+- AI chat: dual system (Anthropic SDK for agents, Vercel AI SDK for streaming portal chat)
+- EmailBison: multi-workspace via EMAILBISON_API_KEYS (comma-separated workspace:key pairs)
+- Inngest for all background jobs (40 registered, cron + event triggered)
 
-### Sessions 1–3 (Feb 2026): Foundation
-- Wholesail template cloned/stripped, Drizzle ORM, Clerk auth, Neon DB
-- 5 connectors (Vercel, Stripe, Clerk, Neon, PostHog)
-- Inngest background sync, live CEO dashboard, costs page
-
-### Sessions 4–8: Full Platform Build
-- EOS schema + AI foundation (5 agents, chat UI)
-- Full Stripe integration (sync engine, webhooks, billing dashboard)
-- Overdue invoice detection, client portal billing
-
-### Sessions 9–12: Scale Layer (Phases 8–48)
-- All remaining phases built: CRM, contracts, forecasting, analytics
-- Mercury banking, Gmail sync, EmailBison inbox
-- Sales-to-cash pipeline, exports, webhooks
-
-### Sessions 13–18: Hardening
-- Comprehensive security passes (prompt injection, client isolation, CSP/HSTS)
-- ArcJet rate limiting on all write endpoints
-- Mobile optimization, toast notifications, error boundaries
-- Collapsible sidebar, 10 infrastructure fixes
-
-### Sessions 19–20: Performance
-- Parallelized DB queries across all pages
-- AI tool filtering (59 → ~15 tools/req), embedding cache
-- unstable_cache, next/font migration, bundle reduction
-
-## Admin Pages (app/(admin)/)
-activity, ai, alerts, analytics, clients, compliance, contracts, costs, dashboard, documents,
-domains, email, exports, finance, forecast, intelligence, invoices, knowledge, leads, meetings,
-messages, nps, outreach, products, projects, proposals, rocks, scorecard, services, settings,
-sprints, strategy, tasks, team, time, vault, webhooks
-
-## Client Portal Pages (app/(client)/[slug]/)
-board, dashboard, documents, invoices, messages, portal, projects, proposals, reports
-
-## Connectors (lib/connectors/ — 16 total)
-vercel, stripe, clerk, neon, posthog, mercury, linear, cursive, emailbison,
-hook, taskspace, tbgc, trackr, wholesail + base framework
-
-## Inngest Jobs (lib/inngest/jobs/ — 41 jobs)
-Sync, AI/Intelligence, and Operations jobs across all integrations
-
-## AI Agents (lib/ai/agents/ — 12)
-ceo-agent, chat, research, outreach-agent, morning-briefing, weekly-intelligence,
-anomaly-detection, client-health, cost-analysis, proactive, strategy-engine + shared/
-
-## Schema (lib/db/schema/ — 27 files)
-ai, billing, companies, contracts, costs, crm, documents, email-drafts, eos, index,
-insights, integrations, kanban, leads, metrics, operations, outreach, project-snapshots,
-projects, proposals, recurring, sprints, strategy, surveys, sync, system, time-tracking
-
-## Key Decisions
-- Auth: Clerk with session claims (no org mode), email-based super admin (adamwolfe102@gmail.com)
-- ORM: Drizzle (NOT Prisma)
-- DB: Neon PostgreSQL + pgvector via `@neondatabase/serverless@0.10.4` + neon-http driver
-- Design: Trackr Offset Brutalist (dark sidebar, #F3F3EF bg, Newsreader + Geist Mono, NO rounded corners)
-- Sentry for all error tracking (no console.error)
-- ArcJet rate limiting on all write endpoints
-- AI chat uses keyword-based tool filtering
-
-## Notes
-- `@neondatabase/serverless` 1.0.2 is BROKEN with drizzle-orm 0.39.x — stay on 0.10.4
-- `next lint` is broken in Next.js 16 — using `eslint` CLI directly
-- Neon org is managed by Vercel
-- /api/inngest is in public routes for webhook access
-- Super admin: adamwolfe102@gmail.com
+## Session N+1 Prompt
+See docs/CONTINUATION-PLAN.md for detailed continuation context.
