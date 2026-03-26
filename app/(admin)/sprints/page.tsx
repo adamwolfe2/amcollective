@@ -146,14 +146,14 @@ export default async function SprintsPage({
                   href={`/sprints/${sprint.id}`}
                   className="flex-1 px-5 py-4 flex items-center justify-between"
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
                     {isCurrent && (
-                      <span className="px-2 py-0.5 bg-[#0A0A0A] text-white font-mono text-[10px] uppercase tracking-wider">
+                      <span className="px-2 py-0.5 bg-[#0A0A0A] text-white font-mono text-[10px] uppercase tracking-wider shrink-0">
                         This Week
                       </span>
                     )}
-                    <div>
-                      <p className="font-serif font-bold text-[#0A0A0A]">
+                    <div className="min-w-0">
+                      <p className="font-serif font-bold text-[#0A0A0A] truncate">
                         {sprint.title}
                       </p>
                       {sprint.weeklyFocus && (
@@ -164,14 +164,14 @@ export default async function SprintsPage({
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-3 sm:gap-6">
                     <div className="text-right">
                       <p className="font-mono text-xs text-[#0A0A0A]/40">
                         {format(sprint.weekOf, "MMM d, yyyy")}
                       </p>
                       {sprint.total > 0 && (
                         <div className="flex items-center gap-2 mt-1">
-                          <div className="w-24 h-1.5 bg-[#0A0A0A]/10">
+                          <div className="hidden sm:block w-24 h-1.5 bg-[#0A0A0A]/10">
                             <div
                               className="h-full bg-[#0A0A0A]"
                               style={{ width: `${pct}%` }}

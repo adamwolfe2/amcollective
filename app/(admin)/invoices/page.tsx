@@ -158,7 +158,7 @@ export default async function InvoicesPage({
         <div className="flex items-center gap-2">
           <InvoiceStatusFilter currentStatus={status || "all"} />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center flex-wrap gap-2">
           <ExportCsvButton invoices={csvData} />
           <SyncStripeButton />
           <CreateInvoiceDialog

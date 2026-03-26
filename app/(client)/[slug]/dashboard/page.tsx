@@ -310,7 +310,7 @@ export default async function ClientDashboardPage({
                     </span>
                     <InvoiceStatusBadge status={inv.status} />
                   </div>
-                  <div className="flex items-center gap-4 shrink-0">
+                  <div className="flex flex-wrap items-center gap-4 shrink-0">
                     <span className="font-mono text-sm text-[#0A0A0A]/70">
                       ${(inv.amount / 100).toLocaleString("en-US", {
                         minimumFractionDigits: 2,

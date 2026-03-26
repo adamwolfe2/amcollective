@@ -20,6 +20,8 @@ import {
   Download,
   Brain,
   Clock,
+  PanelLeft,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
@@ -214,22 +216,38 @@ function ConversationSidebar({
   activeId,
   onSelect,
   onNew,
+  onClose,
+  isOverlay,
 }: {
   conversations: Conversation[];
   activeId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
+  onClose?: () => void;
+  isOverlay?: boolean;
 }) {
   return (
-    <div className="w-64 border-r border-[#0A0A0A]/10 bg-[#F3F3EF] flex flex-col h-full">
-      <div className="p-3 border-b border-[#0A0A0A]/10">
+    <div className={cn(
+      "border-r border-[#0A0A0A]/10 bg-[#F3F3EF] flex flex-col",
+      isOverlay ? "w-full h-full" : "w-64 h-full"
+    )}>
+      <div className="p-3 border-b border-[#0A0A0A]/10 flex items-center gap-2">
         <button
           onClick={onNew}
-          className="flex items-center gap-2 w-full px-3 py-2 text-xs font-mono border border-[#0A0A0A]/20 hover:border-[#0A0A0A] hover:bg-white transition-colors"
+          className="flex items-center gap-2 flex-1 px-3 py-2 text-xs font-mono border border-[#0A0A0A]/20 hover:border-[#0A0A0A] hover:bg-white transition-colors"
         >
           <Plus className="w-3 h-3" />
           New Chat
         </button>
+        {isOverlay && onClose && (
+          <button
+            onClick={onClose}
+            className="flex items-center justify-center w-8 h-8 border border-[#0A0A0A]/20 hover:border-[#0A0A0A] hover:bg-white transition-colors shrink-0"
+            aria-label="Close sidebar"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-1">
         {conversations.length === 0 && (
@@ -274,6 +292,7 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
   const [mode, setMode] = useState<"chat" | "research">("chat");
   const [sources, setSources] = useState<Source[]>([]);
   const [researchLoading, setResearchLoading] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -503,17 +522,56 @@ export function AiChat({ variant = "embedded", className, initialMessage }: AiCh
 
   if (variant === "full") {
     return (
-      <div className={cn("flex h-full", className)}>
-        <ConversationSidebar
-          conversations={conversations}
-          activeId={activeConvId}
-          onSelect={handleSelectConversation}
-          onNew={handleNewChat}
-        />
+      <div className={cn("flex h-full relative", className)}>
+        {/* Desktop sidebar — hidden on mobile */}
+        <div className="hidden md:flex w-64 shrink-0 h-full">
+          <ConversationSidebar
+            conversations={conversations}
+            activeId={activeConvId}
+            onSelect={handleSelectConversation}
+            onNew={handleNewChat}
+          />
+        </div>
+
+        {/* Mobile sidebar overlay */}
+        {mobileSidebarOpen && (
+          <>
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 z-40 bg-black/40 md:hidden"
+              onClick={() => setMobileSidebarOpen(false)}
+            />
+            {/* Sidebar panel */}
+            <div className="fixed inset-y-0 left-0 z-50 w-72 md:hidden">
+              <ConversationSidebar
+                conversations={conversations}
+                activeId={activeConvId}
+                onSelect={(id) => {
+                  handleSelectConversation(id);
+                  setMobileSidebarOpen(false);
+                }}
+                onNew={() => {
+                  handleNewChat();
+                  setMobileSidebarOpen(false);
+                }}
+                onClose={() => setMobileSidebarOpen(false)}
+                isOverlay
+              />
+            </div>
+          </>
+        )}
         <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-3 border-b border-[#0A0A0A]/10">
+          <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-[#0A0A0A]/10">
             <div className="flex items-center gap-3">
+              {/* Mobile sidebar toggle */}
+              <button
+                onClick={() => setMobileSidebarOpen(true)}
+                className="flex items-center justify-center w-7 h-7 border border-[#0A0A0A]/20 hover:border-[#0A0A0A] hover:bg-[#0A0A0A]/5 transition-colors md:hidden"
+                aria-label="Open conversations"
+              >
+                <PanelLeft className="w-3.5 h-3.5" />
+              </button>
               <Sparkles className="w-5 h-5" />
               <h1 className="text-lg font-bold font-serif tracking-tight">
                 AM Agent

@@ -112,7 +112,7 @@ export default async function PublicProposalPage({
       </p>
 
       <h1 className="text-3xl font-serif font-bold mb-2">{proposal.title}</h1>
-      <div className="flex items-center gap-4 font-mono text-xs text-[#0A0A0A]/50 mb-8">
+      <div className="flex flex-wrap items-center gap-4 font-mono text-xs text-[#0A0A0A]/50 mb-8">
         <span>{proposal.proposalNumber}</span>
         <span>Prepared for {clientName ?? "Client"}</span>
         {proposal.validUntil && (

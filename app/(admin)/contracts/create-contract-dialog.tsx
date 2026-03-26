@@ -58,7 +58,7 @@ export function CreateContractDialog({
           New Contract
         </button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold font-serif">New Contract</DialogTitle>
         </DialogHeader>
@@ -112,14 +112,14 @@ export function CreateContractDialog({
         <DialogFooter>
           <button
             onClick={() => setOpen(false)}
-            className="px-4 py-2 border border-[#0A0A0A]/20 font-mono text-sm hover:bg-[#0A0A0A]/5 transition-colors"
+            className="px-4 py-3 border border-[#0A0A0A]/20 font-mono text-sm hover:bg-[#0A0A0A]/5 transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleCreate}
             disabled={!clientId || loading}
-            className="px-4 py-2 bg-[#0A0A0A] text-white font-mono text-sm hover:bg-[#0A0A0A]/80 transition-colors disabled:opacity-50"
+            className="px-4 py-3 bg-[#0A0A0A] text-white font-mono text-sm hover:bg-[#0A0A0A]/80 transition-colors disabled:opacity-50"
           >
             {loading ? "Creating..." : "Create Contract"}
           </button>

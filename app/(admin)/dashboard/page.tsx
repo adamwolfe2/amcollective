@@ -576,7 +576,7 @@ async function ActionsPanel() {
                 <Link
                   key={i}
                   href={item.url}
-                  className="px-3 py-2.5 flex items-start gap-2.5 hover:bg-[#0A0A0A]/[0.02] transition-colors block"
+                  className="px-3 py-3 flex items-start gap-2.5 hover:bg-[#0A0A0A]/[0.02] transition-colors block"
                 >
                   <span
                     className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${

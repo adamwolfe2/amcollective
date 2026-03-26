@@ -277,7 +277,7 @@ export function MarketingPage() {
                 aria-controls={`tabpanel-${tab}`}
                 id={`tab-${tab}`}
                 onClick={() => setActiveTab(tab)}
-                className={`font-serif text-sm pb-1 transition-all duration-300 ${
+                className={`font-serif text-sm py-3 pb-1 transition-all duration-300 ${
                   activeTab === tab
                     ? "text-[#0A0A0A] border-b border-[#0A0A0A]"
                     : "text-[#0A0A0A]/35 hover:text-[#0A0A0A]/60"
@@ -354,7 +354,7 @@ function VenturesTab() {
                   href={venture.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 font-serif text-sm text-[#0A0A0A] border border-[#0A0A0A]/15 rounded-none px-5 py-2 hover:border-[#0A0A0A]/40 transition-colors group"
+                  className="inline-flex items-center gap-2 font-serif text-sm text-[#0A0A0A] border border-[#0A0A0A]/15 rounded-none px-5 py-3 hover:border-[#0A0A0A]/40 transition-colors group"
                 >
                   Visit site
                   <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
@@ -467,7 +467,7 @@ function TeamTab() {
               href={person.instagram}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#0A0A0A]/30 hover:text-[#0A0A0A] transition-colors"
+              className="p-2 text-[#0A0A0A]/30 hover:text-[#0A0A0A] transition-colors"
             >
               <Instagram className="h-4 w-4" />
             </a>
@@ -475,7 +475,7 @@ function TeamTab() {
               href={person.github}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#0A0A0A]/30 hover:text-[#0A0A0A] transition-colors"
+              className="p-2 text-[#0A0A0A]/30 hover:text-[#0A0A0A] transition-colors"
             >
               <Github className="h-4 w-4" />
             </a>
@@ -483,7 +483,7 @@ function TeamTab() {
               href={person.linkedin}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[#0A0A0A]/30 hover:text-[#0A0A0A] transition-colors"
+              className="p-2 text-[#0A0A0A]/30 hover:text-[#0A0A0A] transition-colors"
             >
               <Linkedin className="h-4 w-4" />
             </a>
@@ -492,7 +492,7 @@ function TeamTab() {
                 href={person.telegram}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-[#0A0A0A]/30 hover:text-[#0A0A0A] transition-colors"
+                className="p-2 text-[#0A0A0A]/30 hover:text-[#0A0A0A] transition-colors"
               >
                 <Send className="h-4 w-4" />
               </a>
@@ -672,7 +672,7 @@ function CalEmbed() {
     <div
       id="cal-embed"
       ref={calRef}
-      className="w-full min-h-[400px] border border-[#0A0A0A]/5"
+      className="w-full max-w-full overflow-x-auto min-h-[400px] border border-[#0A0A0A]/5"
       style={{ overflow: "auto" }}
     />
   );

@@ -173,7 +173,7 @@ export function LeadUploadDialog({ campaigns, onClose }: Props) {
           </h2>
           <button
             onClick={onClose}
-            className="font-mono text-xs text-[#0A0A0A]/50 hover:text-[#0A0A0A] transition-colors"
+            className="p-2 font-mono text-xs text-[#0A0A0A]/50 hover:text-[#0A0A0A] transition-colors"
           >
             Close
           </button>
@@ -268,7 +268,7 @@ export function LeadUploadDialog({ campaigns, onClose }: Props) {
               <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50">
                 Preview — {parsed.leads.length} valid lead{parsed.leads.length !== 1 ? "s" : ""}
               </p>
-              <div className="border border-[#0A0A0A] overflow-x-auto">
+              <div className="border border-[#0A0A0A] overflow-x-auto max-w-full">
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-[#0A0A0A]/10">

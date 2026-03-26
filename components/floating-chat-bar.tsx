@@ -23,7 +23,7 @@ export function FloatingChatBar() {
 
   return (
     /* Sidebar is w-60 on md+ — offset left so bar centers in the content area */
-    <div className="fixed bottom-6 left-0 md:left-60 right-0 flex justify-center px-6 pointer-events-none z-40">
+    <div className="fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-0 md:left-60 right-0 flex justify-center px-6 pointer-events-none z-40">
       <div className="pointer-events-auto w-full max-w-2xl">
         <div className="flex items-center gap-2 bg-white border border-[#0A0A0A]/15 rounded-sm px-4 py-2.5">
           <Sparkles className="w-4 h-4 text-[#0A0A0A]/25 shrink-0" />

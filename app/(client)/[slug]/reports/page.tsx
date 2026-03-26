@@ -115,7 +115,7 @@ export default async function ClientReportsPage({
 
       {/* Summary Bar */}
       {projectsWithDetails.length > 0 && (
-        <div className="grid grid-cols-3 border border-[#0A0A0A]/10 mb-6 divide-x divide-[#0A0A0A]/10">
+        <div className="grid grid-cols-1 sm:grid-cols-3 border border-[#0A0A0A]/10 mb-6 divide-y sm:divide-y-0 sm:divide-x divide-[#0A0A0A]/10">
           <div className="px-5 py-4">
             <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-1">
               Active Projects
@@ -189,7 +189,7 @@ export default async function ClientReportsPage({
 
               {/* Task Metrics Grid */}
               {metrics.totalTasks > 0 ? (
-                <div className="grid grid-cols-4 gap-px bg-[#0A0A0A]/10 mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[#0A0A0A]/10 mb-4">
                   <MetricCell
                     label="Total Tasks"
                     value={String(metrics.totalTasks)}

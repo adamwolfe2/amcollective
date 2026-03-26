@@ -67,7 +67,7 @@ export default async function ClientInvoicesPage({
           </p>
         </div>
       ) : (
-        <div className="border border-[#0A0A0A]/10">
+        <div className="border border-[#0A0A0A]/10 overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="border-[#0A0A0A]/10 hover:bg-transparent">
