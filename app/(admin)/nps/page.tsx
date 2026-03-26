@@ -160,8 +160,7 @@ export default async function NpsPage() {
                   colSpan={7}
                   className="text-center py-12 text-[#0A0A0A]/40 font-serif"
                 >
-                  No surveys yet. Send your first NPS survey to start
-                  collecting feedback.
+                  No surveys yet. Use the Send Survey form above to send your first NPS survey — select a client and it will go out immediately via email.
                 </TableCell>
               </TableRow>
             )}

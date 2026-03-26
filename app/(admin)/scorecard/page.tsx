@@ -72,7 +72,7 @@ export default async function ScorecardPage() {
             No scorecard metrics defined yet.
           </p>
           <p className="font-mono text-xs text-[#0A0A0A]/40">
-            Add your first metric to start tracking weekly numbers.
+            The scorecard tracks your weekly EOS numbers — revenue, leads, utilization, anything with a weekly target. Click Add Metric above to define your first measurable.
           </p>
         </div>
       ) : (

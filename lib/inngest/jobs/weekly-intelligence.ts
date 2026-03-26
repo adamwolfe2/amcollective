@@ -38,7 +38,10 @@ export const weeklyIntelligence = inngest.createFunction(
       });
     },
   },
-  { cron: "0 14 * * 1" }, // Monday 2 PM UTC = 8 AM CT
+  [
+    { cron: "0 14 * * 1" }, // Monday 2 PM UTC = 8 AM CT
+    { event: "intelligence/run-weekly" },
+  ],
   async ({ step }) => {
     const weekOf = getWeekOf();
 

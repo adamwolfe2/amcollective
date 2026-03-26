@@ -163,7 +163,7 @@ export default async function TimePage() {
                   colSpan={9}
                   className="text-center py-12 text-[#0A0A0A]/40 font-serif"
                 >
-                  No time entries yet. Log your first entry above.
+                  No time entries yet. Use the form above to log your first entry — select a client, enter hours and a description, and mark it billable to include it in future invoices.
                 </TableCell>
               </TableRow>
             )}

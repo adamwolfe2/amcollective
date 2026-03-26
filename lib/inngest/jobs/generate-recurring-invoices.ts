@@ -72,7 +72,10 @@ export const generateRecurringInvoices = inngest.createFunction(
       });
     },
   },
-  { cron: "0 13 * * *" }, // 1 PM UTC = 5 AM PT daily
+  [
+    { cron: "0 13 * * *" }, // 1 PM UTC = 5 AM PT daily
+    { event: "billing/generate-recurring-invoices" },
+  ],
   async ({ step }) => {
     const today = new Date().toISOString().split("T")[0];
 

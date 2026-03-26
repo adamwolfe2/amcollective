@@ -71,7 +71,7 @@ export function ForecastDashboard() {
         <p className="font-mono text-sm text-[#0A0A0A]/70">
           {fetchError
             ? "Failed to load forecast data. Please refresh the page."
-            : "No forecast data available."}
+            : "No forecast data available yet. Add invoices, active contracts, and pipeline leads to generate a 6-month revenue forecast."}
         </p>
       </div>
     );

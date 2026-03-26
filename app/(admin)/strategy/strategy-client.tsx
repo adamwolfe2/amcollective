@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { GenerateStrategyButton } from "./generate-button";
 import {
   RefreshCw,
   TrendingUp,
@@ -298,7 +299,7 @@ export function StrategyClient({
             </p>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {runMessage && (
             <span className="text-xs text-[#0A0A0A]/50 animate-pulse">{runMessage}</span>
           )}
@@ -321,6 +322,7 @@ export function StrategyClient({
             <Zap className="h-3.5 w-3.5 mr-1.5" />
             Deep Analysis (Opus)
           </Button>
+          <GenerateStrategyButton />
         </div>
       </div>
 
@@ -404,8 +406,11 @@ export function StrategyClient({
           {sortedRecs.length === 0 ? (
             <div className="border border-dashed border-[#0A0A0A]/10 p-8 text-center">
               <BarChart3 className="h-8 w-8 text-[#0A0A0A]/20 mx-auto mb-2" />
-              <p className="text-sm text-[#0A0A0A]/50">No active recommendations.</p>
-              <p className="text-xs text-[#0A0A0A]/30 mt-1">Run an analysis to generate strategic insights.</p>
+              <p className="text-sm text-[#0A0A0A]/50">No strategy analysis yet.</p>
+              <p className="text-xs text-[#0A0A0A]/30 mt-1 mb-4">Generate one now or wait for the automatic Monday 8 AM run.</p>
+              <div className="flex justify-center">
+                <GenerateStrategyButton />
+              </div>
             </div>
           ) : (
             <div className="space-y-2">

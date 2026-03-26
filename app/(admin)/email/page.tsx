@@ -114,8 +114,7 @@ export default async function EmailPage() {
                   colSpan={7}
                   className="text-center py-12 text-[#0A0A0A]/40 font-serif"
                 >
-                  No email drafts. Ask ClaudeBot to draft an email or create one
-                  manually.
+                  No email drafts. ClaudeBot generates drafts automatically from client activity — or ask AM Agent to draft an email for a specific client right now.
                 </TableCell>
               </TableRow>
             )}

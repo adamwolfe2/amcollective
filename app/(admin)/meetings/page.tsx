@@ -43,7 +43,7 @@ export default async function MeetingsPage() {
             No meetings yet.
           </p>
           <p className="text-[#0A0A0A]/30 font-mono text-xs mt-2">
-            Schedule your first L10 meeting to get started.
+            L10 meetings are your weekly EOS leadership sync — agenda, issues, action items, and a 1-10 rating. Create one to start tracking.
           </p>
         </div>
       ) : (

@@ -95,7 +95,7 @@ export default async function RocksPage({
               No rocks for {quarter}
             </EmptyTitle>
             <EmptyDescription>
-              Add quarterly rocks to track your 90-day strategic priorities.
+              Rocks are your 3-7 most important 90-day priorities (EOS). Add rocks for this quarter, assign an owner, and update progress weekly.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>

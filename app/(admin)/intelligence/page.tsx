@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
+import { GenerateIntelligenceButton } from "./generate-button";
 
 export const metadata: Metadata = {
   title: "Intelligence | AM Collective",
@@ -58,13 +59,16 @@ export default async function IntelligencePage() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold font-serif tracking-tight">
-          Business Intelligence
-        </h1>
-        <p className="font-mono text-xs text-[#0A0A0A]/40 mt-1">
-          AI-powered weekly analysis. Generated every Monday at 8 AM CT.
-        </p>
+      <div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold font-serif tracking-tight">
+            Business Intelligence
+          </h1>
+          <p className="font-mono text-xs text-[#0A0A0A]/40 mt-1">
+            AI-powered weekly analysis. Generated every Monday at 8 AM CT.
+          </p>
+        </div>
+        <GenerateIntelligenceButton />
       </div>
 
       {/* Latest Report */}
@@ -84,10 +88,15 @@ export default async function IntelligencePage() {
         </div>
       ) : (
         <div className="border border-[#0A0A0A]/30 border-dashed bg-white p-12 text-center mb-6">
-          <p className="font-serif text-[#0A0A0A]/40">
-            No intelligence reports yet. The first report will generate
-            automatically on Monday.
+          <p className="font-serif text-[#0A0A0A]/40 mb-2">
+            No intelligence reports yet.
           </p>
+          <p className="font-mono text-xs text-[#0A0A0A]/30 mb-6">
+            Generate one now or wait for the automatic Monday 8 AM CT run.
+          </p>
+          <div className="flex justify-center">
+            <GenerateIntelligenceButton />
+          </div>
         </div>
       )}
 

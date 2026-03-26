@@ -20,6 +20,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClientOverviewForm } from "./client-overview-form";
 import { DeleteClientButton } from "./delete-client-button";
+import { PortalAccessCard } from "./portal-access-card";
 import { captureError } from "@/lib/errors";
 
 export default async function ClientDetailPage({
@@ -155,7 +156,15 @@ export default async function ClientDetailPage({
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="mt-6">
-          <ClientOverviewForm client={client} />
+          <div className="space-y-6">
+            <ClientOverviewForm client={client} />
+            <PortalAccessCard
+              clientId={client.id}
+              clientEmail={client.email ?? null}
+              portalAccess={client.portalAccess}
+              clerkUserId={client.clerkUserId ?? null}
+            />
+          </div>
         </TabsContent>
 
         {/* Projects Tab */}

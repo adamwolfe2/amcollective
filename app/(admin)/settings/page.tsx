@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { NavSettings } from "./nav-settings";
+import { SyncActions } from "./sync-actions";
 
 export const metadata: Metadata = {
   title: "Settings | AM Collective",
@@ -99,7 +100,7 @@ export default function SettingsPage() {
       </div>
 
       {/* Navigation Visibility */}
-      <div>
+      <div className="mb-8">
         <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-1">
           Sidebar Navigation
         </h2>
@@ -109,6 +110,17 @@ export default function SettingsPage() {
         <div className="border border-[#0A0A0A]/10 bg-white p-6">
           <NavSettings />
         </div>
+      </div>
+
+      {/* Manual Sync Triggers */}
+      <div>
+        <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-1">
+          Manual Sync Triggers
+        </h2>
+        <p className="font-mono text-xs text-[#0A0A0A]/40 mb-4">
+          Trigger background jobs on demand. Runs are logged in the sync history.
+        </p>
+        <SyncActions />
       </div>
     </div>
   );

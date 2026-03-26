@@ -488,7 +488,7 @@ export function VaultTable({ rows }: { rows: Credential[] }) {
       {rows.length === 0 ? (
         <div className="border border-[#0A0A0A]/10 p-12 text-center">
           <p className="font-mono text-sm text-[#0A0A0A]/40">
-            No credentials stored yet. Add your first one above.
+            No credentials stored yet. Add API keys, service logins, and client portal passwords — anything your team needs access to. Use AI Parse to extract fields from raw credential text.
           </p>
         </div>
       ) : (

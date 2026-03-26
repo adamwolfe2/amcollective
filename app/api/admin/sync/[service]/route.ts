@@ -100,6 +100,38 @@ const SERVICES: Record<string, ServiceConfig> = {
       return { metadata: { triggeredVia: "inngest" } };
     },
   },
+  "check-overdue-invoices": {
+    name: "Check Overdue Invoices",
+    envKey: "DATABASE_URL",
+    sync: async () => {
+      await inngest.send({ name: "billing/check-overdue-invoices", data: {} });
+      return { metadata: { triggeredVia: "inngest" } };
+    },
+  },
+  "generate-recurring-invoices": {
+    name: "Generate Recurring Invoices",
+    envKey: "DATABASE_URL",
+    sync: async () => {
+      await inngest.send({ name: "billing/generate-recurring-invoices", data: {} });
+      return { metadata: { triggeredVia: "inngest" } };
+    },
+  },
+  "strategy-analysis": {
+    name: "Strategy Analysis",
+    envKey: "ANTHROPIC_API_KEY",
+    sync: async () => {
+      await inngest.send({ name: "strategy/run-analysis", data: {} });
+      return { metadata: { triggeredVia: "inngest" } };
+    },
+  },
+  "intelligence-report": {
+    name: "Intelligence Report",
+    envKey: "ANTHROPIC_API_KEY",
+    sync: async () => {
+      await inngest.send({ name: "intelligence/run-weekly", data: {} });
+      return { metadata: { triggeredVia: "inngest" } };
+    },
+  },
 };
 
 export async function POST(

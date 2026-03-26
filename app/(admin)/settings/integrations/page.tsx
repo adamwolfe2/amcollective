@@ -4,6 +4,7 @@ import * as schema from "@/lib/db/schema";
 import { desc, and, eq } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
 import { format, formatDistanceToNow } from "date-fns";
+import { neon } from "@neondatabase/serverless";
 import { isComposioConfigured } from "@/lib/integrations/composio";
 import { GmailConnectionCard } from "./gmail-connection-card";
 import { ConnectionCard } from "./connection-card";
@@ -88,14 +89,83 @@ const INTEGRATIONS: IntegrationDef[] = [
     envKey: "LINEAR_API_KEY",
     syncable: false,
   },
+  {
+    name: "Anthropic (Claude AI)",
+    service: "anthropic",
+    description: "AI agents for CEO assistant, outreach drafting, and data analysis.",
+    envKey: "ANTHROPIC_API_KEY",
+    syncable: false,
+  },
+  {
+    name: "EmailBison",
+    service: "emailbison",
+    description: "Cold email campaigns, sender health monitoring, and reply inbox.",
+    envKey: "EMAILBISON_API_KEY",
+    syncable: false,
+  },
+  {
+    name: "Sentry",
+    service: "sentry",
+    description: "Error monitoring and performance tracking in production.",
+    envKey: "SENTRY_DSN",
+    syncable: false,
+  },
+  {
+    name: "ArcJet (Security)",
+    service: "arcjet",
+    description: "Rate limiting, bot detection, and shield protection on all API routes.",
+    envKey: "ARCJET_KEY",
+    syncable: false,
+  },
+  {
+    name: "Upstash Redis",
+    service: "redis",
+    description: "In-memory rate limiting and caching layer for high-throughput endpoints.",
+    envKey: "UPSTASH_REDIS_REST_URL",
+    syncable: false,
+  },
 ];
 
+function isIntegrationConfigured(integration: IntegrationDef): boolean {
+  // EmailBison needs both a key (single or multi) AND the base URL
+  if (integration.service === "emailbison") {
+    return (
+      !!(process.env.EMAILBISON_API_KEY || process.env.EMAILBISON_API_KEYS) &&
+      !!process.env.EMAILBISON_BASE_URL
+    );
+  }
+  // Redis needs both URL and token
+  if (integration.service === "redis") {
+    return (
+      !!process.env.UPSTASH_REDIS_REST_URL &&
+      !!process.env.UPSTASH_REDIS_REST_TOKEN
+    );
+  }
+  // Inngest — either signing key or event key counts
+  if (integration.service === "inngest") {
+    return !!(process.env.INNGEST_SIGNING_KEY || process.env.INNGEST_EVENT_KEY);
+  }
+  return !!process.env[integration.envKey];
+}
+
 export default async function IntegrationsPage() {
-  const connectedCount = INTEGRATIONS.filter(
-    (i) => !!process.env[i.envKey]
-  ).length;
+  const connectedCount = INTEGRATIONS.filter(isIntegrationConfigured).length;
 
   const composioReady = isComposioConfigured();
+
+  // Live database ping for system health banner
+  let dbLatencyMs: number | null = null;
+  let dbError = false;
+  if (process.env.DATABASE_URL) {
+    try {
+      const start = Date.now();
+      const sql = neon(process.env.DATABASE_URL);
+      await sql`SELECT 1`;
+      dbLatencyMs = Date.now() - start;
+    } catch {
+      dbError = true;
+    }
+  }
 
   // Run all DB queries in parallel — wrap each in catch for graceful degradation
   const [latestRunsResult, recentRunsResult, gmailResult, projectsResult, mercuryResult] =
@@ -193,6 +263,106 @@ export default async function IntegrationsPage() {
         })}
       </div>
 
+      {/* System Health Banner */}
+      <div className="mb-8">
+        <h2 className="font-serif text-lg font-bold text-[#0A0A0A] mb-4">
+          System Health
+        </h2>
+        <div className="border border-[#0A0A0A]/10 bg-white divide-y divide-[#0A0A0A]/5">
+          {/* Database row */}
+          <div className="px-5 py-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span
+                className={`w-2 h-2 shrink-0 ${
+                  !process.env.DATABASE_URL
+                    ? "bg-[#0A0A0A]/20"
+                    : dbError
+                    ? "bg-[#0A0A0A]/50"
+                    : "bg-[#0A0A0A]"
+                }`}
+              />
+              <span className="font-mono text-xs uppercase tracking-wider">
+                Database (Neon)
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              {dbLatencyMs !== null && (
+                <span className="font-mono text-[10px] text-[#0A0A0A]/40">
+                  {dbLatencyMs}ms
+                </span>
+              )}
+              <span
+                className={`font-mono text-[10px] uppercase tracking-wider ${
+                  !process.env.DATABASE_URL
+                    ? "text-[#0A0A0A]/30"
+                    : dbError
+                    ? "text-[#0A0A0A]/70"
+                    : "text-[#0A0A0A]"
+                }`}
+              >
+                {!process.env.DATABASE_URL
+                  ? "Missing"
+                  : dbError
+                  ? "Error"
+                  : "Connected"}
+              </span>
+            </div>
+          </div>
+
+          {/* All integrations as status rows */}
+          {INTEGRATIONS.map((integration) => {
+            const configured = isIntegrationConfigured(integration);
+            return (
+              <div
+                key={integration.service}
+                className="px-5 py-3 flex items-center justify-between"
+              >
+                <div className="flex items-center gap-3">
+                  <span
+                    className={`w-2 h-2 shrink-0 ${
+                      configured ? "bg-[#0A0A0A]" : "bg-[#0A0A0A]/20"
+                    }`}
+                  />
+                  <span className="font-mono text-xs uppercase tracking-wider">
+                    {integration.name}
+                  </span>
+                </div>
+                <div className="flex items-center gap-4">
+                  {!configured && (
+                    <span className="font-mono text-[9px] text-[#0A0A0A]/30 hidden sm:block">
+                      {integration.envKey}
+                    </span>
+                  )}
+                  <span
+                    className={`font-mono text-[10px] uppercase tracking-wider ${
+                      configured ? "text-[#0A0A0A]" : "text-[#0A0A0A]/30"
+                    }`}
+                  >
+                    {configured ? "Configured" : "Missing"}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Missing count warning */}
+        {INTEGRATIONS.filter((i) => !isIntegrationConfigured(i)).length > 0 && (
+          <div className="mt-2 border border-[#0A0A0A]/10 px-4 py-2 bg-[#0A0A0A]/[0.02]">
+            <p className="font-mono text-[10px] text-[#0A0A0A]/50">
+              {INTEGRATIONS.filter((i) => !isIntegrationConfigured(i)).length}{" "}
+              integration
+              {INTEGRATIONS.filter((i) => !isIntegrationConfigured(i)).length >
+              1
+                ? "s"
+                : ""}{" "}
+              not configured. Missing services will cause silent failures on
+              pages that depend on them. Set the required env vars in Doppler.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Summary */}
       <div className="flex items-center gap-3 mb-6">
         <h2 className="font-serif text-lg font-bold text-[#0A0A0A]">
@@ -213,7 +383,7 @@ export default async function IntegrationsPage() {
               name={integration.name}
               service={integration.service}
               description={integration.description}
-              configured={!!process.env[integration.envKey]}
+              configured={isIntegrationConfigured(integration)}
               syncable={integration.syncable}
               lastSync={
                 lastSync

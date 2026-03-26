@@ -27,7 +27,10 @@ export const checkOverdueInvoices = inngest.createFunction(
       });
     },
   },
-  { cron: "0 17 * * *" }, // 5 PM UTC = 9 AM PT
+  [
+    { cron: "0 17 * * *" }, // 5 PM UTC = 9 AM PT
+    { event: "billing/check-overdue-invoices" },
+  ],
   async ({ step }) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);

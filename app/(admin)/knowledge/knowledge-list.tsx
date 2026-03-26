@@ -200,7 +200,7 @@ export function KnowledgeList({ initialArticles, allTags }: Props) {
             <p className="font-serif text-sm text-[#0A0A0A]/40">
               {search || filterType !== "all" || filterTag
                 ? "No articles match your filters."
-                : "No articles yet. Create your first article to get started."}
+                : "No knowledge articles yet. Upload SOPs, briefs, and notes from the Documents page, or ask AM Agent to create a knowledge article."}
             </p>
           </div>
         )}

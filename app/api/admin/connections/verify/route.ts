@@ -138,6 +138,52 @@ export async function POST(req: NextRequest) {
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
       }),
+
+      // Anthropic — list models endpoint (lightweight)
+      pingService("anthropic", "ANTHROPIC_API_KEY", async () => {
+        const res = await fetch("https://api.anthropic.com/v1/models", {
+          headers: {
+            "x-api-key": process.env.ANTHROPIC_API_KEY!,
+            "anthropic-version": "2023-06-01",
+          },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      }),
+
+      // EmailBison — list campaigns (lightweight)
+      pingService("emailbison", "EMAILBISON_API_KEY", async () => {
+        const baseUrl = process.env.EMAILBISON_BASE_URL;
+        if (!baseUrl) throw new Error("EMAILBISON_BASE_URL not set");
+        const apiKey =
+          process.env.EMAILBISON_API_KEY ??
+          (process.env.EMAILBISON_API_KEYS ?? "").split(",")[0]?.split(":").slice(1).join(":").trim();
+        if (!apiKey) throw new Error("No EmailBison key");
+        const res = await fetch(`${baseUrl}/api/campaigns?per_page=1`, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      }),
+
+      // Sentry — env var presence only (DSN is not a callable API key)
+      pingService("sentry", "SENTRY_DSN", async () => {
+        if (!process.env.SENTRY_DSN) throw new Error("Not configured");
+      }),
+
+      // ArcJet — env var presence only (key is used in middleware, not a REST API)
+      pingService("arcjet", "ARCJET_KEY", async () => {
+        if (!process.env.ARCJET_KEY) throw new Error("Not configured");
+      }),
+
+      // Upstash Redis — HTTP ping
+      pingService("redis", "UPSTASH_REDIS_REST_URL", async () => {
+        const url = process.env.UPSTASH_REDIS_REST_URL;
+        const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+        if (!url || !token) throw new Error("Redis not configured");
+        const res = await fetch(`${url}/ping`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      }),
     ]);
 
     const statuses = results.map((r) =>

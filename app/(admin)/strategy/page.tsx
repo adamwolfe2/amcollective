@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, eq, or } from "drizzle-orm";
 import { StrategyClient, type StrategyRec, type StrategyMetricsData } from "./strategy-client";
+import { GenerateStrategyButton } from "./generate-button";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { redirect } from "next/navigation";
 
@@ -97,6 +98,16 @@ export default async function StrategyPage() {
 
   return (
     <div className="max-w-7xl mx-auto">
+      {!metricsData && recsData.length === 0 && (
+        <div className="border border-dashed border-[#0A0A0A]/20 bg-white p-12 text-center mb-6">
+          <p className="font-serif text-[#0A0A0A]/40 mb-4">
+            No strategy analysis yet. Generate one now or wait for the automatic Monday 8 AM run.
+          </p>
+          <div className="flex justify-center">
+            <GenerateStrategyButton />
+          </div>
+        </div>
+      )}
       <StrategyClient metrics={metricsData} recommendations={recsData} />
     </div>
   );
