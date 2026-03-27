@@ -19,31 +19,43 @@ export async function sendQuoteToClientEmail(data: {
   const quoteUrl = `${APP_URL}/client-portal/quotes/${data.quoteId}`;
 
   const expiryLine = data.expiresAt
-    ? `<p style="margin:0 0 16px;color:#0A0A0A;font-size:15px;line-height:1.6;">
-        This quote is valid until <strong>${data.expiresAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</strong>.
+    ? `<p style="margin:0 0 20px;font-family:'Courier New',Courier,monospace;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#8A8075;">
+        VALID UNTIL: ${data.expiresAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}
        </p>`
     : "";
 
   const notesLine = data.notes
-    ? `<p style="margin:0 0 16px;color:#0A0A0A;font-size:15px;line-height:1.6;">
-        <strong>Note from our team:</strong> ${data.notes}
-       </p>`
+    ? `<table cellpadding="0" cellspacing="0" style="width:100%;border-left:4px solid #0A0A0A;margin-bottom:20px;">
+        <tr><td style="padding:12px 16px;">
+          <p style="margin:0 0 4px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#8A8075;">Note from our team</p>
+          <p style="margin:0;font-size:14px;line-height:1.6;color:#1A1A1A;">${data.notes}</p>
+        </td></tr>
+      </table>`
     : "";
 
   const bodyHtml = `
-    <p style="margin:0 0 16px;color:#0A0A0A;font-size:15px;line-height:1.6;">Hi ${data.clientName},</p>
-    <p style="margin:0 0 16px;color:#0A0A0A;font-size:15px;line-height:1.6;">
-      We've prepared a custom quote for you — <strong>${data.quoteNumber}</strong> for <strong>$${data.total.toFixed(2)}</strong>. Please review it at your earliest convenience.
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#1A1A1A;">Hi ${data.clientName},</p>
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#1A1A1A;">
+      We've prepared a custom quote for you. Please review it at your earliest convenience.
     </p>
+    <table cellpadding="0" cellspacing="0" style="width:100%;border:2px solid #0A0A0A;margin-bottom:24px;">
+      <tr><td style="padding:20px 24px;">
+        <p style="margin:0 0 4px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#8A8075;">Quote Number</p>
+        <p style="margin:0 0 16px;font-family:'Courier New',Courier,monospace;font-size:16px;font-weight:700;color:#0A0A0A;">${data.quoteNumber}</p>
+        <p style="margin:0 0 4px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#8A8075;">Total</p>
+        <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:28px;font-weight:700;color:#0A0A0A;line-height:1;">$${data.total.toFixed(2)}</p>
+      </td></tr>
+    </table>
     ${expiryLine}
     ${notesLine}
-    <p style="margin:0;color:#C8C0B4;font-size:13px;">Log in to your portal to review the line items, accept the quote, or reach out with any questions.</p>
+    <p style="margin:0 0 24px;font-size:14px;line-height:1.65;color:#6B6260;">Log in to your portal to review the line items, accept the quote, or reach out with any questions.</p>
   `;
 
   const html = buildBaseHtml({
     headline: `New Quote — ${data.quoteNumber}`,
+    preheader: `Quote ${data.quoteNumber} for $${data.total.toFixed(2)} is ready for your review.`,
     bodyHtml,
-    ctaText: "Review Quote →",
+    ctaText: "Review Quote",
     ctaUrl: quoteUrl,
   });
 
@@ -100,21 +112,29 @@ export async function sendQuoteResponseToRep(data: {
     : `${data.orgName} declined your quote`;
 
   const bodyHtml = `
-    <p style="margin:0 0 16px;color:#0A0A0A;font-size:15px;line-height:1.6;">
+    <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#1A1A1A;">
       Hi ${data.repName}, <strong>${data.orgName}</strong> has <strong>${actionLabel.toLowerCase()}</strong> quote <strong>${data.quoteNumber}</strong>.
     </p>
     ${isAccepted && data.orderNumber ? `
-    <p style="margin:0 0 16px;color:#0A0A0A;font-size:15px;line-height:1.6;">
-      An order (<strong>${data.orderNumber}</strong>) has been created and is pending your review.
-    </p>` : ""}
+    <table cellpadding="0" cellspacing="0" style="width:100%;border-left:4px solid #16A34A;background-color:#F0FDF4;margin-bottom:24px;">
+      <tr><td style="padding:14px 16px;">
+        <p style="margin:0 0 4px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#15803D;">Order Created</p>
+        <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:16px;font-weight:700;color:#14532D;">${data.orderNumber}</p>
+        <p style="margin:4px 0 0;font-size:13px;color:#166534;">Pending your review.</p>
+      </td></tr>
+    </table>` : ""}
     ${!isAccepted && data.reason ? `
-    <p style="margin:0 0 16px;color:#0A0A0A;font-size:15px;line-height:1.6;">
-      <strong>Reason:</strong> ${data.reason}
-    </p>` : ""}
+    <table cellpadding="0" cellspacing="0" style="width:100%;border-left:4px solid #DC2626;background-color:#FEF2F2;margin-bottom:24px;">
+      <tr><td style="padding:14px 16px;">
+        <p style="margin:0 0 4px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#B91C1C;">Reason Given</p>
+        <p style="margin:0;font-size:14px;line-height:1.5;color:#7F1D1D;">${data.reason}</p>
+      </td></tr>
+    </table>` : ""}
   `;
 
   const html = buildBaseHtml({
     headline,
+    preheader: `${data.orgName} has ${actionLabel.toLowerCase()} quote ${data.quoteNumber}.`,
     bodyHtml,
     ctaText: isAccepted ? "View Order" : "View Quote",
     ctaUrl: adminUrl,
@@ -152,22 +172,25 @@ export async function sendQuoteDeclinedInternal(data: {
   const OPS_EMAIL = process.env.OPS_NOTIFICATION_EMAIL || FROM_EMAIL;
   const adminUrl = `${APP_URL}/admin/quotes/${data.quoteId}`;
 
-  const html = `
-    <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;">
-      <p style="margin:0 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:#C8C0B4;font-weight:600;">Quote Declined</p>
-      <h2 style="margin:0 0 20px;font-size:22px;font-weight:700;color:#0A0A0A;">Quote #${data.quoteNumber}</h2>
-      <table width="100%" cellpadding="0" cellspacing="0" style="background:#F9F7F4;border:1px solid #E5E1DB;margin-bottom:20px;">
-        <tr><td style="padding:14px 18px;">
-          <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#C8C0B4;">Client</p>
-          <p style="margin:0;font-size:15px;font-weight:700;color:#0A0A0A;">${data.orgName}</p>
+  const html = buildBaseHtml({
+    headline: `Quote Declined — ${data.orgName}`,
+    preheader: `${data.orgName} has declined quote ${data.quoteNumber}.`,
+    bodyHtml: `
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#1A1A1A;">
+        <strong>${data.orgName}</strong> has declined quote <strong>${data.quoteNumber}</strong>.
+      </p>
+      ${data.reason ? `
+      <table cellpadding="0" cellspacing="0" style="width:100%;border-left:4px solid #DC2626;background-color:#FEF2F2;margin-bottom:24px;">
+        <tr><td style="padding:14px 16px;">
+          <p style="margin:0 0 4px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#B91C1C;">Reason Given</p>
+          <p style="margin:0;font-size:14px;line-height:1.5;color:#7F1D1D;">${data.reason}</p>
         </td></tr>
-        ${data.reason ? `<tr><td style="padding:0 18px 14px;">
-          <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#C8C0B4;">Reason</p>
-          <p style="margin:0;font-size:14px;color:#3D3833;">${data.reason}</p>
-        </td></tr>` : ''}
-      </table>
-      <a href="${adminUrl}" style="display:inline-block;background:#0A0A0A;color:#F9F7F4;padding:10px 20px;font-size:13px;font-weight:600;text-decoration:none;">View Quote →</a>
-    </div>`;
+      </table>` : ""}
+      <p style="margin:0 0 24px;font-size:14px;line-height:1.65;color:#6B6260;">Review the quote in the admin panel to follow up or archive it.</p>
+    `,
+    ctaText: "View Quote",
+    ctaUrl: adminUrl,
+  });
 
   const text = `Quote #${data.quoteNumber} was declined by ${data.orgName}.${data.reason ? `\nReason: ${data.reason}` : ''}\n\nView: ${adminUrl}`;
 

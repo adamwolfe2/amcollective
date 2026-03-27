@@ -23,22 +23,22 @@ export async function sendContractEmail(data: {
 
   const html = buildBaseHtml({
     headline: data.contractTitle,
+    preheader: `Contract ${data.contractNumber} is ready for your signature.`,
     bodyHtml: `
-      <p style="font-family:monospace;font-size:12px;color:#666;margin-bottom:24px;">${data.contractNumber}</p>
-      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
-        Hi ${data.clientName},
-      </p>
-      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
-        Your contract is ready for review and signature.
+      <p style="margin:0 0 6px;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;letter-spacing:0.10em;text-transform:uppercase;color:#8A8075;">${data.contractNumber}</p>
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#1A1A1A;">
+        Hi ${data.clientName}, your contract is ready for review and signature. Please take a moment to read through the details before signing.
       </p>
       ${totalStr ? `
-      <div style="border:2px solid #0A0A0A;padding:16px 20px;margin-bottom:24px;">
-        <p style="font-family:monospace;font-size:11px;color:#666;margin:0 0 4px 0;">CONTRACT VALUE</p>
-        <p style="font-family:monospace;font-size:24px;font-weight:bold;margin:0;">${totalStr}</p>
-      </div>` : ""}
-      ${data.expiresAt ? `<p style="font-family:monospace;font-size:12px;color:#666;margin-bottom:24px;">Expires: ${data.expiresAt instanceof Date ? data.expiresAt.toLocaleDateString() : data.expiresAt}</p>` : ""}
+      <table cellpadding="0" cellspacing="0" style="width:100%;border:2px solid #0A0A0A;margin-bottom:24px;">
+        <tr><td style="padding:16px 20px;">
+          <p style="margin:0 0 4px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#8A8075;">CONTRACT VALUE</p>
+          <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:26px;font-weight:700;color:#0A0A0A;line-height:1;">${totalStr}</p>
+        </td></tr>
+      </table>` : ""}
+      ${data.expiresAt ? `<p style="margin:0 0 20px;font-family:'Courier New',Courier,monospace;font-size:11px;letter-spacing:0.06em;color:#8A8075;text-transform:uppercase;">EXPIRES: ${data.expiresAt instanceof Date ? data.expiresAt.toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" }) : data.expiresAt}</p>` : ""}
     `,
-    ctaText: "Review & Sign Contract",
+    ctaText: "Review and Sign Contract",
     ctaUrl: data.signingUrl,
   });
 
@@ -66,19 +66,26 @@ export async function sendContractExecutedEmail(data: {
 
   const html = buildBaseHtml({
     headline: "Contract Fully Executed",
+    preheader: `${data.contractTitle} — both parties have signed.`,
     bodyHtml: `
-      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#1A1A1A;">
         Hi ${data.clientName},
       </p>
-      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#1A1A1A;">
         Your contract <strong>${data.contractTitle}</strong> (${data.contractNumber}) has been fully executed by both parties.
       </p>
-      ${data.startDate ? `<p style="font-size:15px;line-height:1.6;margin-bottom:24px;">Effective date: <strong>${data.startDate}</strong></p>` : ""}
-      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
-        We're excited to get started. Our team will be in touch shortly with next steps.
+      ${data.startDate ? `
+      <table cellpadding="0" cellspacing="0" style="width:100%;border-left:4px solid #0A0A0A;margin-bottom:24px;">
+        <tr><td style="padding:12px 16px;">
+          <p style="margin:0 0 2px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#8A8075;">EFFECTIVE DATE</p>
+          <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:16px;font-weight:700;color:#0A0A0A;">${data.startDate}</p>
+        </td></tr>
+      </table>` : ""}
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#1A1A1A;">
+        We're looking forward to working together. Our team will be in touch shortly with next steps and onboarding details.
       </p>
     `,
-    ctaText: "View Your Portal",
+    ctaText: "Access Your Portal",
     ctaUrl: APP_URL,
   });
 
@@ -104,14 +111,24 @@ export async function sendClientWelcomeEmail(data: {
 
   const html = buildBaseHtml({
     headline: "Welcome to AM Collective",
+    preheader: "Your client portal is ready. Access project updates, invoices, and more.",
     bodyHtml: `
-      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#1A1A1A;">
         Hi ${data.clientName},
       </p>
-      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
-        Welcome aboard! Your client portal is ready. You can use it to view project updates, invoices, contracts, and communicate with our team.
+      <p style="margin:0 0 20px;font-size:15px;line-height:1.65;color:#1A1A1A;">
+        Welcome to AM Collective. Your private client portal is now active.
       </p>
-      <p style="font-size:15px;line-height:1.6;margin-bottom:24px;">
+      <table cellpadding="0" cellspacing="0" style="width:100%;background-color:#F3F3EF;border:1px solid #D8D4CF;margin-bottom:24px;">
+        <tr><td style="padding:20px 24px;">
+          <p style="margin:0 0 12px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#8A8075;">YOUR PORTAL INCLUDES</p>
+          <p style="margin:0 0 6px;font-size:14px;line-height:1.5;color:#1A1A1A;">Project updates and task board</p>
+          <p style="margin:0 0 6px;font-size:14px;line-height:1.5;color:#1A1A1A;">Invoice history and payments</p>
+          <p style="margin:0 0 6px;font-size:14px;line-height:1.5;color:#1A1A1A;">Contracts and signed documents</p>
+          <p style="margin:0;font-size:14px;line-height:1.5;color:#1A1A1A;">Direct messaging with our team</p>
+        </td></tr>
+      </table>
+      <p style="margin:0 0 24px;font-size:15px;line-height:1.65;color:#1A1A1A;">
         Click below to access your portal and set up your account.
       </p>
     `,
@@ -224,31 +241,31 @@ export async function sendInternalOrderNotification(data: OrderEmailData) {
 
   const itemRowsHtml = data.items
     .map((item, i) => {
-      const bg = i % 2 === 0 ? "#F9F7F4" : "#FFFFFF";
+      const bg = i % 2 === 0 ? "#F3F3EF" : "#FFFFFF";
       return `<tr style="background-color:${bg};">
-        <td style="padding:8px 12px;font-size:13px;color:#0A0A0A;border-bottom:1px solid #E5E1DB;">${item.name}</td>
-        <td style="padding:8px 12px;font-size:13px;color:#0A0A0A;border-bottom:1px solid #E5E1DB;text-align:center;">${item.quantity}</td>
-        <td style="padding:8px 12px;font-size:13px;color:#0A0A0A;border-bottom:1px solid #E5E1DB;text-align:right;">$${item.total.toFixed(2)}</td>
+        <td style="padding:10px 12px;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#0A0A0A;border-bottom:1px solid #D8D4CF;">${item.name}</td>
+        <td style="padding:10px 12px;font-family:'Courier New',Courier,monospace;font-size:13px;color:#0A0A0A;border-bottom:1px solid #D8D4CF;text-align:center;">${item.quantity}</td>
+        <td style="padding:10px 12px;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;color:#0A0A0A;border-bottom:1px solid #D8D4CF;text-align:right;">$${item.total.toFixed(2)}</td>
       </tr>`;
     })
     .join("");
 
   const bodyHtml = `
-    <p style="margin:0 0 20px;font-size:15px;color:#3D3833;line-height:1.6;">A new order has been placed and is waiting for review.</p>
+    <p style="margin:0 0 20px;font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#1A1A1A;line-height:1.65;">A new order has been placed and is waiting for review.</p>
 
     <!-- Order meta -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F9F7F4;border:1px solid #E5E1DB;margin-bottom:20px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F3F3EF;border:2px solid #0A0A0A;margin-bottom:20px;">
       <tr><td style="padding:16px 20px;">
         <table width="100%" cellpadding="0" cellspacing="0">
           <tr>
             <td style="width:50%;padding:0 16px 0 0;">
-              <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#C8C0B4;font-weight:600;">Order</p>
-              <p style="margin:0;font-size:15px;font-weight:700;color:#0A0A0A;">${data.orderNumber}</p>
+              <p style="margin:0 0 4px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#8A8075;">Order</p>
+              <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:16px;font-weight:700;color:#0A0A0A;">${data.orderNumber}</p>
             </td>
             <td style="width:50%;">
-              <p style="margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:#C8C0B4;font-weight:600;">Customer</p>
-              <p style="margin:0;font-size:15px;font-weight:700;color:#0A0A0A;">${data.customerName}</p>
-              <p style="margin:2px 0 0;font-size:12px;color:#C8C0B4;">${data.customerEmail}</p>
+              <p style="margin:0 0 4px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:#8A8075;">Customer</p>
+              <p style="margin:0;font-family:Georgia,'Times New Roman',serif;font-size:15px;font-weight:700;color:#0A0A0A;">${data.customerName}</p>
+              <p style="margin:2px 0 0;font-family:'Courier New',Courier,monospace;font-size:11px;color:#8A8075;">${data.customerEmail}</p>
             </td>
           </tr>
         </table>
@@ -256,22 +273,22 @@ export async function sendInternalOrderNotification(data: OrderEmailData) {
     </table>
 
     <!-- Items -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #E5E1DB;margin-bottom:16px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border:1px solid #D8D4CF;margin-bottom:16px;">
       <thead>
         <tr style="background-color:#0A0A0A;">
-          <th style="padding:8px 12px;text-align:left;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;font-weight:600;">Product</th>
-          <th style="padding:8px 12px;text-align:center;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;font-weight:600;">Qty</th>
-          <th style="padding:8px 12px;text-align:right;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;color:#FFFFFF;font-weight:600;">Total</th>
+          <th style="padding:10px 12px;text-align:left;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#FFFFFF;">Product</th>
+          <th style="padding:10px 12px;text-align:center;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#FFFFFF;">Qty</th>
+          <th style="padding:10px 12px;text-align:right;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#FFFFFF;">Total</th>
         </tr>
       </thead>
       <tbody>${itemRowsHtml}</tbody>
     </table>
 
     <!-- Order total -->
-    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:4px;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-top:2px solid #0A0A0A;margin-bottom:4px;">
       <tr>
-        <td style="padding:8px 0;font-size:15px;font-weight:700;color:#0A0A0A;">Order Total</td>
-        <td style="padding:8px 0;font-size:15px;font-weight:700;color:#0A0A0A;text-align:right;">$${data.total.toFixed(2)}</td>
+        <td style="padding:12px 0 0;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8A8075;">Order Total</td>
+        <td style="padding:12px 0 0;font-family:'Courier New',Courier,monospace;font-size:18px;font-weight:700;color:#0A0A0A;text-align:right;">$${data.total.toFixed(2)}</td>
       </tr>
     </table>
   `;

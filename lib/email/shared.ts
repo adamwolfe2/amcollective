@@ -26,6 +26,8 @@ export interface BaseHtmlOptions {
   ctaUrl?: string;
   /** Optional amber banner shown above the header (e.g. payment reminders) */
   alertBannerHtml?: string;
+  /** Optional preheader text shown in email client preview */
+  preheader?: string;
 }
 
 export function buildBaseHtml({
@@ -34,49 +36,83 @@ export function buildBaseHtml({
   ctaText,
   ctaUrl,
   alertBannerHtml,
+  preheader,
 }: BaseHtmlOptions): string {
+  const preheaderBlock = preheader
+    ? `<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;">${preheader}&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;&nbsp;&zwnj;</div>`
+    : "";
+
   const ctaBlock =
     ctaText && ctaUrl
-      ? `<tr><td style="padding:8px 32px 32px;">
-          <a href="${ctaUrl}" style="display:inline-block;background-color:#0A0A0A;color:#FFFFFF;font-size:13px;font-weight:600;text-decoration:none;padding:14px 28px;letter-spacing:0.06em;text-transform:uppercase;">${ctaText}</a>
+      ? `<tr><td style="padding:0 32px 32px;">
+          <table cellpadding="0" cellspacing="0"><tr><td>
+            <a href="${ctaUrl}" style="display:inline-block;background-color:#0A0A0A;color:#FFFFFF;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;text-decoration:none;padding:14px 28px;letter-spacing:0.10em;text-transform:uppercase;border:2px solid #0A0A0A;">${ctaText}</a>
+          </td></tr></table>
         </td></tr>`
       : "";
 
   const alertBlock = alertBannerHtml
-    ? `<tr><td style="background-color:#FFFBEB;border-bottom:2px solid #D97706;padding:14px 32px;">
-        ${alertBannerHtml}
+    ? `<tr><td style="background-color:#FFFBEB;border-left:4px solid #D97706;border-bottom:1px solid #FDE68A;padding:14px 32px;">
+        <p style="margin:0;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#92400E;">PAYMENT REMINDER</p>
+        <div style="margin-top:6px;font-family:Georgia,'Times New Roman',serif;font-size:14px;color:#78350F;line-height:1.5;">${alertBannerHtml}</div>
       </td></tr>`
     : "";
 
   return `<!DOCTYPE html>
 <html lang="en">
-<head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/></head>
-<body style="margin:0;padding:0;background-color:#F9F7F4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#F9F7F4;padding:32px 16px;">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta name="x-apple-disable-message-reformatting"/>
+  <title>AM Collective</title>
+</head>
+<body style="margin:0;padding:0;background-color:#F3F3EF;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+  ${preheaderBlock}
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color:#F3F3EF;padding:40px 16px;">
     <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background-color:#FFFFFF;border:1px solid #E5E1DB;">
+      <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;width:100%;background-color:#FFFFFF;border:2px solid #0A0A0A;">
 
-        <!-- HEADER: dark bar with brand name -->
-        <tr><td style="background-color:#0A0A0A;padding:24px 32px;">
-          <p style="margin:0;color:#FFFFFF;font-size:11px;letter-spacing:0.15em;text-transform:uppercase;font-weight:600;">AM Collective Capital</p>
+        <!-- HEADER: full-bleed black bar, monospace brand name -->
+        <tr><td style="background-color:#0A0A0A;padding:20px 32px 18px;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td>
+                <p style="margin:0;color:#FFFFFF;font-family:'Courier New',Courier,monospace;font-size:13px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;line-height:1;">AM COLLECTIVE</p>
+              </td>
+              <td align="right">
+                <p style="margin:0;color:rgba(255,255,255,0.35);font-family:'Courier New',Courier,monospace;font-size:9px;letter-spacing:0.12em;text-transform:uppercase;">amcollectivecapital.com</p>
+              </td>
+            </tr>
+          </table>
         </td></tr>
 
         <!-- OPTIONAL ALERT BANNER -->
         ${alertBlock}
 
         <!-- CONTENT AREA -->
-        <tr><td style="padding:32px 32px 24px;">
-          <h1 style="margin:0 0 20px;color:#0A0A0A;font-family:Georgia,serif;font-size:24px;font-weight:700;line-height:1.3;">${headline}</h1>
-          ${bodyHtml}
+        <tr><td style="padding:32px 32px 8px;">
+          <h1 style="margin:0 0 20px;color:#0A0A0A;font-family:Georgia,'Times New Roman',serif;font-size:26px;font-weight:700;line-height:1.25;letter-spacing:-0.01em;">${headline}</h1>
+          <div style="font-family:Georgia,'Times New Roman',serif;font-size:15px;color:#1A1A1A;line-height:1.65;">
+            ${bodyHtml}
+          </div>
         </td></tr>
 
         <!-- CTA BUTTON -->
         ${ctaBlock}
 
         <!-- FOOTER -->
-        <tr><td style="padding:20px 32px;border-top:1px solid #E5E1DB;background-color:#F9F7F4;">
-          <p style="margin:0;color:#0A0A0A;font-size:11px;letter-spacing:0.1em;text-transform:uppercase;">AM Collective Capital</p>
-          <p style="margin:4px 0 0;color:#C8C0B4;font-size:12px;">amcollectivecapital.com</p>
+        <tr><td style="padding:20px 32px 24px;border-top:1px solid #E8E4DF;background-color:#F3F3EF;">
+          <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+            <tr>
+              <td>
+                <p style="margin:0;color:#0A0A0A;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;">AM COLLECTIVE CAPITAL</p>
+                <p style="margin:4px 0 0;color:#8A8075;font-family:'Courier New',Courier,monospace;font-size:10px;letter-spacing:0.04em;">team@amcollectivecapital.com</p>
+              </td>
+              <td align="right" style="vertical-align:top;">
+                <a href="#unsubscribe" style="color:#B0A898;font-family:'Courier New',Courier,monospace;font-size:10px;text-decoration:underline;letter-spacing:0.04em;">Unsubscribe</a>
+              </td>
+            </tr>
+          </table>
         </td></tr>
 
       </table>
