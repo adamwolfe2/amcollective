@@ -62,6 +62,14 @@ const VENTURES = [
     social: "/hook social.png",
     url: "https://hookugc.com",
   },
+  {
+    name: "MyVSL",
+    description:
+      "AI funnel builder that books calls. Build quiz-to-calendar booking funnels in minutes — three questions, smart scoring, automatic calendar routing. No code required.",
+    logo: "/vsl logo.png",
+    social: "/vsl social.png",
+    url: "https://getmyvsl.com",
+  },
 ];
 
 // ─── Team Data ──────────────────────────────────────────────────────────────
