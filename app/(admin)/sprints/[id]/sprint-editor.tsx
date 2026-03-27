@@ -6,6 +6,7 @@ import {
   useRef,
   useEffect,
   KeyboardEvent,
+  useCallback,
 } from "react";
 import {
   Plus,
@@ -160,12 +161,14 @@ function TaskRow({
   onToggle,
   onUpdate,
   onDelete,
+  onEnterCreate,
 }: {
   task: SprintTask;
   sprintId: string;
   onToggle: (id: string, val: boolean) => void;
   onUpdate: (id: string, content: string) => void;
   onDelete: (id: string) => void;
+  onEnterCreate?: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
@@ -290,7 +293,11 @@ function TaskRow({
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commitEdit}
             onKeyDown={(e) => {
-              if (e.key === "Enter") commitEdit();
+              if (e.key === "Enter") {
+                commitEdit();
+                // After saving, trigger creating the next task
+                setTimeout(() => onEnterCreate?.(), 0);
+              }
               if (e.key === "Escape") {
                 setDraft(task.content);
                 setEditing(false);
@@ -600,9 +607,22 @@ function SectionBlock({
               onToggle={onToggleTask}
               onUpdate={onUpdateTask}
               onDelete={onDeleteTask}
+              onEnterCreate={() => {
+                if (!isUnassigned) setShowTaskInput(true);
+              }}
             />
           ))}
       </div>
+
+      {/* Empty section state */}
+      {!isUnassigned && section.tasks.length === 0 && !showTaskInput && (
+        <button
+          onClick={() => setShowTaskInput(true)}
+          className="w-full mt-1 py-3 border border-dashed border-[#0A0A0A]/10 font-mono text-[10px] text-[#0A0A0A]/25 hover:text-[#0A0A0A]/50 hover:border-[#0A0A0A]/20 transition-colors text-center"
+        >
+          + Add first task
+        </button>
+      )}
 
       {/* Add task — only on real sections */}
       {!isUnassigned && (
@@ -623,11 +643,11 @@ function SectionBlock({
               onBlur={() => {
                 if (!newTaskContent.trim()) setShowTaskInput(false);
               }}
-              placeholder="Add task — press Enter"
+              placeholder="Add task — press Enter to save, Escape to cancel"
               className="flex-1 font-serif text-sm bg-transparent border-b border-[#0A0A0A]/20 focus:outline-none focus:border-[#0A0A0A]/50 text-[#0A0A0A]/70 placeholder:text-[#0A0A0A]/30"
             />
           </div>
-        ) : (
+        ) : section.tasks.length > 0 ? (
           <button
             onClick={() => setShowTaskInput(true)}
             className="mt-2 flex items-center gap-1 font-mono text-[10px] text-[#0A0A0A]/25 hover:text-[#0A0A0A]/50 transition-colors"
@@ -635,7 +655,7 @@ function SectionBlock({
             <Plus size={10} />
             Add task
           </button>
-        )
+        ) : null
       )}
     </div>
   );
@@ -1296,6 +1316,18 @@ export function SprintEditor({
   const [sections, setSections] = useState<SprintSection[]>(sprint.sections);
   const shareToken = sprint.shareToken ?? null;
 
+  // Prevent Cmd+S from opening browser save dialog — sprint auto-saves
+  const handleGlobalKeyDown = useCallback((e: globalThis.KeyboardEvent) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "s") {
+      e.preventDefault();
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleGlobalKeyDown);
+    return () => document.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [handleGlobalKeyDown]);
+
   function saveTitle(val: string) {
     setTitle(val);
     startTransition(async () => {
@@ -1474,6 +1506,21 @@ export function SprintEditor({
           />
         ))}
 
+      {/* Empty state when no sections */}
+      {sections.length === 0 && (
+        <div className="border border-dashed border-[#0A0A0A]/15 py-12 text-center mb-8">
+          <p className="font-serif text-base text-[#0A0A0A]/40 mb-1">
+            No project sections yet.
+          </p>
+          <p className="font-mono text-[10px] text-[#0A0A0A]/25 uppercase tracking-wider mb-6">
+            Add a section for each project you are working on this week.
+          </p>
+          <p className="font-mono text-[10px] text-[#0A0A0A]/30">
+            Use <span className="border border-[#0A0A0A]/15 px-1.5 py-0.5">Add project section</span> below, or <span className="border border-[#0A0A0A]/15 px-1.5 py-0.5">AI Parse</span> to import from notes.
+          </p>
+        </div>
+      )}
+
       {/* Add section */}
       <AddSectionForm
         sprintId={sprint.id}
@@ -1482,6 +1529,30 @@ export function SprintEditor({
         teamMembers={teamMembers}
         nextSortOrder={sections.length}
       />
+
+      {/* Keyboard shortcut legend */}
+      <div className="mt-8 pt-6 border-t border-[#0A0A0A]/5">
+        <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/20 mb-3">
+          Keyboard shortcuts
+        </p>
+        <div className="flex flex-wrap gap-x-6 gap-y-1.5">
+          {[
+            { keys: "Enter",   description: "Create next task" },
+            { keys: "Escape",  description: "Cancel edit" },
+            { keys: "Cmd+S",   description: "Auto-saves (no dialog)" },
+            { keys: "Cmd+Enter", description: "Parse AI import" },
+          ].map(({ keys, description }) => (
+            <div key={keys} className="flex items-center gap-1.5">
+              <span className="font-mono text-[9px] border border-[#0A0A0A]/10 px-1.5 py-0.5 text-[#0A0A0A]/35 bg-[#0A0A0A]/[0.02]">
+                {keys}
+              </span>
+              <span className="font-mono text-[9px] text-[#0A0A0A]/25">
+                {description}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
