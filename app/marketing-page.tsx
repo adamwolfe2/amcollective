@@ -39,6 +39,14 @@ const VENTURES = [
     url: "https://wholesailhub.com",
   },
   {
+    name: "MyVSL",
+    description:
+      "AI funnel builder that books calls. Build quiz-to-calendar booking funnels in minutes — three questions, smart scoring, automatic calendar routing. No code required.",
+    logo: "/vsl logo.png",
+    social: "/vsl social.png",
+    url: "https://getmyvsl.com",
+  },
+  {
     name: "Trackr",
     description:
       "Research any AI tool in under 2 minutes. Track what you pay for. Stay current on top product launches and paint points custom to your company. One shared workspace for your team to go from spreadsheets to AI-Native.",
@@ -61,14 +69,6 @@ const VENTURES = [
     logo: "/hook logo.png",
     social: "/hook social.png",
     url: "https://hookugc.com",
-  },
-  {
-    name: "MyVSL",
-    description:
-      "AI funnel builder that books calls. Build quiz-to-calendar booking funnels in minutes — three questions, smart scoring, automatic calendar routing. No code required.",
-    logo: "/vsl logo.png",
-    social: "/vsl social.png",
-    url: "https://getmyvsl.com",
   },
 ];
 
