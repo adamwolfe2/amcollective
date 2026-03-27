@@ -1,19 +1,36 @@
 /**
  * GET /api/public/proposals/[id] — Public proposal data (no auth required).
+ *
+ * Only returns proposals that have been explicitly sent to a client
+ * (status != "draft"). This prevents enumeration of draft proposals.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, ne, and } from "drizzle-orm";
+import { ajWebhook } from "@/lib/middleware/arcjet";
 
 export async function GET(
-  _req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (ajWebhook) {
+    const decision = await ajWebhook.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
+
   try {
     const { id } = await params;
+
+    // Validate UUID format to prevent enumeration probes
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(id)) {
+      return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
+    }
 
     const [result] = await db
       .select({
@@ -26,7 +43,12 @@ export async function GET(
         schema.clients,
         eq(schema.proposals.clientId, schema.clients.id)
       )
-      .where(eq(schema.proposals.id, id))
+      .where(
+        and(
+          eq(schema.proposals.id, id),
+          ne(schema.proposals.status, "draft")
+        )
+      )
       .limit(1);
 
     if (!result) {

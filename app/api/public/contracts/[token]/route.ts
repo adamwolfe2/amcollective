@@ -4,6 +4,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -13,6 +14,12 @@ import { createNotification } from "@/lib/db/repositories/notifications";
 import { fireEvent } from "@/lib/webhooks/events";
 import { generateInvoiceNumber } from "@/lib/invoices/number";
 import { ajWebhook } from "@/lib/middleware/arcjet";
+
+const contractSignSchema = z.object({
+  signatureData: z.string().max(100_000).nullable().optional(),
+  signatoryName: z.string().max(200).trim().nullable().optional(),
+  signatoryTitle: z.string().max(200).trim().nullable().optional(),
+});
 
 type RouteContext = { params: Promise<{ token: string }> };
 
@@ -80,7 +87,15 @@ export async function POST(request: NextRequest, ctx: RouteContext) {
 
   try {
     const { token } = await ctx.params;
-    const body = await request.json();
+    const rawBody = await request.json();
+    const parsed = contractSignSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid input", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+    const body = parsed.data;
 
     const [contract] = await db
       .select()

@@ -89,9 +89,13 @@ export async function POST(request: NextRequest) {
 
   const secret = process.env.VERCEL_WEBHOOK_SECRET;
 
-  // If webhook secret is not configured, acknowledge but do not process.
+  // If webhook secret is not configured, reject the request (fail closed).
   if (!secret) {
-    return NextResponse.json({ received: true });
+    captureError(new Error("VERCEL_WEBHOOK_SECRET is not configured — rejecting webhook"), {
+      level: "error",
+      tags: { source: "vercel-webhook" },
+    });
+    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
   }
 
   // ── Read & verify ────────────────────────────────────────────────────────

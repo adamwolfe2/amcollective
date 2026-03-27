@@ -80,7 +80,11 @@ export async function POST(request: NextRequest) {
 
     const secret = process.env.LINEAR_WEBHOOK_SECRET;
     if (!secret) {
-      return json({ received: true, processed: false, reason: "no_secret" });
+      captureError(new Error("LINEAR_WEBHOOK_SECRET is not configured — rejecting webhook"), {
+        level: "error",
+        tags: { source: "linear-webhook" },
+      });
+      return json({ error: "Webhook secret not configured" }, 500);
     }
 
     // ── Read & verify signature ─────────────────────────────────────────────

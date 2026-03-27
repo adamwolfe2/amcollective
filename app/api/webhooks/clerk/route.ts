@@ -51,9 +51,13 @@ export async function POST(request: NextRequest) {
 
   const secret = process.env.CLERK_WEBHOOK_SECRET;
 
-  // If webhook secret is not configured, acknowledge gracefully.
+  // If webhook secret is not configured, reject the request (fail closed).
   if (!secret) {
-    return NextResponse.json({ received: true });
+    captureError(new Error("CLERK_WEBHOOK_SECRET is not configured — rejecting webhook"), {
+      level: "error",
+      tags: { source: "clerk-webhook" },
+    });
+    return NextResponse.json({ error: "Webhook secret not configured" }, { status: 500 });
   }
 
   // ── Read & verify ────────────────────────────────────────────────────────

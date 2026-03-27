@@ -37,6 +37,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 import { gatherBriefingData } from "@/lib/ai/agents/morning-briefing";
 import * as mercuryConnector from "@/lib/connectors/mercury";
 import { detectAnomalies } from "@/lib/ai/agents/anomaly-detection";
@@ -49,7 +50,16 @@ export const maxDuration = 30;
 function verifyAuth(request: NextRequest): boolean {
   const secret = process.env.OPENCLAW_SHARED_SECRET;
   if (!secret) return false;
-  return request.headers.get("Authorization") === `Bearer ${secret}`;
+  const authHeader = request.headers.get("Authorization") ?? "";
+  const expected = `Bearer ${secret}`;
+  try {
+    const a = Buffer.from(authHeader);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
 }
 
 export async function GET(request: NextRequest) {

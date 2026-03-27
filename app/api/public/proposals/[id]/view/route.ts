@@ -2,18 +2,25 @@
  * POST /api/public/proposals/[id]/view — Record a client view of the proposal.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { after } from "next/server";
 import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { ajWebhook } from "@/lib/middleware/arcjet";
 
 export async function POST(
-  _req: Request,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  if (ajWebhook) {
+    const decision = await ajWebhook.protect(req, { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json({ error: "Rate limited" }, { status: 429 });
+    }
+  }
   try {
     const { id } = await params;
 

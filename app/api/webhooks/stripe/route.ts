@@ -1320,8 +1320,11 @@ export async function POST(req: NextRequest) {
 
   // ── 2. Verify Stripe is configured ─────────────────────────────────────────
   if (!process.env.STRIPE_WEBHOOK_SECRET) {
-    // STRIPE_WEBHOOK_SECRET not configured — skip processing
-    return json({ received: true, skipped: true });
+    captureError(new Error("STRIPE_WEBHOOK_SECRET is not configured — rejecting webhook"), {
+      level: "error",
+      tags: { component: "stripe-webhook" },
+    });
+    return json({ error: "Webhook secret not configured" }, 500);
   }
 
   let event: Stripe.Event;

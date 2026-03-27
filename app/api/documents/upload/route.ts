@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
 
       const blob = await put(pathname, file, {
         access: "public",
-        addRandomSuffix: false,
+        addRandomSuffix: true,
       });
 
       fileUrl = blob.url;
