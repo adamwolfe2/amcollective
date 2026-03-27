@@ -45,15 +45,20 @@ export default async function ClientInvoicesPage({
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-2xl font-bold font-serif tracking-tight">
-          Invoices
-        </h1>
-        {invoices.length > 0 && (
-          <span className="px-2 py-0.5 text-xs font-mono border border-[#0A0A0A] bg-[#0A0A0A] text-white">
-            {invoices.length}
-          </span>
-        )}
+      <div className="mb-6">
+        <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-1">
+          AM Collective Capital
+        </p>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold font-serif tracking-tight text-[#0A0A0A]">
+            Invoices
+          </h1>
+          {invoices.length > 0 && (
+            <span className="px-2 py-0.5 font-mono text-[10px] uppercase tracking-wider border border-[#0A0A0A]/20 text-[#0A0A0A]/50">
+              {invoices.length} total
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Table */}
@@ -177,22 +182,23 @@ export default async function ClientInvoicesPage({
 }
 
 function InvoiceStatusBadge({ status }: { status: string }) {
-  const styles: Record<string, string> = {
-    draft: "bg-transparent text-[#0A0A0A]/50 border-[#0A0A0A]/20",
-    sent: "bg-[#0A0A0A]/5 text-[#0A0A0A]/60 border-[#0A0A0A]/25",
-    paid: "bg-[#0A0A0A] text-white border-[#0A0A0A]",
-    overdue: "bg-[#0A0A0A]/8 text-[#0A0A0A]/70 border-[#0A0A0A]/20",
-    cancelled: "bg-transparent text-[#0A0A0A]/30 border-[#0A0A0A]/10",
+  const styleMap: Record<string, { className: string; label: string }> = {
+    draft:     { className: "bg-transparent text-[#0A0A0A]/40 border-[#0A0A0A]/15",                   label: "Draft"     },
+    sent:      { className: "bg-[#0A0A0A]/5 text-[#0A0A0A]/70 border-[#0A0A0A]/20",                  label: "Pending"   },
+    open:      { className: "bg-[#0A0A0A]/5 text-[#0A0A0A]/70 border-[#0A0A0A]/20",                  label: "Open"      },
+    paid:      { className: "bg-[#166534] text-white border-[#166534]",                                label: "Paid"      },
+    overdue:   { className: "bg-[#DC2626] text-white border-[#DC2626]",                                label: "Overdue"   },
+    cancelled: { className: "bg-transparent text-[#0A0A0A]/25 border-[#0A0A0A]/10 line-through",      label: "Cancelled" },
   };
+
+  const config = styleMap[status] ?? styleMap.draft;
 
   return (
     <Badge
       variant="outline"
-      className={`font-mono text-[10px] uppercase tracking-wider rounded-none px-2 py-0.5 ${
-        styles[status] || styles.draft
-      }`}
+      className={`font-mono text-[10px] uppercase tracking-wider rounded-none px-2 py-0.5 ${config.className}`}
     >
-      {status}
+      {config.label}
     </Badge>
   );
 }

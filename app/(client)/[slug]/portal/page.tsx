@@ -143,10 +143,18 @@ export default async function ClientPortalPage({
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <h1 className="text-2xl font-bold font-serif tracking-tight">
-          Account Overview
+      <div className="mb-8">
+        <p className="font-mono text-[10px] uppercase tracking-wider text-[#0A0A0A]/40 mb-1">
+          AM Collective Capital
+        </p>
+        <h1 className="text-3xl font-bold font-serif tracking-tight text-[#0A0A0A]">
+          {client.name || client.companyName || "Your Portal"}
         </h1>
+        {client.companyName && client.name && (
+          <p className="font-mono text-xs text-[#0A0A0A]/40 mt-1">
+            {client.companyName}
+          </p>
+        )}
       </div>
 
       {/* Status Cards */}
