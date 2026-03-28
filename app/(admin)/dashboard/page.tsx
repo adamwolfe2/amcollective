@@ -31,6 +31,7 @@ import {
   Crosshair,
   ListTodo,
   TrendingUp,
+  TrendingDown,
   LineChart,
   Send,
   FileCheck,
@@ -48,6 +49,7 @@ import {
   ActionsPanelSkeleton,
 } from "@/components/dashboard/DashboardSkeletons";
 import { captureError } from "@/lib/errors";
+import { SetupChecklist } from "@/components/dashboard/SetupChecklist";
 
 // ─── Cached data fetchers ───────────────────────────────────────────────────
 
@@ -346,40 +348,49 @@ async function PlatformSnapshotsSection() {
 
 async function MetricsStrip() {
   try {
-    const [mrrData, mercuryResult, totalClientsResult, overdueResult, spendResult] =
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+
+    const [mrrData, mercuryResult, activeProjectsResult, activeClientsResult, deltaSnapshots] =
       await Promise.all([
         getCachedMrr(),
         getCachedMercuryAccounts(),
-        db.select({ value: count() }).from(schema.clients),
+        // Active portfolio projects (products with status = active)
         db
-          .select({
-            cnt: count(),
-            total: sql<string>`COALESCE(SUM(${schema.invoices.amount}), 0)`,
-          })
-          .from(schema.invoices)
-          .where(eq(schema.invoices.status, "overdue")),
+          .select({ value: count() })
+          .from(schema.portfolioProjects)
+          .where(eq(schema.portfolioProjects.status, "active")),
+        // Active clients: distinct clients with at least one open kanban card
         db
-          .select({
-            totalSpend: sql<string>`COALESCE(SUM(ABS(${schema.mercuryTransactions.amount})), 0)`,
-          })
-          .from(schema.mercuryTransactions)
-          .where(
-            and(
-              eq(schema.mercuryTransactions.direction, "debit"),
-              gte(
-                schema.mercuryTransactions.postedAt,
-                new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)
-              )
-            )
-          ),
+          .select({ value: sql<number>`COUNT(DISTINCT ${schema.kanbanCards.clientId})` })
+          .from(schema.kanbanCards)
+          .where(sql`${schema.kanbanCards.completedAt} IS NULL`),
+        // 7-day snapshots for trend delta (oldest vs newest)
+        db
+          .select()
+          .from(schema.dailyMetricsSnapshots)
+          .where(gte(schema.dailyMetricsSnapshots.date, sevenDaysAgo))
+          .orderBy(asc(schema.dailyMetricsSnapshots.date))
+          .limit(7),
       ]);
 
     const accounts = mercuryResult.success ? (mercuryResult.data ?? []) : [];
     const totalCash = accounts.reduce((s, a) => s + a.currentBalance, 0);
-    const monthlySpend = Number(spendResult[0]?.totalSpend ?? 0) / 2;
-    const runway = monthlySpend > 0 ? totalCash / monthlySpend : null;
-    const overdueCount = overdueResult[0]?.cnt ?? 0;
-    const overdueTotal = Number(overdueResult[0]?.total ?? 0) / 100;
+    const activeProjects = activeProjectsResult[0]?.value ?? 0;
+    const activeClients = Number(activeClientsResult[0]?.value ?? 0);
+
+    // Compute 7-day delta percentages from daily snapshots
+    let mrrDelta: number | null = null;
+    let cashDelta: number | null = null;
+    if (deltaSnapshots.length >= 2) {
+      const oldest = deltaSnapshots[0];
+      const newest = deltaSnapshots[deltaSnapshots.length - 1];
+      if (oldest.mrr > 0) {
+        mrrDelta = ((newest.mrr - oldest.mrr) / oldest.mrr) * 100;
+      }
+      if (oldest.totalCash > 0) {
+        cashDelta = ((newest.totalCash - oldest.totalCash) / oldest.totalCash) * 100;
+      }
+    }
 
     return (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -388,25 +399,26 @@ async function MetricsStrip() {
           value={formatCurrency(mrrData.mrr)}
           sub={`${mrrData.activeSubs} subs`}
           href="/finance"
+          trend={mrrDelta}
         />
         <MetricPill
           label="Cash"
           value={formatCurrency(totalCash)}
-          sub={runway ? `${runway.toFixed(0)} mo runway` : "no data"}
+          sub="total balance"
           href="/finance"
+          trend={cashDelta}
         />
         <MetricPill
-          label="Clients"
-          value={String(totalClientsResult[0]?.value ?? 0)}
-          sub="total active"
+          label="Active Projects"
+          value={String(activeProjects)}
+          sub="products live"
+          href="/products"
+        />
+        <MetricPill
+          label="Active Clients"
+          value={String(activeClients)}
+          sub="open engagements"
           href="/clients"
-        />
-        <MetricPill
-          label="Overdue"
-          value={overdueCount > 0 ? formatCurrency(overdueTotal) : "$0"}
-          sub={overdueCount > 0 ? `${overdueCount} inv` : ""}
-          href="/invoices"
-          alert={overdueCount > 0}
         />
       </div>
     );
@@ -688,6 +700,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col lg:h-[calc(100vh-7rem)] pb-20">
+      {/* Onboarding checklist — shown until dismissed */}
+      <SetupChecklist />
+
       {/* Header + Metrics */}
       <div className="shrink-0 space-y-3 mb-4">
         <div className="flex items-center justify-between">
@@ -747,13 +762,19 @@ function MetricPill({
   sub,
   href,
   alert = false,
+  trend,
 }: {
   label: string;
   value: string;
   sub?: string;
   href: string;
   alert?: boolean;
+  /** 7-day delta as a percentage (positive = up, negative = down, null = no data) */
+  trend?: number | null;
 }) {
+  const trendPositive = trend !== null && trend !== undefined && trend > 0;
+  const trendNegative = trend !== null && trend !== undefined && trend < 0;
+
   return (
     <Link
       href={href}
@@ -763,9 +784,29 @@ function MetricPill({
           : "border-[#0A0A0A]/10"
       }`}
     >
-      <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40">
-        {label}
-      </span>
+      <div className="flex items-center justify-between gap-1">
+        <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40">
+          {label}
+        </span>
+        {trend !== null && trend !== undefined && (
+          <span
+            className={`flex items-center gap-0.5 font-mono text-[9px] shrink-0 ${
+              trendPositive
+                ? "text-[#0A0A0A]/60"
+                : trendNegative
+                  ? "text-[#0A0A0A]/40"
+                  : "text-[#0A0A0A]/30"
+            }`}
+          >
+            {trendPositive ? (
+              <TrendingUp size={8} />
+            ) : trendNegative ? (
+              <TrendingDown size={8} />
+            ) : null}
+            {Math.abs(trend).toFixed(1)}%
+          </span>
+        )}
+      </div>
       <span className="font-mono text-base sm:text-lg font-bold block leading-tight truncate">{value}</span>
       {sub && (
         <span className="font-mono text-[9px] text-[#0A0A0A]/40 block mt-0.5">
