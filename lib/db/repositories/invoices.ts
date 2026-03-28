@@ -168,6 +168,28 @@ export async function sendInvoice(id: string, actorId: string) {
   return invoice ?? null;
 }
 
+export async function resendInvoice(id: string, actorId: string) {
+  const result = await db
+    .update(invoices)
+    .set({
+      reminderCount: sql`${invoices.reminderCount} + 1`,
+      lastReminderAt: new Date(),
+    })
+    .where(eq(invoices.id, id))
+    .returning();
+  const invoice = result[0];
+  if (invoice) {
+    await createAuditLog({
+      actorId,
+      actorType: "user",
+      action: "resend",
+      entityType: "invoice",
+      entityId: invoice.id,
+    });
+  }
+  return invoice ?? null;
+}
+
 export async function updatePaymentLink(
   id: string,
   paymentLinkUrl: string

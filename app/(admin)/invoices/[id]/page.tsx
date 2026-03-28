@@ -75,6 +75,9 @@ export default async function InvoiceDetailPage({
           invoiceId={invoice.id}
           status={invoice.status}
           paymentLinkUrl={invoice.stripePaymentLinkUrl}
+          clientEmail={clientEmail}
+          amount={invoice.amount}
+          dueDate={invoice.dueDate}
         />
       </div>
 

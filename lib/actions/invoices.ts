@@ -190,8 +190,8 @@ export async function sendInvoiceAction(id: string): Promise<ActionResult> {
   if (!data) return { success: false, error: "Invoice not found" };
 
   const { invoice, clientName, clientEmail } = data;
-  if (invoice.status !== "draft") {
-    return { success: false, error: "Only draft invoices can be sent" };
+  if (!["draft", "sent", "overdue"].includes(invoice.status)) {
+    return { success: false, error: "Only draft, sent, or overdue invoices can be sent" };
   }
   if (!clientEmail) {
     return { success: false, error: "Client has no email address" };
@@ -263,8 +263,11 @@ export async function sendInvoiceAction(id: string): Promise<ActionResult> {
     }
   }
 
-  // Update status to sent
-  const updated = await invoicesRepo.sendInvoice(id, userId);
+  // Update status to sent (first send) or increment reminder count (resend)
+  const isFirstSend = invoice.status === "draft";
+  const updated = isFirstSend
+    ? await invoicesRepo.sendInvoice(id, userId)
+    : await invoicesRepo.resendInvoice(id, userId);
 
   revalidatePath("/invoices");
   revalidatePath(`/invoices/${id}`);
