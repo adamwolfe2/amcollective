@@ -8,7 +8,7 @@
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, eq, or } from "drizzle-orm";
-import { StrategyClient, type StrategyRec, type StrategyMetricsData } from "./strategy-client";
+import { StrategyClient, type StrategyRec, type StrategyMetricsData, type RockRow } from "./strategy-client";
 import { GenerateStrategyButton } from "./generate-button";
 import { requireAdmin } from "@/lib/auth/require-admin";
 import { redirect } from "next/navigation";
@@ -24,8 +24,12 @@ export default async function StrategyPage() {
   const { error } = await requireAdmin();
   if (error) redirect("/sign-in");
 
-  // Fetch latest metrics + recommendations in parallel
-  const [[latestMetrics], recommendations] = await Promise.all([
+  // Derive current quarter string e.g. "Q2 2026"
+  const now = new Date();
+  const quarter = `Q${Math.ceil((now.getMonth() + 1) / 3)} ${now.getFullYear()}`;
+
+  // Fetch latest metrics, recommendations, and current-quarter rocks in parallel
+  const [[latestMetrics], recommendations, quarterRocks] = await Promise.all([
     db
       .select()
       .from(schema.strategyMetrics)
@@ -59,6 +63,23 @@ export default async function StrategyPage() {
       )
       .orderBy(desc(schema.strategyRecommendations.priority), desc(schema.strategyRecommendations.createdAt))
       .limit(50)
+      .catch(() => []),
+
+    // Current-quarter rocks
+    db
+      .select({
+        id: schema.rocks.id,
+        title: schema.rocks.title,
+        description: schema.rocks.description,
+        status: schema.rocks.status,
+        progress: schema.rocks.progress,
+        quarter: schema.rocks.quarter,
+        dueDate: schema.rocks.dueDate,
+      })
+      .from(schema.rocks)
+      .where(eq(schema.rocks.quarter, quarter))
+      .orderBy(schema.rocks.status, schema.rocks.title)
+      .limit(10)
       .catch(() => []),
   ]);
 
@@ -96,6 +117,16 @@ export default async function StrategyPage() {
     createdAt: r.createdAt,
   }));
 
+  const rocksData: RockRow[] = quarterRocks.map((r) => ({
+    id: r.id,
+    title: r.title,
+    description: r.description ?? null,
+    status: r.status,
+    progress: r.progress,
+    quarter: r.quarter,
+    dueDate: r.dueDate ? r.dueDate.toISOString().split("T")[0] : null,
+  }));
+
   return (
     <div className="max-w-7xl mx-auto">
       {!metricsData && recsData.length === 0 && (
@@ -108,7 +139,7 @@ export default async function StrategyPage() {
           </div>
         </div>
       )}
-      <StrategyClient metrics={metricsData} recommendations={recsData} />
+      <StrategyClient metrics={metricsData} recommendations={recsData} rocks={rocksData} />
     </div>
   );
 }

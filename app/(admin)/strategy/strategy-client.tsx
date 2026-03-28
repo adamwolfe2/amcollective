@@ -22,6 +22,16 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface RockRow {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  progress: number;
+  quarter: string;
+  dueDate: string | null;
+}
+
 export interface StrategyRec {
   id: string;
   type: "revenue_opportunity" | "cost_reduction" | "risk" | "growth" | "operations";
@@ -218,9 +228,11 @@ function RecommendationCard({
 export function StrategyClient({
   metrics,
   recommendations: initialRecs,
+  rocks,
 }: {
   metrics: StrategyMetricsData | null;
   recommendations: StrategyRec[];
+  rocks: RockRow[];
 }) {
   const [recommendations, setRecommendations] = useState(initialRecs);
   const [running, startRunning] = useTransition();
@@ -377,6 +389,126 @@ export function StrategyClient({
         </div>
       )}
 
+      {/* ── SWOT Grid ────────────────────────────────────────────────────── */}
+      {(metrics || sortedRecs.length > 0) && (
+        <div className="border border-[#0A0A0A]/10 bg-white">
+          <div className="px-4 py-3 border-b border-[#0A0A0A]/10">
+            <h2 className="text-xs font-bold text-[#0A0A0A]/70 uppercase tracking-wide">SWOT Analysis</h2>
+            <p className="text-xs text-[#0A0A0A]/30 mt-0.5">Derived from current metrics and AI recommendations</p>
+          </div>
+          <div className="grid grid-cols-2">
+            {/* Strengths */}
+            <div className="p-4 border-b border-r border-[#0A0A0A]/10">
+              <p className="text-xs font-bold text-[#0A0A0A] uppercase tracking-wide mb-2">Strengths</p>
+              <ul className="space-y-1">
+                {metrics && metrics.healthScore !== null && metrics.healthScore >= 60 && (
+                  <li className="text-xs text-[#0A0A0A]/70 flex gap-2">
+                    <span className="shrink-0 font-mono text-[#0A0A0A]/30">—</span>
+                    Health score {metrics.healthScore}/100
+                  </li>
+                )}
+                {metrics && metrics.runwayMonths !== null && parseFloat(metrics.runwayMonths) >= 12 && (
+                  <li className="text-xs text-[#0A0A0A]/70 flex gap-2">
+                    <span className="shrink-0 font-mono text-[#0A0A0A]/30">—</span>
+                    {parseFloat(metrics.runwayMonths)}mo cash runway
+                  </li>
+                )}
+                {metrics && metrics.mrrGrowthPct !== null && parseFloat(metrics.mrrGrowthPct) > 0 && (
+                  <li className="text-xs text-[#0A0A0A]/70 flex gap-2">
+                    <span className="shrink-0 font-mono text-[#0A0A0A]/30">—</span>
+                    +{metrics.mrrGrowthPct}% MRR growth
+                  </li>
+                )}
+                {Object.entries(productMargins).filter(([, m]) => m.marginPct >= 70).map(([tag, m]) => (
+                  <li key={tag} className="text-xs text-[#0A0A0A]/70 flex gap-2">
+                    <span className="shrink-0 font-mono text-[#0A0A0A]/30">—</span>
+                    {tag} at {m.marginPct}% margin
+                  </li>
+                ))}
+                {metrics && Object.keys(productMargins).length === 0 && metrics.healthScore === null && (
+                  <li className="text-xs text-[#0A0A0A]/30 italic">Run analysis to populate</li>
+                )}
+                {(!metrics || (metrics.healthScore === null && Object.keys(productMargins).length === 0 && (metrics.mrrGrowthPct === null || parseFloat(metrics.mrrGrowthPct ?? "0") <= 0))) && (
+                  <li className="text-xs text-[#0A0A0A]/30 italic">No data yet</li>
+                )}
+              </ul>
+            </div>
+            {/* Weaknesses */}
+            <div className="p-4 border-b border-[#0A0A0A]/10">
+              <p className="text-xs font-bold text-[#0A0A0A]/70 uppercase tracking-wide mb-2">Weaknesses</p>
+              <ul className="space-y-1">
+                {metrics && metrics.runwayMonths !== null && parseFloat(metrics.runwayMonths) < 12 && (
+                  <li className="text-xs text-[#0A0A0A]/70 flex gap-2">
+                    <span className="shrink-0 font-mono text-[#0A0A0A]/30">—</span>
+                    Only {parseFloat(metrics.runwayMonths)}mo runway
+                  </li>
+                )}
+                {metrics && metrics.concentrationPct !== null && metrics.concentrationPct > 40 && (
+                  <li className="text-xs text-[#0A0A0A]/70 flex gap-2">
+                    <span className="shrink-0 font-mono text-[#0A0A0A]/30">—</span>
+                    {metrics.concentrationPct}% revenue concentration
+                  </li>
+                )}
+                {metrics && metrics.mrrGrowthPct !== null && parseFloat(metrics.mrrGrowthPct) < 0 && (
+                  <li className="text-xs text-[#0A0A0A]/70 flex gap-2">
+                    <span className="shrink-0 font-mono text-[#0A0A0A]/30">—</span>
+                    {metrics.mrrGrowthPct}% MRR decline
+                  </li>
+                )}
+                {recommendations.filter((r) => r.type === "cost_reduction" && (r.status === "active" || r.status === "in_progress")).slice(0, 2).map((r) => (
+                  <li key={r.id} className="text-xs text-[#0A0A0A]/70 flex gap-2">
+                    <span className="shrink-0 font-mono text-[#0A0A0A]/30">—</span>
+                    {r.title}
+                  </li>
+                ))}
+                {(!metrics || (metrics.runwayMonths === null && metrics.concentrationPct === null && (metrics.mrrGrowthPct === null || parseFloat(metrics.mrrGrowthPct ?? "0") >= 0))) && recommendations.filter((r) => r.type === "cost_reduction").length === 0 && (
+                  <li className="text-xs text-[#0A0A0A]/30 italic">No data yet</li>
+                )}
+              </ul>
+            </div>
+            {/* Opportunities */}
+            <div className="p-4 border-r border-[#0A0A0A]/10">
+              <p className="text-xs font-bold text-[#0A0A0A]/50 uppercase tracking-wide mb-2">Opportunities</p>
+              <ul className="space-y-1">
+                {recommendations.filter((r) => (r.type === "revenue_opportunity" || r.type === "growth") && (r.status === "active" || r.status === "in_progress")).slice(0, 4).map((r) => (
+                  <li key={r.id} className="text-xs text-[#0A0A0A]/60 flex gap-2">
+                    <span className="shrink-0 font-mono text-[#0A0A0A]/30">—</span>
+                    {r.title}
+                    {r.estimatedValueCents && (
+                      <span className="text-[#0A0A0A]/40 shrink-0">(~{fmtMo(r.estimatedValueCents)})</span>
+                    )}
+                  </li>
+                ))}
+                {recommendations.filter((r) => r.type === "revenue_opportunity" || r.type === "growth").length === 0 && (
+                  <li className="text-xs text-[#0A0A0A]/30 italic">Run analysis to surface opportunities</li>
+                )}
+              </ul>
+            </div>
+            {/* Threats */}
+            <div className="p-4">
+              <p className="text-xs font-bold text-[#0A0A0A]/50 uppercase tracking-wide mb-2">Threats</p>
+              <ul className="space-y-1">
+                {recommendations.filter((r) => r.type === "risk" && (r.status === "active" || r.status === "in_progress")).slice(0, 4).map((r) => (
+                  <li key={r.id} className="text-xs text-[#0A0A0A]/60 flex gap-2">
+                    <span className="shrink-0 font-mono text-[#0A0A0A]/30">—</span>
+                    {r.title}
+                  </li>
+                ))}
+                {metrics && metrics.riskLevel && metrics.riskLevel !== "low" && recommendations.filter((r) => r.type === "risk").length === 0 && (
+                  <li className="text-xs text-[#0A0A0A]/60 flex gap-2">
+                    <span className="shrink-0 font-mono text-[#0A0A0A]/30">—</span>
+                    Overall risk level: {metrics.riskLevel}
+                  </li>
+                )}
+                {recommendations.filter((r) => r.type === "risk").length === 0 && (!metrics?.riskLevel || metrics.riskLevel === "low") && (
+                  <li className="text-xs text-[#0A0A0A]/30 italic">No active threats identified</li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Two-column layout ────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
@@ -423,6 +555,65 @@ export function StrategyClient({
 
         {/* ── Right sidebar (2/5 width) ────────────────────────────────── */}
         <div className="lg:col-span-2 space-y-4">
+
+          {/* Quarterly Rocks */}
+          <div className="border border-[#0A0A0A]/10 bg-white">
+            <div className="px-4 py-3 border-b border-[#0A0A0A]/10 flex items-center justify-between">
+              <h2 className="text-xs font-bold text-[#0A0A0A]/70 uppercase tracking-wide">Quarterly Rocks</h2>
+              {rocks.length > 0 && (
+                <span className="text-xs text-[#0A0A0A]/30">{rocks[0].quarter}</span>
+              )}
+            </div>
+            {rocks.length === 0 ? (
+              <div className="p-4 text-center text-xs text-[#0A0A0A]/30">No rocks set for this quarter</div>
+            ) : (
+              <div className="divide-y divide-[#0A0A0A]/5">
+                {rocks.map((rock) => {
+                  const statusColor =
+                    rock.status === "done"
+                      ? "bg-[#0A0A0A] text-white"
+                      : rock.status === "on_track"
+                      ? "bg-[#0A0A0A]/10 text-[#0A0A0A]/70"
+                      : rock.status === "at_risk"
+                      ? "bg-[#0A0A0A]/20 text-[#0A0A0A]/80"
+                      : "bg-[#0A0A0A]/5 text-[#0A0A0A]/50";
+                  const statusLabel =
+                    rock.status === "done"
+                      ? "Done"
+                      : rock.status === "on_track"
+                      ? "On Track"
+                      : rock.status === "at_risk"
+                      ? "At Risk"
+                      : "Off Track";
+                  return (
+                    <div key={rock.id} className="px-4 py-3 space-y-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-xs font-medium leading-snug ${rock.status === "done" ? "text-[#0A0A0A]/40 line-through" : "text-[#0A0A0A]"}`}>
+                          {rock.title}
+                        </p>
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 shrink-0 uppercase tracking-wider rounded-none ${statusColor}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      {rock.status !== "done" && (
+                        <div className="flex items-center gap-2">
+                          <div className="flex-1 h-1 bg-[#0A0A0A]/5">
+                            <div
+                              className="h-full bg-[#0A0A0A]/40"
+                              style={{ width: `${rock.progress}%` }}
+                            />
+                          </div>
+                          <span className="text-[9px] font-mono text-[#0A0A0A]/40 shrink-0">
+                            {rock.progress}%
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           {/* Product Profitability */}
           <div className="border border-[#0A0A0A]/10 bg-white">
