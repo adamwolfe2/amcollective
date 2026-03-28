@@ -315,6 +315,14 @@ export function OutreachDashboard() {
               {syncStatus}
             </span>
           )}
+          <a
+            href={process.env.NEXT_PUBLIC_EMAILBISON_DASHBOARD_URL ?? "https://app.emailbison.com"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2 text-xs font-mono uppercase tracking-wider border border-[#0A0A0A] bg-white text-[#0A0A0A] hover:bg-[#0A0A0A]/5 transition-colors"
+          >
+            New Campaign
+          </a>
           <button
             onClick={() => setShowUploadDialog(true)}
             className="px-4 py-2 text-xs font-mono uppercase tracking-wider border border-[#0A0A0A] bg-white text-[#0A0A0A] hover:bg-[#0A0A0A]/5 transition-colors"
@@ -406,6 +414,125 @@ export function OutreachDashboard() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Lead Funnel */}
+          {s.sent > 0 && (
+            <div className="border border-[#0A0A0A] bg-white p-6">
+              <h3 className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 mb-4">
+                Lead Funnel
+              </h3>
+              <div className="flex items-stretch gap-0">
+                {[
+                  { label: "Contacted", value: s.sent, pct: 100 },
+                  {
+                    label: "Opened",
+                    value: s.opened,
+                    pct: s.sent > 0 ? Math.round((s.opened / s.sent) * 100) : 0,
+                  },
+                  {
+                    label: "Replied",
+                    value: s.replied,
+                    pct: s.sent > 0 ? Math.round((s.replied / s.sent) * 100) : 0,
+                  },
+                  {
+                    label: "Interested",
+                    value: s.interested,
+                    pct: s.sent > 0 ? Math.round((s.interested / s.sent) * 100) : 0,
+                  },
+                ].map((stage, i, arr) => (
+                  <div key={stage.label} className="flex-1 relative">
+                    <div
+                      className="border border-[#0A0A0A]/10 p-3 text-center"
+                      style={{
+                        background: `rgba(10,10,10,${0.03 + i * 0.02})`,
+                        borderLeft: i > 0 ? "none" : undefined,
+                      }}
+                    >
+                      <p className="font-mono text-[9px] uppercase tracking-widest text-[#0A0A0A]/40 mb-1">
+                        {stage.label}
+                      </p>
+                      <p className="font-mono text-lg font-bold text-[#0A0A0A]">
+                        {stage.value.toLocaleString()}
+                      </p>
+                      <p className="font-mono text-[10px] text-[#0A0A0A]/50 mt-0.5">
+                        {stage.pct}%
+                      </p>
+                      {i < arr.length - 1 && (
+                        <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10 w-4 h-4 bg-white border border-[#0A0A0A]/20 flex items-center justify-center">
+                          <span className="font-mono text-[8px] text-[#0A0A0A]/40">›</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Top Campaigns by Open Rate */}
+          {data.campaigns.length > 0 && (
+            <div className="border border-[#0A0A0A] bg-white">
+              <div className="px-4 py-3 border-b border-[#0A0A0A]/10">
+                <h3 className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50">
+                  Top Campaigns by Open Rate
+                </h3>
+              </div>
+              <div className="divide-y divide-[#0A0A0A]/5">
+                {data.campaigns
+                  .filter((c) => (c.contacted ?? 0) > 0)
+                  .map((c) => ({
+                    ...c,
+                    openRatePct:
+                      (c.contacted ?? 0) > 0
+                        ? Math.round(((c.opened ?? 0) / (c.contacted ?? 1)) * 100)
+                        : 0,
+                    replyRatePct:
+                      (c.contacted ?? 0) > 0
+                        ? Math.round(((c.replied ?? 0) / (c.contacted ?? 1)) * 100)
+                        : 0,
+                  }))
+                  .sort((a, b) => b.openRatePct - a.openRatePct)
+                  .slice(0, 5)
+                  .map((c) => (
+                    <div key={c.id} className="px-4 py-3">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="font-serif text-sm font-medium truncate max-w-[60%]">
+                          {c.name}
+                        </span>
+                        <div className="flex items-center gap-4 shrink-0">
+                          <span className="font-mono text-xs text-[#0A0A0A]/50">
+                            {c.openRatePct}% open
+                          </span>
+                          <span className="font-mono text-xs text-[#0A0A0A]">
+                            {c.replyRatePct}% reply
+                          </span>
+                        </div>
+                      </div>
+                      <div className="h-1 bg-[#0A0A0A]/5 relative">
+                        <div
+                          className="h-full bg-[#0A0A0A]/40 absolute left-0 top-0"
+                          style={{ width: `${c.openRatePct}%` }}
+                        />
+                        <div
+                          className="h-full bg-[#0A0A0A] absolute left-0 top-0"
+                          style={{ width: `${c.replyRatePct}%` }}
+                        />
+                      </div>
+                      <p className="font-mono text-[9px] text-[#0A0A0A]/30 mt-1">
+                        {(c.contacted ?? 0).toLocaleString()} contacted · {(c.replied ?? 0)} replies · status: {c.status ?? "unknown"}
+                      </p>
+                    </div>
+                  ))}
+                {data.campaigns.filter((c) => (c.contacted ?? 0) > 0).length === 0 && (
+                  <div className="py-8 text-center">
+                    <p className="font-mono text-xs text-[#0A0A0A]/30">
+                      No campaign data yet. Sync from EmailBison to see stats.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
