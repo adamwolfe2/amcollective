@@ -50,6 +50,7 @@ import {
 import { captureError } from "@/lib/errors";
 import { SetupChecklist } from "@/components/dashboard/SetupChecklist";
 import { MetricPillClient } from "@/components/dashboard/MetricPillClient";
+import { SectionError } from "@/components/ui/section-error";
 
 // ─── Cached data fetchers ───────────────────────────────────────────────────
 
@@ -723,31 +724,41 @@ export default async function DashboardPage() {
             Open AM Agent →
           </Link>
         </div>
-        <Suspense fallback={<MetricsStripSkeleton />}>
-          <MetricsStrip />
-        </Suspense>
+        <SectionError name="Metrics Strip">
+          <Suspense fallback={<MetricsStripSkeleton />}>
+            <MetricsStrip />
+          </Suspense>
+        </SectionError>
       </div>
 
       {/* Main: Pipeline + Products + Side Panel */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 min-h-0">
         <div className="lg:col-span-8 lg:overflow-y-auto min-h-0 space-y-3 sm:space-y-4">
-          <Suspense fallback={<PlatformCardSkeleton />}>
-            <PlatformSnapshotsSection />
-          </Suspense>
+          <SectionError name="Platform Snapshots">
+            <Suspense fallback={<PlatformCardSkeleton />}>
+              <PlatformSnapshotsSection />
+            </Suspense>
+          </SectionError>
 
-          <Suspense fallback={<PipelineSkeleton />}>
-            <PipelineSection />
-          </Suspense>
+          <SectionError name="Pipeline">
+            <Suspense fallback={<PipelineSkeleton />}>
+              <PipelineSection />
+            </Suspense>
+          </SectionError>
 
-          <Suspense fallback={<div className="h-24 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />}>
-            <CashRunwaySection />
-          </Suspense>
+          <SectionError name="Cash Runway">
+            <Suspense fallback={<div className="h-24 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />}>
+              <CashRunwaySection />
+            </Suspense>
+          </SectionError>
         </div>
 
         <div className="lg:col-span-4 lg:overflow-y-auto min-h-0">
-          <Suspense fallback={<ActionsPanelSkeleton />}>
-            <ActionsPanel />
-          </Suspense>
+          <SectionError name="Actions Panel">
+            <Suspense fallback={<ActionsPanelSkeleton />}>
+              <ActionsPanel />
+            </Suspense>
+          </SectionError>
         </div>
       </div>
 

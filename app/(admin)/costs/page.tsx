@@ -17,6 +17,7 @@ import { SubscriptionManager, type ProjectOption } from "./subscription-manager"
 import * as stripeConnector from "@/lib/connectors/stripe";
 import Link from "next/link";
 import { captureError } from "@/lib/errors";
+import { SectionError } from "@/components/ui/section-error";
 
 // ─── Data Fetchers (cached 5 min) ────────────────────────────────────────────
 
@@ -630,7 +631,9 @@ export default async function CostsPage() {
       )}
 
       {/* ── Subscriptions — CRUD ── */}
-      <SubscriptionManager subscriptions={serializedSubscriptions} projects={portfolioProjects} />
+      <SectionError name="Subscriptions">
+        <SubscriptionManager subscriptions={serializedSubscriptions} projects={portfolioProjects} />
+      </SectionError>
 
       {/* ── Per-Project Costs ── */}
       <div className="mb-8">

@@ -17,6 +17,7 @@ const CashFlowChart = dynamic(
 import { TransactionFeed } from "./transaction-feed";
 import { MercurySyncButton } from "./sync-button";
 import { captureError } from "@/lib/errors";
+import { SectionError } from "@/components/ui/section-error";
 
 const PAGE_SIZE = 50;
 
@@ -275,7 +276,9 @@ export default async function FinancePage({
           <h2 className="font-serif font-bold text-[#0A0A0A] mb-4">
             Cash Flow — Last 90 Days
           </h2>
-          <CashFlowChart data={cashFlowData} />
+          <SectionError name="Cash Flow Chart">
+            <CashFlowChart data={cashFlowData} />
+          </SectionError>
         </div>
 
         {/* Revenue Breakdown */}
@@ -434,12 +437,14 @@ export default async function FinancePage({
             {txnData.totalCount}
           </span>
         </div>
-        <TransactionFeed
-          transactions={txnData.transactions}
-          totalCount={txnData.totalCount}
-          page={page}
-          pageSize={PAGE_SIZE}
-        />
+        <SectionError name="Transaction Feed">
+          <TransactionFeed
+            transactions={txnData.transactions}
+            totalCount={txnData.totalCount}
+            page={page}
+            pageSize={PAGE_SIZE}
+          />
+        </SectionError>
       </div>
 
       {/* Account Cards */}

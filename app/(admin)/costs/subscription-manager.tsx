@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, X } from "lucide-react";
+import { Plus, Pencil, Trash2, X, CreditCard } from "lucide-react";
 import {
   createSubscription,
   updateSubscription,
@@ -382,11 +382,16 @@ export function SubscriptionManager({
           <tbody className="divide-y divide-[#0A0A0A]/5">
             {subscriptions.length === 0 ? (
               <tr>
-                <td
-                  colSpan={7}
-                  className="px-5 py-8 text-center text-[#0A0A0A]/40 font-serif"
-                >
-                  No subscriptions tracked. Add one above.
+                <td colSpan={7} className="p-0">
+                  <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                    <div className="w-12 h-12 border border-[#0A0A0A]/20 flex items-center justify-center mb-4">
+                      <CreditCard className="h-5 w-5 text-[#0A0A0A]/30" strokeWidth={1.5} />
+                    </div>
+                    <p className="font-serif text-lg font-bold text-[#0A0A0A] mb-1">No subscriptions tracked</p>
+                    <p className="font-mono text-xs text-[#0A0A0A]/40 max-w-sm">
+                      Add your first subscription above to start tracking recurring costs across all companies.
+                    </p>
+                  </div>
                 </td>
               </tr>
             ) : (
