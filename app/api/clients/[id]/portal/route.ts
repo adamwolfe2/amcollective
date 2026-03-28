@@ -1,9 +1,9 @@
 /**
- * Client Portal Provisioning — POST /api/clients/[id]/portal
+ * Client Portal Provisioning
  *
- * Creates or updates portal access for a client.
- * Looks up or creates a Clerk user by email, links them to the client record,
- * and sets portalAccess = true.
+ * POST   /api/clients/[id]/portal — grant portal access, send welcome email
+ * PATCH  /api/clients/[id]/portal — resend welcome email
+ * DELETE /api/clients/[id]/portal — revoke portal access
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -15,6 +15,8 @@ import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { clerkClient } from "@clerk/nextjs/server";
+import { sendPortalWelcomeEmail } from "@/lib/email/team";
+import { getSiteUrl } from "@/lib/get-site-url";
 import { z } from "zod";
 
 export const runtime = "nodejs";
@@ -22,6 +24,15 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
   email: z.string().email("Invalid email address"),
 });
+
+async function fetchClient(clientId: string) {
+  const [client] = await db
+    .select()
+    .from(schema.clients)
+    .where(eq(schema.clients.id, clientId))
+    .limit(1);
+  return client ?? null;
+}
 
 export async function POST(
   req: NextRequest,
@@ -34,7 +45,6 @@ export async function POST(
 
   const { id: clientId } = await params;
 
-  // Validate body
   let body: unknown;
   try {
     body = await req.json();
@@ -52,70 +62,66 @@ export async function POST(
 
   const { email } = parsed.data;
 
-  // Fetch client
-  const [client] = await db
-    .select()
-    .from(schema.clients)
-    .where(eq(schema.clients.id, clientId))
-    .limit(1);
-
+  const client = await fetchClient(clientId);
   if (!client) {
     return NextResponse.json({ error: "Client not found" }, { status: 404 });
   }
 
   try {
-    // Look up or invite the user in Clerk
     const clerk = await clerkClient();
     let clerkUserId: string;
+    let wasInvited = false;
+
+    const appUrl = getSiteUrl();
+    const portalUrl = `${appUrl}/${clientId}/dashboard`;
 
     const existingUsers = await clerk.users.getUserList({ emailAddress: [email] });
 
     if (existingUsers.totalCount > 0 && existingUsers.data[0]) {
       clerkUserId = existingUsers.data[0].id;
     } else {
-      // Create a Clerk invitation so the user receives a sign-up email
       const invitation = await clerk.invitations.createInvitation({
         emailAddress: email,
-        redirectUrl: `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/${clientId}/portal`,
+        redirectUrl: portalUrl,
         publicMetadata: { role: "client", clientId },
       });
-      // Invitations don't have a userId yet — we'll link on first sign-in.
-      // Store a placeholder so we can identify the invite was sent.
       clerkUserId = `invite:${invitation.id}`;
+      wasInvited = true;
     }
 
-    // Update the client record
     await db
       .update(schema.clients)
       .set({
         portalAccess: true,
         clerkUserId,
+        email,
         updatedAt: new Date(),
       })
       .where(eq(schema.clients.id, clientId));
 
-    const portalUrl = `/${clientId}/portal`;
-
     after(async () => {
-      await createAuditLog({
-        actorId: adminId,
-        actorType: "user",
-        action: "portal_access_granted",
-        entityType: "client",
-        entityId: clientId,
-        metadata: {
-          email,
-          clerkUserId,
+      await Promise.all([
+        createAuditLog({
+          actorId: adminId,
+          actorType: "user",
+          action: "portal_access_granted",
+          entityType: "client",
+          entityId: clientId,
+          metadata: { email, clerkUserId, portalUrl },
+        }),
+        sendPortalWelcomeEmail({
+          clientName: client.name,
+          clientEmail: email,
           portalUrl,
-        },
-      });
+        }),
+      ]);
     });
 
     return NextResponse.json({
       success: true,
-      portalUrl,
+      portalUrl: `/${clientId}/dashboard`,
       clerkUserId,
-      invited: clerkUserId.startsWith("invite:"),
+      invited: wasInvited,
     });
   } catch (err) {
     captureError(err, { tags: { route: `POST /api/clients/${clientId}/portal` } });
@@ -127,4 +133,98 @@ export async function POST(
       { status: 500 }
     );
   }
+}
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const adminId = await checkAdmin();
+  if (!adminId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: clientId } = await params;
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const parsed = bodySchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.errors[0]?.message ?? "Validation error" },
+      { status: 400 }
+    );
+  }
+
+  const { email } = parsed.data;
+  const client = await fetchClient(clientId);
+  if (!client) {
+    return NextResponse.json({ error: "Client not found" }, { status: 404 });
+  }
+
+  const appUrl = getSiteUrl();
+  const portalUrl = `${appUrl}/${clientId}/dashboard`;
+
+  after(async () => {
+    await Promise.all([
+      createAuditLog({
+        actorId: adminId,
+        actorType: "user",
+        action: "portal_welcome_resent",
+        entityType: "client",
+        entityId: clientId,
+        metadata: { email },
+      }),
+      sendPortalWelcomeEmail({
+        clientName: client.name,
+        clientEmail: email,
+        portalUrl,
+      }),
+    ]);
+  });
+
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const adminId = await checkAdmin();
+  if (!adminId) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { id: clientId } = await params;
+
+  const client = await fetchClient(clientId);
+  if (!client) {
+    return NextResponse.json({ error: "Client not found" }, { status: 404 });
+  }
+
+  await db
+    .update(schema.clients)
+    .set({
+      portalAccess: false,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.clients.id, clientId));
+
+  after(async () => {
+    await createAuditLog({
+      actorId: adminId,
+      actorType: "user",
+      action: "portal_access_revoked",
+      entityType: "client",
+      entityId: clientId,
+      metadata: { clientName: client.name },
+    });
+  });
+
+  return NextResponse.json({ success: true });
 }
