@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/table";
 import { TimeEntryForm } from "./time-entry-form";
 import { TimeActions } from "./time-actions";
+import { GenerateInvoiceDialog } from "./generate-invoice-dialog";
 
 function formatCents(cents: number): string {
   return `$${(cents / 100).toLocaleString("en-US", {
@@ -78,14 +79,27 @@ export default async function TimePage() {
   return (
     <div>
       {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold font-serif tracking-tight">
-          Time Tracking
-        </h1>
-        <p className="font-mono text-xs text-[#0A0A0A]/40 mt-1">
-          Log billable hours. Track burn rates. Generate invoices from time.
-        </p>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold font-serif tracking-tight">
+            Time Tracking
+          </h1>
+          <p className="font-mono text-xs text-[#0A0A0A]/40 mt-1">
+            Log billable hours. Track burn rates. Generate invoices from time.
+          </p>
+        </div>
+        <GenerateInvoiceDialog />
       </div>
+
+      {/* Unbilled summary banner */}
+      {unbilledHours > 0 && (
+        <div className="border border-[#0A0A0A] bg-[#0A0A0A] text-white px-4 py-3 mb-6 flex items-center justify-between">
+          <p className="font-mono text-xs">
+            <span className="font-bold">{unbilledHours.toFixed(1)}h</span> unbilled — {formatCents(unbilledValue)} outstanding
+          </p>
+          <GenerateInvoiceDialog />
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
