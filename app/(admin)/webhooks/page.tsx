@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 import { Badge } from "@/components/ui/badge";
 import { WebhookActions } from "./webhook-actions";
 import { NewWebhookForm } from "./new-webhook-form";
+import { DeliveryLogButton } from "./delivery-log";
 
 export default async function WebhooksPage() {
   const [registrations, deliveryStats] = await Promise.all([
@@ -145,11 +146,17 @@ export default async function WebhooksPage() {
                       )}
                     </div>
                   </div>
-                  <WebhookActions
-                    id={reg.id}
-                    isActive={reg.isActive}
-                    secret={reg.secret}
-                  />
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                    <DeliveryLogButton
+                      registrationId={reg.id}
+                      endpointUrl={reg.endpointUrl}
+                    />
+                    <WebhookActions
+                      id={reg.id}
+                      isActive={reg.isActive}
+                      secret={reg.secret}
+                    />
+                  </div>
                 </div>
               </div>
             );
