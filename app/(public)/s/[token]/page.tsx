@@ -1,7 +1,6 @@
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, asc, and, isNull, sql } from "drizzle-orm";
-import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
@@ -121,7 +120,26 @@ export default async function PublicSprintPage({
     auth(),
   ]);
 
-  if (!data) notFound();
+  if (!data) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 sm:px-6 py-24 text-center">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/30 mb-6">
+          AM Collective · Weekly Sprint
+        </p>
+        <h1 className="text-2xl font-bold font-serif text-[#0A0A0A] tracking-tight mb-4">
+          This sprint hasn&apos;t been shared
+        </h1>
+        <p className="font-mono text-xs text-[#0A0A0A]/40 mb-8">
+          The link may be invalid or the sprint owner has disabled sharing.
+        </p>
+        <div className="border-t border-[#0A0A0A]/10 pt-8">
+          <p className="font-mono text-[10px] text-[#0A0A0A]/20 uppercase tracking-widest">
+            AM Collective Capital
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   const { sprint, sections } = data;
   const canEdit = !!userId;
