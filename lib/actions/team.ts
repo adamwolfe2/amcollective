@@ -1,9 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { randomBytes } from "crypto";
 import { z } from "zod";
 import * as teamRepo from "@/lib/db/repositories/team";
 import { requireAuth } from "@/lib/auth";
+import { sendTeamInviteEmail } from "@/lib/email/team";
+import { getSiteUrl } from "@/lib/get-site-url";
 
 const createMemberSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -13,6 +17,11 @@ const createMemberSchema = z.object({
 });
 
 const updateMemberSchema = createMemberSchema.partial();
+
+const inviteSchema = z.object({
+  email: z.string().email("Invalid email"),
+  role: z.enum(["admin", "member"]).default("member"),
+});
 
 type ActionResult<T = unknown> = {
   success: boolean;
@@ -88,6 +97,108 @@ export async function removeMember(id: string): Promise<ActionResult> {
   if (!userId) return { success: false, error: "Unauthorized" };
 
   await teamRepo.removeTeamMember(id, userId);
-  revalidatePath("/team");
+  revalidatePath("/settings/team");
+  return { success: true };
+}
+
+export async function getPendingInvitations(): Promise<ActionResult> {
+  const userId = await requireAuth();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  const data = await teamRepo.getPendingInvitations();
+  return { success: true, data };
+}
+
+export async function sendInvitation(
+  formData: z.infer<typeof inviteSchema>
+): Promise<ActionResult> {
+  const userId = await requireAuth();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  const parsed = inviteSchema.safeParse(formData);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error.errors[0]?.message };
+  }
+
+  const { email, role } = parsed.data;
+  const token = randomBytes(32).toString("hex");
+  const appUrl = getSiteUrl();
+  const inviteUrl = `${appUrl}/accept-invite?token=${token}`;
+
+  const invitation = await teamRepo.createInvitation(
+    { email, role, token, invitedById: userId },
+    userId
+  );
+
+  after(async () => {
+    await sendTeamInviteEmail({ inviteeEmail: email, role, inviteUrl });
+  });
+
+  revalidatePath("/settings/team");
+  return { success: true, data: invitation };
+}
+
+export async function resendInvitation(id: string): Promise<ActionResult> {
+  const userId = await requireAuth();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  const invitation = await teamRepo.getInvitationByToken(id);
+  if (!invitation) {
+    // id may be the invitation id, not token — fetch by id via raw query
+    return { success: false, error: "Invitation not found" };
+  }
+
+  const appUrl = getSiteUrl();
+  const inviteUrl = `${appUrl}/accept-invite?token=${invitation.token}`;
+
+  after(async () => {
+    await sendTeamInviteEmail({
+      inviteeEmail: invitation.email,
+      role: invitation.role,
+      inviteUrl,
+    });
+  });
+
+  return { success: true };
+}
+
+export async function resendInvitationById(invitationId: string): Promise<ActionResult> {
+  const userId = await requireAuth();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  const { db } = await import("@/lib/db");
+  const { teamInvitations } = await import("@/lib/db/schema");
+  const { eq } = await import("drizzle-orm");
+
+  const result = await db
+    .select()
+    .from(teamInvitations)
+    .where(eq(teamInvitations.id, invitationId));
+
+  const invitation = result[0];
+  if (!invitation) return { success: false, error: "Invitation not found" };
+
+  const appUrl = getSiteUrl();
+  const inviteUrl = `${appUrl}/accept-invite?token=${invitation.token}`;
+
+  after(async () => {
+    await sendTeamInviteEmail({
+      inviteeEmail: invitation.email,
+      role: invitation.role,
+      inviteUrl,
+    });
+  });
+
+  return { success: true };
+}
+
+export async function revokeInvitation(invitationId: string): Promise<ActionResult> {
+  const userId = await requireAuth();
+  if (!userId) return { success: false, error: "Unauthorized" };
+
+  const invitation = await teamRepo.revokeInvitation(invitationId, userId);
+  if (!invitation) return { success: false, error: "Invitation not found" };
+
+  revalidatePath("/settings/team");
   return { success: true };
 }

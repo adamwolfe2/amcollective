@@ -114,6 +114,40 @@ export const teamAssignments = pgTable(
   ]
 );
 
+export const invitationStatusEnum = pgEnum("invitation_status", [
+  "pending",
+  "accepted",
+  "revoked",
+  "expired",
+]);
+
+export const teamInvitations = pgTable(
+  "team_invitations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    email: varchar("email", { length: 255 }).notNull(),
+    role: teamRoleEnum("role").default("member").notNull(),
+    token: varchar("token", { length: 255 }).notNull().unique(),
+    status: invitationStatusEnum("status").default("pending").notNull(),
+    invitedById: varchar("invited_by_id", { length: 255 }).notNull(),
+    clerkInvitationId: varchar("clerk_invitation_id", { length: 255 }),
+    expiresAt: timestamp("expires_at", { mode: "date" }).notNull(),
+    acceptedAt: timestamp("accepted_at", { mode: "date" }),
+    revokedAt: timestamp("revoked_at", { mode: "date" }),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("team_invitations_email_idx").on(table.email),
+    index("team_invitations_token_idx").on(table.token),
+    index("team_invitations_status_idx").on(table.status),
+    index("team_invitations_created_at_idx").on(table.createdAt),
+  ]
+);
+
 // ─── Relations ──────────────────────────────────────────────────────────────
 
 export const portfolioProjectsRelations = relations(
