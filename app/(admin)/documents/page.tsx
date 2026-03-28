@@ -17,10 +17,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Paperclip, Eye } from "lucide-react";
+import { FileText, Paperclip } from "lucide-react";
 import { UploadDocumentDialog } from "./upload-dialog";
+import { EmptyState } from "@/components/ui/empty-state";
 import { DocumentFilters } from "./document-filters";
 import { DocumentActions } from "./document-actions";
+import { DocumentPreviewTrigger } from "./document-preview";
 import { getStatusBadge, docTypeCategory } from "@/lib/ui/status-colors";
 
 function formatFileSize(bytes: number | null): string {
@@ -72,6 +74,7 @@ export default async function DocumentsPage({
         title: schema.documents.title,
         fileUrl: schema.documents.fileUrl,
         fileName: schema.documents.fileName,
+        fileMimeType: schema.documents.fileMimeType,
         fileSizeBytes: schema.documents.fileSizeBytes,
         docType: schema.documents.docType,
         isClientVisible: schema.documents.isClientVisible,
@@ -114,19 +117,20 @@ export default async function DocumentsPage({
 
       {/* Table */}
       {docs.length === 0 ? (
-        <div className="border border-[#0A0A0A]/10 py-16 text-center">
-          <FileText className="h-8 w-8 mx-auto text-[#0A0A0A]/20 mb-3" />
-          <p className="text-[#0A0A0A]/40 font-serif text-lg">
-            {conditions.length > 0
-              ? "No documents match your filters."
-              : "No documents yet."}
-          </p>
-          <p className="text-[#0A0A0A]/30 font-mono text-xs mt-2">
-            {conditions.length > 0
-              ? "Try different filters."
-              : "Upload your first document to get started."}
-          </p>
-        </div>
+        <EmptyState
+          icon={FileText}
+          title={conditions.length > 0 ? "No documents match your filters" : "No documents uploaded"}
+          description={
+            conditions.length > 0
+              ? "Try different filters to find the documents you are looking for."
+              : "Upload your first document to start sharing files and contracts with clients."
+          }
+          action={
+            conditions.length > 0
+              ? undefined
+              : { label: "Upload document" }
+          }
+        />
       ) : (
         <div className="border border-[#0A0A0A]/10">
           <Table>
@@ -148,9 +152,6 @@ export default async function DocumentsPage({
                   File
                 </TableHead>
                 <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
-                  Visible
-                </TableHead>
-                <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50">
                   Created
                 </TableHead>
                 <TableHead className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/50 w-20" />
@@ -163,9 +164,18 @@ export default async function DocumentsPage({
                   className="border-[#0A0A0A]/10 group"
                 >
                   <TableCell>
-                    <span className="font-serif font-medium text-[#0A0A0A]">
-                      {doc.title}
-                    </span>
+                    {doc.fileUrl ? (
+                      <DocumentPreviewTrigger
+                        title={doc.title}
+                        fileUrl={doc.fileUrl}
+                        mimeType={doc.fileMimeType ?? null}
+                        fileName={doc.fileName ?? null}
+                      />
+                    ) : (
+                      <span className="font-serif font-medium text-[#0A0A0A]">
+                        {doc.title}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell>
                     <Badge
@@ -213,16 +223,15 @@ export default async function DocumentsPage({
                       </span>
                     )}
                   </TableCell>
-                  <TableCell>
-                    {doc.isClientVisible && (
-                      <Eye className="h-3.5 w-3.5 text-[#0A0A0A]/30" />
-                    )}
-                  </TableCell>
                   <TableCell className="text-[#0A0A0A]/40 font-mono text-xs">
                     {format(new Date(doc.createdAt), "MMM d, yyyy")}
                   </TableCell>
                   <TableCell>
-                    <DocumentActions id={doc.id} fileUrl={doc.fileUrl} />
+                    <DocumentActions
+                      id={doc.id}
+                      fileUrl={doc.fileUrl}
+                      isClientVisible={doc.isClientVisible}
+                    />
                   </TableCell>
                 </TableRow>
               ))}

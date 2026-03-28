@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Upload } from "lucide-react";
+import { Upload, X } from "lucide-react";
 
 const DOC_TYPES = [
   { value: "contract", label: "Contract" },
@@ -47,47 +47,99 @@ interface Client {
   name: string;
 }
 
+const ALLOWED_EXTENSIONS = ".pdf, .docx, .xlsx, .png, .jpg";
+const ACCEPT = ".pdf,.docx,.xlsx,.doc,.xls,.png,.jpg,.jpeg,.webp,.mp4,.txt,.md";
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 export function UploadDocumentDialog({ clients }: { clients: Client[] }) {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+
+  function handleFileSelect(file: File) {
+    setSelectedFile(file);
+    setError(null);
+  }
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFileSelect(file);
+  }, []);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    setDragOver(false);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setPending(true);
     setError(null);
+    setProgress(0);
 
     const form = new FormData(e.currentTarget);
+    if (selectedFile) {
+      form.set("file", selectedFile);
+    }
 
     try {
+      // Simulate progress during upload
+      const progressInterval = setInterval(() => {
+        setProgress((p) => (p < 85 ? p + 5 : p));
+      }, 200);
+
       const res = await fetch("/api/documents/upload", {
         method: "POST",
         body: form,
       });
+
+      clearInterval(progressInterval);
+      setProgress(100);
 
       const data = await res.json();
 
       if (!res.ok) {
         setError(data.error || "Upload failed");
         setPending(false);
+        setProgress(0);
         return;
       }
 
-      setOpen(false);
-      setFileName(null);
-      router.refresh();
+      setTimeout(() => {
+        setOpen(false);
+        setSelectedFile(null);
+        setProgress(0);
+        router.refresh();
+      }, 300);
     } catch {
       setError("Upload failed. Please try again.");
+      setProgress(0);
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={(v) => {
+      setOpen(v);
+      if (!v) { setSelectedFile(null); setProgress(0); setError(null); }
+    }}>
       <DialogTrigger asChild>
         <Button className="font-mono text-xs uppercase tracking-wider rounded-none bg-[#0A0A0A] text-white hover:bg-[#0A0A0A]/80 h-9 px-4">
           <Upload className="h-3.5 w-3.5 mr-2" />
@@ -117,8 +169,12 @@ export function UploadDocumentDialog({ clients }: { clients: Client[] }) {
             <Label className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/60">
               File
             </Label>
+            {/* Drag-and-drop zone */}
             <div
               onClick={() => fileRef.current?.click()}
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
               role="button"
               tabIndex={0}
               onKeyDown={(e) => {
@@ -127,27 +183,56 @@ export function UploadDocumentDialog({ clients }: { clients: Client[] }) {
                   fileRef.current?.click();
                 }
               }}
-              className="border border-dashed border-[#0A0A0A]/20 p-6 text-center cursor-pointer hover:border-[#0A0A0A]/40 transition-colors"
+              className={`border border-dashed p-6 text-center cursor-pointer transition-colors ${
+                dragOver
+                  ? "border-[#0A0A0A]/60 bg-[#0A0A0A]/5"
+                  : "border-[#0A0A0A]/20 hover:border-[#0A0A0A]/40"
+              }`}
             >
               <input
                 ref={fileRef}
                 type="file"
                 name="file"
                 className="hidden"
-                accept=".pdf,.docx,.xlsx,.doc,.xls,.png,.jpg,.jpeg,.webp,.mp4,.txt,.md"
+                accept={ACCEPT}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  setFileName(f?.name || null);
+                  if (f) handleFileSelect(f);
                 }}
               />
-              {fileName ? (
-                <p className="font-mono text-sm text-[#0A0A0A]">{fileName}</p>
+              {selectedFile ? (
+                <div className="flex items-center justify-center gap-2">
+                  <span className="font-mono text-sm text-[#0A0A0A]">{selectedFile.name}</span>
+                  <span className="font-mono text-xs text-[#0A0A0A]/40">({formatFileSize(selectedFile.size)})</span>
+                  <button
+                    type="button"
+                    onClick={(ev) => { ev.stopPropagation(); setSelectedFile(null); }}
+                    className="text-[#0A0A0A]/40 hover:text-[#0A0A0A]/70"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               ) : (
-                <p className="font-mono text-xs text-[#0A0A0A]/40">
-                  Click to select a file (max 25MB)
-                </p>
+                <div>
+                  <p className="font-mono text-xs text-[#0A0A0A]/40">
+                    Drag and drop or click to select (max 25MB)
+                  </p>
+                  <p className="font-mono text-[10px] text-[#0A0A0A]/25 mt-1">
+                    Allowed: {ALLOWED_EXTENSIONS}
+                  </p>
+                </div>
               )}
             </div>
+
+            {/* Progress bar */}
+            {pending && (
+              <div className="h-1 bg-[#0A0A0A]/10 w-full">
+                <div
+                  className="h-1 bg-[#0A0A0A] transition-all duration-200"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
