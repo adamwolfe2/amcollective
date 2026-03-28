@@ -24,6 +24,8 @@ import { CreateInvoiceDialog } from "./create-invoice-dialog";
 import { SyncStripeButton } from "./sync-stripe-button";
 import { ExportCsvButton } from "./export-csv-button";
 import { statusBadge, statusText, invoiceStatusCategory } from "@/lib/ui/status-colors";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Receipt } from "lucide-react";
 
 const STATUS_STYLES: Record<string, string> = {
   ...Object.fromEntries(
@@ -206,13 +208,22 @@ export default async function InvoicesPage({
           <TableBody>
             {invoiceRows.length === 0 && (
               <TableRow>
-                <TableCell
-                  colSpan={8}
-                  className="text-center py-12 text-[#0A0A0A]/40 font-serif"
-                >
-                  {status
-                    ? `No ${status} invoices found.`
-                    : "No invoices yet. Create your first invoice to get started."}
+                <TableCell colSpan={8} className="p-0">
+                  <EmptyState
+                    icon={Receipt}
+                    title={status ? `No ${status} invoices found` : "No invoices yet"}
+                    description={
+                      status
+                        ? "Try a different status filter to find the invoices you are looking for."
+                        : "Create your first invoice to start tracking client billing and payments."
+                    }
+                    action={
+                      status
+                        ? undefined
+                        : { label: "Create invoice" }
+                    }
+                    className="border-0"
+                  />
                 </TableCell>
               </TableRow>
             )}

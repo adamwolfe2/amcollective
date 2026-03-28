@@ -16,12 +16,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Empty,
-  EmptyHeader,
-  EmptyTitle,
-  EmptyDescription,
-} from "@/components/ui/empty";
+import { EmptyState } from "@/components/ui/empty-state";
+import { FolderKanban } from "lucide-react";
 import { AddProjectDialog } from "./add-project-dialog";
 import { formatDistanceToNow } from "date-fns";
 import { db } from "@/lib/db";
@@ -161,15 +157,12 @@ export default async function ProjectsPage() {
 
       {/* Table or Empty State */}
       {projects.length === 0 ? (
-        <Empty className="border border-[#0A0A0A]/20 min-h-[300px]">
-          <EmptyHeader>
-            <EmptyTitle className="font-serif">No projects yet</EmptyTitle>
-            <EmptyDescription>
-              Add your first portfolio project to start tracking team
-              assignments, clients, and costs.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
+        <EmptyState
+          icon={FolderKanban}
+          title="No projects"
+          description="Add your first portfolio project to start tracking team assignments, clients, and costs."
+          action={{ label: "Create project" }}
+        />
       ) : (
         <div className="border border-[#0A0A0A]/20">
           <Table>

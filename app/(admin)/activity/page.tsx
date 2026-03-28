@@ -8,6 +8,8 @@ import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { Badge } from "@/components/ui/badge";
 import { LiveActivityFeed } from "./live-activity-feed";
 import { OnlineUsers } from "./online-users";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Activity } from "lucide-react";
 
 const ACTION_COLORS: Record<string, string> = {
   create: "bg-[#0A0A0A] text-white border-transparent",
@@ -45,14 +47,11 @@ export default async function ActivityPage() {
 
       {/* Static Activity Feed */}
       {activity.length === 0 ? (
-        <div className="border border-[#0A0A0A]/10 py-16 text-center">
-          <p className="text-[#0A0A0A]/40 font-serif">
-            No activity recorded yet.
-          </p>
-          <p className="text-[#0A0A0A]/25 font-mono text-xs mt-1">
-            Actions will appear here as you use the system.
-          </p>
-        </div>
+        <EmptyState
+          icon={Activity}
+          title="No activity recorded yet"
+          description="Actions across the platform will appear here as the system is used."
+        />
       ) : (
         <div className="relative">
           {/* Vertical timeline line */}

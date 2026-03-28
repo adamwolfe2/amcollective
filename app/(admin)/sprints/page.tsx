@@ -12,6 +12,8 @@ import { Plus, ChevronRight } from "lucide-react";
 import { SprintDeleteButton } from "./sprint-delete-button";
 import { SprintCalendar } from "./sprint-calendar";
 import { format, isThisWeek } from "date-fns";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Zap } from "lucide-react";
 
 async function getSprints() {
   const [sprints, taskCounts] = await Promise.all([
@@ -110,19 +112,19 @@ export default async function SprintsPage({
       </div>
 
       {sprints.length === 0 ? (
-        <div className="border border-[#0A0A0A]/10 py-20 text-center">
-          <p className="font-serif text-lg text-[#0A0A0A]/40">
-            No sprints yet.
-          </p>
-          <p className="font-mono text-xs text-[#0A0A0A]/30 mt-2">
-            Create your first weekly sprint to get started.
-          </p>
-          <form action={createSprint} className="mt-6">
+        <div className="flex flex-col items-center">
+          <EmptyState
+            icon={Zap}
+            title="No sprints"
+            description="Create your first weekly sprint to start planning and tracking your operating cadence."
+            className="w-full"
+          />
+          <form action={createSprint} className="mt-4">
             <button
               type="submit"
-              className="px-5 py-2.5 bg-[#0A0A0A] text-white font-mono text-xs"
+              className="px-5 py-2.5 bg-[#0A0A0A] text-white font-mono text-xs hover:bg-[#0A0A0A]/80 transition-colors"
             >
-              Create 3/1 Week Sprint
+              Create sprint
             </button>
           </form>
         </div>

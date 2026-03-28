@@ -7,6 +7,8 @@ export const metadata: Metadata = {
 };
 import { Badge } from "@/components/ui/badge";
 import { statusBadge, meetingStatusCategory } from "@/lib/ui/status-colors";
+import { EmptyState } from "@/components/ui/empty-state";
+import { CalendarDays } from "lucide-react";
 
 const statusStyles: Record<string, string> = Object.fromEntries(
   Object.entries(meetingStatusCategory).map(([k, v]) => [k, statusBadge[v]])
@@ -38,14 +40,12 @@ export default async function MeetingsPage() {
 
       {/* Empty state */}
       {meetings.length === 0 ? (
-        <div className="border border-[#0A0A0A]/10 py-16 text-center">
-          <p className="text-[#0A0A0A]/40 font-serif text-lg">
-            No meetings yet.
-          </p>
-          <p className="text-[#0A0A0A]/30 font-mono text-xs mt-2">
-            L10 meetings are your weekly EOS leadership sync — agenda, issues, action items, and a 1-10 rating. Create one to start tracking.
-          </p>
-        </div>
+        <EmptyState
+          icon={CalendarDays}
+          title="No meetings scheduled"
+          description="L10 meetings are your weekly EOS leadership sync — agenda, issues, action items, and a 1-10 rating. Schedule one to start tracking."
+          action={{ label: "Schedule meeting" }}
+        />
       ) : (
         /* Meeting card feed */
         <div className="flex flex-col gap-3">

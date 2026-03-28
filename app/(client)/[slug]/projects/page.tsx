@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { getClientByClerkId, getClientProjects } from "@/lib/db/repositories/clients";
 import { getProject } from "@/lib/db/repositories/projects";
 import { Badge } from "@/components/ui/badge";
+import { FolderKanban } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 
 export default async function ClientProjectsPage() {
   const { userId } = await auth();
@@ -51,14 +53,11 @@ export default async function ClientProjectsPage() {
 
       {/* Projects */}
       {projectsWithDetails.length === 0 ? (
-        <div className="border border-[#0A0A0A]/10 py-16 text-center">
-          <p className="text-[#0A0A0A]/40 font-serif text-lg">
-            No projects yet.
-          </p>
-          <p className="text-[#0A0A0A]/25 font-mono text-xs mt-2">
-            Projects assigned to your account will appear here.
-          </p>
-        </div>
+        <EmptyState
+          icon={FolderKanban}
+          title="No projects yet"
+          description="Projects assigned to your account by AM Collective will appear here."
+        />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
           {projectsWithDetails.map(({ link, project }) => (

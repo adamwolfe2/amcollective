@@ -16,6 +16,8 @@ import { LeadActions } from "./lead-actions";
 import { NewLeadForm } from "./new-lead-form";
 import { LeadKanban } from "./lead-kanban";
 import { statusBadge, statusText, leadStageCategory } from "@/lib/ui/status-colors";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Crosshair } from "lucide-react";
 
 const STAGE_LABELS: Record<string, string> = {
   awareness: "Awareness",
@@ -249,11 +251,14 @@ export default async function LeadsPage() {
             })}
             {leads.length === 0 && (
               <tr>
-                <td
-                  colSpan={7}
-                  className="px-4 py-12 text-center font-mono text-sm text-[#0A0A0A]/40"
-                >
-                  No leads yet. Create your first lead to get started.
+                <td colSpan={7} className="px-0 py-0">
+                  <EmptyState
+                    icon={Crosshair}
+                    title="No leads in pipeline"
+                    description="Add your first lead to start tracking prospects from awareness through to closed won."
+                    action={{ label: "Add a lead" }}
+                    className="border-0"
+                  />
                 </td>
               </tr>
             )}

@@ -18,6 +18,8 @@ import { ClientSearch } from "./client-search";
 import { ClientFilter } from "./client-filter";
 import { AddClientDialog } from "./add-client-dialog";
 import { captureError } from "@/lib/errors";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Users, UserPlus } from "lucide-react";
 
 const getCachedClientCount = unstable_cache(
   () => clientsRepo.getClientCount(),
@@ -116,18 +118,20 @@ export default async function ClientsPage({
 
       {/* Table */}
       {clientsList.length === 0 ? (
-        <div className="border border-[#0A0A0A]/10 py-16 text-center">
-          <p className="text-[#0A0A0A]/40 font-serif text-lg">
-            {search || filter !== "all"
-              ? "No clients match your filters."
-              : "No clients yet."}
-          </p>
-          <p className="text-[#0A0A0A]/30 font-mono text-xs mt-2">
-            {search || filter !== "all"
-              ? "Try a different search or filter."
-              : "Add your first client to get started."}
-          </p>
-        </div>
+        <EmptyState
+          icon={search || filter !== "all" ? Users : UserPlus}
+          title={search || filter !== "all" ? "No clients match your filters" : "No clients yet"}
+          description={
+            search || filter !== "all"
+              ? "Try a different search or filter to find what you are looking for."
+              : "Add your first client to start tracking revenue, invoices, and portal access."
+          }
+          action={
+            search || filter !== "all"
+              ? undefined
+              : { label: "Add your first client", href: "/clients" }
+          }
+        />
       ) : (
         <div className="border border-[#0A0A0A]/10 overflow-x-auto">
           <Table>

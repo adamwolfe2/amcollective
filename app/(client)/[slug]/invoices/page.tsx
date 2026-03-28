@@ -5,7 +5,8 @@ import { redirect } from "next/navigation";
 import { getClientByClerkId } from "@/lib/db/repositories/clients";
 import { getClientInvoices } from "@/lib/db/repositories/invoices";
 import { Badge } from "@/components/ui/badge";
-import { Download } from "lucide-react";
+import { Download, Receipt } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   Table,
   TableBody,
@@ -63,14 +64,11 @@ export default async function ClientInvoicesPage({
 
       {/* Table */}
       {invoices.length === 0 ? (
-        <div className="border border-[#0A0A0A]/10 py-16 text-center">
-          <p className="text-[#0A0A0A]/40 font-serif text-lg">
-            No invoices yet.
-          </p>
-          <p className="text-[#0A0A0A]/25 font-mono text-xs mt-2">
-            Invoices from AM Collective will appear here.
-          </p>
-        </div>
+        <EmptyState
+          icon={Receipt}
+          title="No invoices yet"
+          description="Invoices from AM Collective will appear here once they have been issued."
+        />
       ) : (
         <div className="border border-[#0A0A0A]/10 overflow-x-auto">
           <Table>

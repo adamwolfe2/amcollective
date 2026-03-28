@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
+import { ListTodo } from "lucide-react";
 import { CreateTaskDialog } from "./create-task-dialog";
 import { statusBadge, statusText, taskPriorityCategory } from "@/lib/ui/status-colors";
 
@@ -291,11 +292,16 @@ export function TaskBoard({ initialTasks, teamMembers, projects, stats }: Props)
               ))}
               {initialTasks.length === 0 && (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="text-center py-12 text-[#0A0A0A]/40 font-serif"
-                  >
-                    No tasks yet. Create your first task to get started.
+                  <td colSpan={6} className="p-0">
+                    <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+                      <div className="w-12 h-12 border border-[#0A0A0A]/20 flex items-center justify-center mb-4">
+                        <ListTodo className="h-5 w-5 text-[#0A0A0A]/30" strokeWidth={1.5} />
+                      </div>
+                      <p className="font-serif text-lg font-bold text-[#0A0A0A] mb-1">No tasks</p>
+                      <p className="font-mono text-xs text-[#0A0A0A]/40 max-w-sm">
+                        Create your first task to start tracking work across projects and team members.
+                      </p>
+                    </div>
                   </td>
                 </tr>
               )}

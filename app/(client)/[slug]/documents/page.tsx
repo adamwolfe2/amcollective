@@ -7,6 +7,7 @@ import * as schema from "@/lib/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
 import { FileText, Paperclip, Download } from "lucide-react";
+import { EmptyState } from "@/components/ui/empty-state";
 
 function formatFileSize(bytes: number | null): string {
   if (!bytes) return "";
@@ -77,15 +78,11 @@ export default async function ClientDocumentsPage() {
 
       {/* Document List */}
       {docs.length === 0 ? (
-        <div className="border border-[#0A0A0A]/10 py-16 text-center">
-          <FileText className="h-8 w-8 mx-auto text-[#0A0A0A]/20 mb-3" />
-          <p className="text-[#0A0A0A]/40 font-serif text-lg">
-            No documents shared yet
-          </p>
-          <p className="text-[#0A0A0A]/30 font-mono text-xs mt-2">
-            Documents shared by your team will appear here.
-          </p>
-        </div>
+        <EmptyState
+          icon={FileText}
+          title="No documents shared with you yet"
+          description="Files and documents shared by your AM Collective team will appear here."
+        />
       ) : (
         <div className="space-y-2">
           {docs.map((doc) => (

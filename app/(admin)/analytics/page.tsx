@@ -17,6 +17,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { SyncButton } from "./sync-button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LineChart } from "lucide-react";
+import { SectionError } from "@/components/ui/section-error";
 import dynamic from "next/dynamic";
 const AnalyticsCharts = dynamic(
   () => import("./analytics-charts").then((mod) => mod.AnalyticsCharts)
@@ -202,11 +205,13 @@ export default async function AnalyticsPage() {
           </div>
         </div>
       ) : (
-        <div className="border border-dashed border-[#0A0A0A]/20 p-8 text-center mb-8">
-          <p className="font-serif text-[#0A0A0A]/40">
-            No analytics data yet. Configure PostHog for your projects to start
-            tracking.
-          </p>
+        <div className="mb-8">
+          <EmptyState
+            icon={LineChart}
+            title="No data available yet — connect your integrations"
+            description="Configure PostHog project IDs and API keys on your portfolio projects to start collecting analytics data."
+            action={{ label: "Go to Projects", href: "/projects" }}
+          />
         </div>
       )}
 
@@ -215,7 +220,9 @@ export default async function AnalyticsPage() {
         <h2 className="font-mono text-xs uppercase tracking-wider text-[#0A0A0A]/40 mb-3">
           Business Analytics
         </h2>
-        <AnalyticsCharts />
+        <SectionError name="Business Analytics">
+          <AnalyticsCharts />
+        </SectionError>
       </div>
 
       {/* Configuration status */}
