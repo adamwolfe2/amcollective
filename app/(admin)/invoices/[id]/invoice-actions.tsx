@@ -21,7 +21,7 @@ import { format } from "date-fns";
 
 export function InvoiceActions({
   invoiceId,
-  status,
+  status: initialStatus,
   paymentLinkUrl,
   clientEmail,
   amount,
@@ -37,6 +37,8 @@ export function InvoiceActions({
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showSendDialog, setShowSendDialog] = useState(false);
+  // Optimistic local status — updates immediately before server confirms
+  const [status, setStatus] = useState(initialStatus);
   const router = useRouter();
 
   function formatCents(cents: number): string {
@@ -49,24 +51,34 @@ export function InvoiceActions({
   async function handleSend() {
     setLoading(true);
     setShowSendDialog(false);
+    // Optimistic: immediately show as sent
+    const prevStatus = status;
+    setStatus("sent");
     const result = await sendInvoiceAction(invoiceId);
     setLoading(false);
     if (result.success) {
-      toast.success(status === "draft" ? "Invoice sent." : "Invoice resent.");
+      toast.success(prevStatus === "draft" ? "Invoice sent." : "Invoice resent.");
       router.refresh();
     } else {
+      // Revert on failure
+      setStatus(prevStatus);
       toast.error(result.error || "Failed to send invoice.");
     }
   }
 
   async function handleMarkPaid() {
     setLoading(true);
+    // Optimistic: immediately show as paid
+    const prevStatus = status;
+    setStatus("paid");
     const result = await markPaid(invoiceId);
     setLoading(false);
     if (result.success) {
       toast.success("Marked as paid.");
       router.refresh();
     } else {
+      // Revert on failure
+      setStatus(prevStatus);
       toast.error("Failed to update invoice.");
     }
   }

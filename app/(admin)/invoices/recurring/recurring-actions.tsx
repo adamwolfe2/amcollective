@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pause, Play, X } from "lucide-react";
+import { Pause, Play, X, Zap } from "lucide-react";
+import { toast } from "sonner";
 
 export function RecurringActions({
   id,
@@ -13,6 +14,7 @@ export function RecurringActions({
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   async function handleAction(action: "pause" | "resume" | "cancel") {
     setLoading(true);
@@ -22,10 +24,34 @@ export function RecurringActions({
           ? `/api/recurring/${id}`
           : `/api/recurring/${id}/${action}`;
       const method = action === "cancel" ? "DELETE" : "POST";
-      await fetch(url, { method });
-      router.refresh();
+      const res = await fetch(url, { method });
+      if (res.ok) {
+        router.refresh();
+      } else {
+        toast.error("Action failed. Please try again.");
+      }
+    } catch {
+      toast.error("Network error. Please try again.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleGenerateNow() {
+    setGenerating(true);
+    try {
+      const res = await fetch(`/api/recurring/${id}/generate`, { method: "POST" });
+      if (res.ok) {
+        toast.success("Invoice generated successfully.");
+        router.refresh();
+      } else {
+        const body = await res.json().catch(() => ({}));
+        toast.error(body.error ?? "Failed to generate invoice.");
+      }
+    } catch {
+      toast.error("Network error. Please try again.");
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -33,8 +59,18 @@ export function RecurringActions({
     <div className="flex items-center gap-1">
       {status === "active" && (
         <button
+          onClick={handleGenerateNow}
+          disabled={generating || loading}
+          className="p-1.5 border border-[#0A0A0A]/20 hover:bg-[#0A0A0A]/5 disabled:opacity-50"
+          title="Generate invoice now"
+        >
+          <Zap className="h-3 w-3" />
+        </button>
+      )}
+      {status === "active" && (
+        <button
           onClick={() => handleAction("pause")}
-          disabled={loading}
+          disabled={loading || generating}
           className="p-1.5 border border-[#0A0A0A]/20 hover:bg-[#0A0A0A]/5 disabled:opacity-50"
           title="Pause"
         >
@@ -44,7 +80,7 @@ export function RecurringActions({
       {status === "paused" && (
         <button
           onClick={() => handleAction("resume")}
-          disabled={loading}
+          disabled={loading || generating}
           className="p-1.5 border border-[#0A0A0A]/20 hover:bg-[#0A0A0A]/5 disabled:opacity-50"
           title="Resume"
         >
@@ -58,7 +94,7 @@ export function RecurringActions({
               handleAction("cancel");
             }
           }}
-          disabled={loading}
+          disabled={loading || generating}
           className="p-1.5 border border-[#0A0A0A]/20 hover:bg-[#0A0A0A]/5 hover:border-[#0A0A0A]/30 disabled:opacity-50"
           title="Cancel"
         >
