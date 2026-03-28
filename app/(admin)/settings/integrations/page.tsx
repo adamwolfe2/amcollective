@@ -176,6 +176,7 @@ export default async function IntegrationsPage() {
           status: schema.syncRuns.status,
           startedAt: schema.syncRuns.startedAt,
           recordsProcessed: schema.syncRuns.recordsProcessed,
+          errorMessage: schema.syncRuns.errorMessage,
         })
         .from(schema.syncRuns)
         .orderBy(schema.syncRuns.service, desc(schema.syncRuns.startedAt)),
@@ -215,10 +216,18 @@ export default async function IntegrationsPage() {
         .orderBy(desc(schema.mercuryAccounts.createdAt)),
     ]);
 
-  const syncByService: Record<string, { status: string; startedAt: Date; recordsProcessed: number | null }> = {};
+  const syncByService: Record<
+    string,
+    { status: string; startedAt: Date; recordsProcessed: number | null; errorMessage: string | null }
+  > = {};
   if (latestRunsResult.status === "fulfilled") {
     for (const run of latestRunsResult.value) {
-      syncByService[run.service] = { status: run.status, startedAt: run.startedAt, recordsProcessed: run.recordsProcessed };
+      syncByService[run.service] = {
+        status: run.status,
+        startedAt: run.startedAt,
+        recordsProcessed: run.recordsProcessed,
+        errorMessage: run.errorMessage ?? null,
+      };
     }
   }
 
@@ -391,6 +400,7 @@ export default async function IntegrationsPage() {
                       status: lastSync.status,
                       startedAt: lastSync.startedAt.toISOString(),
                       recordsProcessed: lastSync.recordsProcessed,
+                      errorMessage: lastSync.errorMessage,
                     }
                   : null
               }
