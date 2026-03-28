@@ -25,6 +25,9 @@ import {
   Search,
   Receipt,
   Sparkles,
+  DollarSign,
+  Zap,
+  FilePlus,
 } from "lucide-react";
 
 const PAGES = [
@@ -38,7 +41,11 @@ const PAGES = [
 ];
 
 const ACTIONS = [
-  { label: "New Client", url: "/clients", icon: UserPlus },
+  { label: "New Client", url: "/clients?new=1", icon: UserPlus },
+  { label: "New Invoice", url: "/invoices/new", icon: FilePlus },
+  { label: "New Lead", url: "/leads?new=1", icon: UserPlus },
+  { label: "Go to Dashboard", url: "/dashboard", icon: LayoutDashboard },
+  { label: "Go to Costs", url: "/costs", icon: DollarSign },
   { label: "Upload Document", url: "/documents", icon: Upload },
   { label: "Sync Mercury", url: "/api/admin/mercury-sync", icon: RefreshCw, isAction: true },
 ];
@@ -124,6 +131,10 @@ export function CommandPalette() {
         return <FolderKanban className="h-4 w-4 text-[#0A0A0A]/40" />;
       case "invoice":
         return <Receipt className="h-4 w-4 text-[#0A0A0A]/40" />;
+      case "lead":
+        return <TrendingUp className="h-4 w-4 text-[#0A0A0A]/40" />;
+      case "sprint":
+        return <Zap className="h-4 w-4 text-[#0A0A0A]/40" />;
       case "semantic":
         return <Sparkles className="h-4 w-4 text-[#0A0A0A]/40" />;
       default:

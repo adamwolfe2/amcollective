@@ -21,7 +21,7 @@ const TRGM_THRESHOLD = 0.15; // Minimum trigram similarity score
 
 interface SearchResult {
   id: string;
-  type: "client" | "document" | "card" | "project" | "invoice" | "semantic";
+  type: "client" | "document" | "card" | "project" | "invoice" | "lead" | "sprint" | "semantic";
   title: string;
   subtitle?: string;
   url: string;
@@ -62,6 +62,8 @@ export async function GET(req: NextRequest) {
       searchCards(q, pattern, useTrgm),
       searchProjects(q, pattern, useTrgm),
       searchInvoices(q, pattern, useTrgm),
+      searchLeads(q, pattern, useTrgm),
+      searchSprints(q, pattern, useTrgm),
     ];
 
     // Optional semantic search
@@ -404,6 +406,130 @@ async function searchInvoices(
     title: i.number ?? `INV-${i.id.slice(0, 8)}`,
     subtitle: `${i.clientName ?? "Unknown"} — $${(i.amount / 100).toFixed(0)} (${i.status})`,
     url: `/invoices/${i.id}`,
+    score: 0.5,
+  }));
+}
+
+async function searchLeads(
+  q: string,
+  pattern: string,
+  useTrgm: boolean
+): Promise<SearchResult[]> {
+  if (useTrgm) {
+    const results = await db
+      .select({
+        id: schema.leads.id,
+        contactName: schema.leads.contactName,
+        companyName: schema.leads.companyName,
+        stage: schema.leads.stage,
+        score: sql<number>`GREATEST(
+          similarity(${schema.leads.contactName}, ${q}),
+          similarity(COALESCE(${schema.leads.companyName}, ''), ${q})
+        )`.as("score"),
+      })
+      .from(schema.leads)
+      .where(
+        sql`GREATEST(
+          similarity(${schema.leads.contactName}, ${q}),
+          similarity(COALESCE(${schema.leads.companyName}, ''), ${q})
+        ) > ${TRGM_THRESHOLD}`
+      )
+      .orderBy(sql`score DESC`)
+      .limit(5);
+
+    return results.map((l) => ({
+      id: l.id,
+      type: "lead",
+      title: l.contactName,
+      subtitle: l.companyName ? `${l.companyName} — ${l.stage}` : l.stage,
+      url: `/leads/${l.id}`,
+      score: l.score,
+    }));
+  }
+
+  const results = await db
+    .select({
+      id: schema.leads.id,
+      contactName: schema.leads.contactName,
+      companyName: schema.leads.companyName,
+      stage: schema.leads.stage,
+    })
+    .from(schema.leads)
+    .where(
+      or(
+        ilike(schema.leads.contactName, pattern),
+        ilike(schema.leads.companyName, pattern)
+      )
+    )
+    .limit(5);
+
+  return results.map((l) => ({
+    id: l.id,
+    type: "lead",
+    title: l.contactName,
+    subtitle: l.companyName ? `${l.companyName} — ${l.stage}` : l.stage,
+    url: `/leads/${l.id}`,
+    score: 0.5,
+  }));
+}
+
+async function searchSprints(
+  q: string,
+  pattern: string,
+  useTrgm: boolean
+): Promise<SearchResult[]> {
+  if (useTrgm) {
+    const results = await db
+      .select({
+        id: schema.weeklySprints.id,
+        title: schema.weeklySprints.title,
+        weeklyFocus: schema.weeklySprints.weeklyFocus,
+        score: sql<number>`GREATEST(
+          similarity(${schema.weeklySprints.title}, ${q}),
+          similarity(COALESCE(${schema.weeklySprints.weeklyFocus}, ''), ${q})
+        )`.as("score"),
+      })
+      .from(schema.weeklySprints)
+      .where(
+        sql`GREATEST(
+          similarity(${schema.weeklySprints.title}, ${q}),
+          similarity(COALESCE(${schema.weeklySprints.weeklyFocus}, ''), ${q})
+        ) > ${TRGM_THRESHOLD}`
+      )
+      .orderBy(sql`score DESC`)
+      .limit(5);
+
+    return results.map((s) => ({
+      id: s.id,
+      type: "sprint",
+      title: s.title,
+      subtitle: s.weeklyFocus ?? undefined,
+      url: `/sprints/${s.id}`,
+      score: s.score,
+    }));
+  }
+
+  const results = await db
+    .select({
+      id: schema.weeklySprints.id,
+      title: schema.weeklySprints.title,
+      weeklyFocus: schema.weeklySprints.weeklyFocus,
+    })
+    .from(schema.weeklySprints)
+    .where(
+      or(
+        ilike(schema.weeklySprints.title, pattern),
+        ilike(schema.weeklySprints.weeklyFocus, pattern)
+      )
+    )
+    .limit(5);
+
+  return results.map((s) => ({
+    id: s.id,
+    type: "sprint",
+    title: s.title,
+    subtitle: s.weeklyFocus ?? undefined,
+    url: `/sprints/${s.id}`,
     score: 0.5,
   }));
 }
