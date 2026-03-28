@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { UserButton } from "@clerk/nextjs";
+import { motion, AnimatePresence } from "framer-motion";
+import { PageTransition } from "@/components/PageTransition";
 import {
   LayoutDashboard,
   TrendingUp,
@@ -252,41 +254,52 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
               )}
             </button>
 
-            {/* Children with tree-line connector */}
-            {open && item.children && (
-              <div className="ml-[23px] border-l border-white/10">
-                {item.children.map((child, idx) => {
-                  const childActive = isActive(pathname, child.href);
-                  const isLast = idx === item.children!.length - 1;
+            {/* Children with tree-line connector — animated expand/collapse */}
+            <AnimatePresence initial={false}>
+              {open && item.children && (
+                <motion.div
+                  key="submenu"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  style={{ overflow: "hidden" }}
+                >
+                  <div className="ml-[23px] border-l border-white/10">
+                    {item.children.map((child, idx) => {
+                      const childActive = isActive(pathname, child.href);
+                      const isLast = idx === item.children!.length - 1;
 
-                  return (
-                    <div key={child.href} className="relative">
-                      {/* Horizontal branch line */}
-                      <div
-                        className={`absolute left-0 top-1/2 w-3 border-t border-white/10 ${
-                          isLast ? "border-l-0" : ""
-                        }`}
-                      />
-                      {/* Hide vertical line below last item */}
-                      {isLast && (
-                        <div className="absolute left-[-1px] top-1/2 bottom-0 w-[1px] bg-[#0A0A0A]" />
-                      )}
-                      <Link
-                        href={child.href}
-                        onClick={onNavigate}
-                        className={`block pl-5 pr-3 py-1.5 text-sm transition-colors ${
-                          childActive
-                            ? "text-white bg-white/10"
-                            : "text-white/40 hover:text-white/70 hover:bg-white/[0.04]"
-                        }`}
-                      >
-                        {child.label}
-                      </Link>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                      return (
+                        <div key={child.href} className="relative">
+                          {/* Horizontal branch line */}
+                          <div
+                            className={`absolute left-0 top-1/2 w-3 border-t border-white/10 ${
+                              isLast ? "border-l-0" : ""
+                            }`}
+                          />
+                          {/* Hide vertical line below last item */}
+                          {isLast && (
+                            <div className="absolute left-[-1px] top-1/2 bottom-0 w-[1px] bg-[#0A0A0A]" />
+                          )}
+                          <Link
+                            href={child.href}
+                            onClick={onNavigate}
+                            className={`block pl-5 pr-3 py-1.5 text-sm transition-colors ${
+                              childActive
+                                ? "text-white bg-white/10"
+                                : "text-white/40 hover:text-white/70 hover:bg-white/[0.04]"
+                            }`}
+                          >
+                            {child.label}
+                          </Link>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         );
       })}
@@ -391,7 +404,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             />
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-8 bg-[#F3F3EF] min-h-0">{children}</main>
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 pb-8 bg-[#F3F3EF] min-h-0">
+          <PageTransition>{children}</PageTransition>
+        </main>
       </div>
     </div>
   );

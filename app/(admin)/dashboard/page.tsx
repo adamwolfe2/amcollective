@@ -31,7 +31,6 @@ import {
   Crosshair,
   ListTodo,
   TrendingUp,
-  TrendingDown,
   LineChart,
   Send,
   FileCheck,
@@ -50,6 +49,7 @@ import {
 } from "@/components/dashboard/DashboardSkeletons";
 import { captureError } from "@/lib/errors";
 import { SetupChecklist } from "@/components/dashboard/SetupChecklist";
+import { MetricPillClient } from "@/components/dashboard/MetricPillClient";
 
 // ─── Cached data fetchers ───────────────────────────────────────────────────
 
@@ -394,29 +394,31 @@ async function MetricsStrip() {
 
     return (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <MetricPill
+        <MetricPillClient
           label="MRR"
-          value={formatCurrency(mrrData.mrr)}
+          numericValue={mrrData.mrr}
           sub={`${mrrData.activeSubs} subs`}
           href="/finance"
           trend={mrrDelta}
+          isCurrency={true}
         />
-        <MetricPill
+        <MetricPillClient
           label="Cash"
-          value={formatCurrency(totalCash)}
+          numericValue={totalCash}
           sub="total balance"
           href="/finance"
           trend={cashDelta}
+          isCurrency={true}
         />
-        <MetricPill
+        <MetricPillClient
           label="Active Projects"
-          value={String(activeProjects)}
+          numericValue={activeProjects}
           sub="products live"
           href="/products"
         />
-        <MetricPill
+        <MetricPillClient
           label="Active Clients"
-          value={String(activeClients)}
+          numericValue={activeClients}
           sub="open engagements"
           href="/clients"
         />
@@ -755,67 +757,6 @@ export default async function DashboardPage() {
 }
 
 // ─── Components ──────────────────────────────────────────────────────────────
-
-function MetricPill({
-  label,
-  value,
-  sub,
-  href,
-  alert = false,
-  trend,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  href: string;
-  alert?: boolean;
-  /** 7-day delta as a percentage (positive = up, negative = down, null = no data) */
-  trend?: number | null;
-}) {
-  const trendPositive = trend !== null && trend !== undefined && trend > 0;
-  const trendNegative = trend !== null && trend !== undefined && trend < 0;
-
-  return (
-    <Link
-      href={href}
-      className={`block border bg-white px-3 py-2.5 hover:bg-[#0A0A0A]/[0.02] transition-colors ${
-        alert
-          ? "border-[#0A0A0A]/30 border-l-2 border-l-[#0A0A0A]"
-          : "border-[#0A0A0A]/10"
-      }`}
-    >
-      <div className="flex items-center justify-between gap-1">
-        <span className="font-mono text-[9px] uppercase tracking-wider text-[#0A0A0A]/40">
-          {label}
-        </span>
-        {trend !== null && trend !== undefined && (
-          <span
-            className={`flex items-center gap-0.5 font-mono text-[9px] shrink-0 ${
-              trendPositive
-                ? "text-[#0A0A0A]/60"
-                : trendNegative
-                  ? "text-[#0A0A0A]/40"
-                  : "text-[#0A0A0A]/30"
-            }`}
-          >
-            {trendPositive ? (
-              <TrendingUp size={8} />
-            ) : trendNegative ? (
-              <TrendingDown size={8} />
-            ) : null}
-            {Math.abs(trend).toFixed(1)}%
-          </span>
-        )}
-      </div>
-      <span className="font-mono text-base sm:text-lg font-bold block leading-tight truncate">{value}</span>
-      {sub && (
-        <span className="font-mono text-[9px] text-[#0A0A0A]/40 block mt-0.5">
-          {sub}
-        </span>
-      )}
-    </Link>
-  );
-}
 
 function QuickLink({
   href,

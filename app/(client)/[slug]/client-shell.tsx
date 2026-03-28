@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useParams } from "next/navigation";
+import { PageTransition } from "@/components/PageTransition";
 import { useState } from "react";
 import { UserButton } from "@clerk/nextjs";
 import {
@@ -17,6 +18,15 @@ import {
   Menu,
   X,
 } from "lucide-react";
+
+// Bottom tab bar items — 5 primary destinations shown on mobile
+const BOTTOM_TAB_SUFFIXES = [
+  { label: "Dashboard", suffix: "dashboard", icon: LayoutDashboard },
+  { label: "Invoices", suffix: "invoices", icon: Receipt },
+  { label: "Projects", suffix: "projects", icon: FolderKanban },
+  { label: "Docs", suffix: "documents", icon: FileText },
+  { label: "Messages", suffix: "messages", icon: MessageSquare },
+] as const;
 
 function useClientNav() {
   const { slug } = useParams<{ slug: string }>();
@@ -62,6 +72,37 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+function BottomTabBar() {
+  const pathname = usePathname();
+  const { slug } = useParams<{ slug: string }>();
+
+  return (
+    <nav className="fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[#0A0A0A]/10 md:hidden safe-area-bottom">
+      <div className="flex items-stretch">
+        {BOTTOM_TAB_SUFFIXES.map(({ label, suffix, icon: Icon }) => {
+          const href = `/${slug}/${suffix}`;
+          const isActive = pathname === href || pathname.startsWith(href + "/");
+
+          return (
+            <Link
+              key={suffix}
+              href={href}
+              className={`flex-1 flex flex-col items-center justify-center gap-1 py-2 text-[10px] font-mono transition-colors ${
+                isActive
+                  ? "text-[#0A0A0A]"
+                  : "text-[#0A0A0A]/40 hover:text-[#0A0A0A]/70"
+              }`}
+            >
+              <Icon className={`h-5 w-5 ${isActive ? "stroke-[2]" : "stroke-[1.5]"}`} />
+              <span className="tracking-wide uppercase">{label}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
 export function ClientShell({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -83,7 +124,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         <SidebarNav />
       </aside>
 
-      {/* Mobile Sidebar Overlay */}
+      {/* Mobile Sidebar Overlay (for full nav access beyond bottom tabs) */}
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 bg-[#0A0A0A]/40 md:hidden"
@@ -91,7 +132,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Mobile Sidebar */}
+      {/* Mobile Sidebar — slide-in for full nav */}
       <aside
         className={`fixed inset-y-0 left-0 z-50 w-60 bg-[#F3F3EF] p-5 flex flex-col overflow-y-auto transition-transform duration-200 md:hidden border-r border-[#0A0A0A]/10 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
@@ -118,9 +159,11 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       <div className="flex-1 flex flex-col min-w-0">
         <header className="border-b border-[#0A0A0A]/10 px-4 md:px-6 py-3 flex items-center justify-between bg-white">
           <div className="flex items-center gap-3">
+            {/* Hamburger only shown on mobile to access full nav */}
             <button
               onClick={() => setMobileOpen(true)}
               className="md:hidden p-1.5 text-[#0A0A0A]/60 hover:text-[#0A0A0A]"
+              aria-label="Open full navigation"
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -138,8 +181,14 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
             />
           </div>
         </header>
-        <main className="flex-1 p-4 md:p-6 bg-white">{children}</main>
+        {/* Extra bottom padding on mobile to clear the fixed tab bar */}
+        <main className="flex-1 p-4 md:p-6 pb-20 md:pb-6 bg-white">
+          <PageTransition>{children}</PageTransition>
+        </main>
       </div>
+
+      {/* Mobile bottom tab bar */}
+      <BottomTabBar />
     </div>
   );
 }

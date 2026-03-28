@@ -65,7 +65,13 @@ export function DauChart({ data }: DauChartProps) {
           }}
         />
         <Legend wrapperStyle={{ fontSize: 10, fontFamily: "var(--font-geist-mono)" }} />
-        <Bar dataKey="dau" name="DAU" />
+        <Bar
+          dataKey="dau"
+          name="DAU"
+          isAnimationActive={true}
+          animationDuration={600}
+          animationEasing="ease-out"
+        />
       </BarChart>
     </ResponsiveContainer>
   );

@@ -67,12 +67,18 @@ export function CashFlowMiniChart({ data }: CashFlowMiniChartProps) {
           dataKey="credits"
           fill="rgba(16, 185, 129, 0.4)"
           name="Credits"
+          isAnimationActive={true}
+          animationDuration={600}
+          animationEasing="ease-out"
         />
         <Bar
           yAxisId="bars"
           dataKey="debits"
           fill="rgba(239, 68, 68, 0.3)"
           name="Debits"
+          isAnimationActive={true}
+          animationDuration={600}
+          animationEasing="ease-out"
         />
         <Line
           yAxisId="line"
@@ -82,6 +88,9 @@ export function CashFlowMiniChart({ data }: CashFlowMiniChartProps) {
           strokeWidth={1.5}
           dot={false}
           name="Balance"
+          isAnimationActive={true}
+          animationDuration={800}
+          animationEasing="ease-out"
         />
       </ComposedChart>
     </ResponsiveContainer>

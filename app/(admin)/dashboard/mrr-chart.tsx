@@ -61,6 +61,9 @@ export function MrrChart({ data }: MrrChartProps) {
           stroke="#0A0A0A"
           strokeWidth={2}
           fill="url(#mrrGrad)"
+          isAnimationActive={true}
+          animationDuration={800}
+          animationEasing="ease-out"
         />
       </AreaChart>
     </ResponsiveContainer>
