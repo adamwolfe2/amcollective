@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import {
   motion,
   useScroll,
@@ -15,68 +15,40 @@ import {
 import Image from "next/image";
 import { PROJECTS, type Project } from "@/content/projects";
 
-// ── Logo images for orbit (NOT the social screenshots) ───────
-const ORBIT_LOGOS: Record<string, string> = {
-  Cursive: "/logos/cursive.png",
-  TaskSpace: "/logos/taskspace.png",
-  WholeSail: "/logos/wholesail.png",
-  MyVSL: "/logos/myvsl.png",
-  Trackr: "/logos/trackr.jpg",
-  CampusGTM: "/CampusGTM Logo.png", // no clean logo in /logos/
-  Hook: "/logos/hook.png",
-};
+// ── Config ───────────────────────────────────────────────────────
+const INTRO_REVOLUTIONS = 2.5;   // fast clockwise spins on load
+const INTRO_DURATION    = 1.9;   // seconds for intro spin
+const IDLE_DURATION     = 85;    // seconds per slow idle revolution
+const SCROLL_REVOLUTIONS = 3.0;  // total rotations over full scroll range
+const TILT_AMOUNT       = 4;     // degrees of mouse-driven tilt
 
-// ── Tuning knobs ─────────────────────────────────────────────
-const IDLE_DURATION = 120; // seconds for one full idle revolution
-const SCROLL_REVOLUTIONS = 2.5; // full rotations across the sticky scroll range
-const DEPTH_SCALE_MIN = 0.45; // scale at back
-const DEPTH_SCALE_MAX = 1.15; // scale at front (slightly larger than base)
-const DEPTH_OPACITY_MIN = 0.2; // opacity at back
-const DEPTH_OPACITY_MAX = 1.0; // opacity at front
-const TILT_AMOUNT = 5; // degrees of mouse-driven tilt
-const ORBIT_Y_OFFSET = -30; // px — shift orbit center upward so items clear the CTA
+// Depth scaling — the front item grows dramatically
+const DEPTH_SCALE_MIN   = 0.28;  // back items (almost hidden)
+const DEPTH_SCALE_MAX   = 4.2;   // front item (~4× base size = ~320px circle)
+const DEPTH_OPACITY_MIN = 0.08;
+const DEPTH_OPACITY_MAX = 1.0;
 
-// ── Responsive breakpoints — wide spread like Off Menu ───────
-interface OrbitDims {
-  radiusX: number;
-  radiusY: number;
-  size: number;
-}
+interface OrbitDims { radiusX: number; radiusY: number; size: number }
 
 function getOrbitDims(w: number): OrbitDims {
-  // More circular shape so items spread vertically across the viewport
-  // Items at sin~0 (center height) are pushed to screen edges via large radiusX
-  if (w < 480) return { radiusX: 155, radiusY: 195, size: 58 };
-  if (w < 640) return { radiusX: 175, radiusY: 210, size: 66 };
-  if (w < 1024) return { radiusX: 300, radiusY: 230, size: 80 };
-  return { radiusX: 420, radiusY: 270, size: 92 };
+  if (w < 480)  return { radiusX: 118, radiusY: 148, size: 52 };
+  if (w < 640)  return { radiusX: 148, radiusY: 162, size: 60 };
+  if (w < 1024) return { radiusX: 265, radiusY: 198, size: 70 };
+  return                { radiusX: 385, radiusY: 252, size: 78 };
 }
 
-// ── Compute which project index is at the "front" of the orbit ──
 function getFrontIndex(rotation: number, total: number): number {
-  let maxSin = -Infinity;
-  let idx = 0;
+  let max = -Infinity, idx = 0;
   for (let i = 0; i < total; i++) {
     const s = Math.sin(rotation + (i / total) * Math.PI * 2);
-    if (s > maxSin) {
-      maxSin = s;
-      idx = i;
-    }
+    if (s > max) { max = s; idx = i; }
   }
   return idx;
 }
 
-// ── Per-item component (hooks-safe — one component per orbit slot) ──
+// ── Per-item component ───────────────────────────────────────────
 function OrbitItem({
-  project,
-  index,
-  total,
-  rotation,
-  radiusX,
-  radiusY,
-  size,
-  onClick,
-  entered,
+  project, index, total, rotation, radiusX, radiusY, size, onClick, entered,
 }: {
   project: Project;
   index: number;
@@ -89,27 +61,39 @@ function OrbitItem({
   entered: boolean;
 }) {
   const baseAngle = (index / total) * Math.PI * 2;
-  const logoSrc = ORBIT_LOGOS[project.name] || project.image;
 
-  // Derive position from the shared rotation MotionValue — zero re-renders
-  const x = useTransform(rotation, (r) => radiusX * Math.cos(r + baseAngle));
-  const y = useTransform(rotation, (r) => radiusY * Math.sin(r + baseAngle));
-  const depth = useTransform(rotation, (r) => Math.sin(r + baseAngle));
+  const x       = useTransform(rotation, (r) => radiusX * Math.cos(r + baseAngle));
+  const depthRaw = useTransform(rotation, (r) => Math.sin(r + baseAngle));
+  const yRaw    = useTransform(rotation, (r) => radiusY * Math.sin(r + baseAngle));
 
-  // Front items are larger + more opaque; back items recede
-  const itemScale = useTransform(
-    depth,
-    (d) =>
-      DEPTH_SCALE_MIN +
-      (DEPTH_SCALE_MAX - DEPTH_SCALE_MIN) * (d * 0.5 + 0.5)
+  // Pull the front item toward the vertical center so the large zoomed
+  // circle sits near the middle of the viewport rather than the orbit edge.
+  const y = useTransform(
+    [yRaw, depthRaw] as const,
+    ([yv, d]: number[]) => {
+      // Only pull when depth > 0.25 (approaching front)
+      const pull = Math.pow(Math.max(0, (d - 0.25) / 0.75), 2.8);
+      return yv * (1 - pull * 0.80);
+    }
   );
-  const itemOpacity = useTransform(
-    depth,
-    (d) =>
-      DEPTH_OPACITY_MIN +
-      (DEPTH_OPACITY_MAX - DEPTH_OPACITY_MIN) * (d * 0.5 + 0.5)
-  );
-  const itemZ = useTransform(depth, (d) => Math.round(d * 10) + 10);
+
+  // Power curve — subtle at back, explosive at front
+  const itemScale = useTransform(depthRaw, (d) => {
+    const t = Math.pow((d + 1) / 2, 2.8);
+    return DEPTH_SCALE_MIN + (DEPTH_SCALE_MAX - DEPTH_SCALE_MIN) * t;
+  });
+
+  const itemOpacity = useTransform(depthRaw, (d) => {
+    const t = (d + 1) / 2;
+    return DEPTH_OPACITY_MIN + (DEPTH_OPACITY_MAX - DEPTH_OPACITY_MIN) * t;
+  });
+
+  const itemZ = useTransform(depthRaw, (d) => Math.round(d * 10) + 10);
+
+  // Use social screenshot image (object-cover, no padding) to prevent clipping
+  const imgSrc = project.image;
+  // Size hint that accounts for the maximum scale
+  const imgSizeHint = Math.round(size * DEPTH_SCALE_MAX * 0.9);
 
   return (
     <motion.div
@@ -127,46 +111,40 @@ function OrbitItem({
         willChange: "transform",
       }}
     >
-      {/* Entrance animation */}
+      {/*
+        Entrance: fade in at the item's actual orbit position.
+        NO scale-from-zero — that's what caused the clustering effect.
+        Items appear already spread around the ring as it spins.
+      */}
       <motion.div
-        initial={{ opacity: 0, scale: 0 }}
-        animate={{
-          opacity: entered ? 1 : 0,
-          scale: entered ? 1 : 0,
-        }}
-        transition={{
-          duration: 0.6,
-          delay: index * 0.1,
-          ease: [0.22, 0.61, 0.36, 1],
-        }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: entered ? 1 : 0 }}
+        transition={{ duration: 0.65, delay: 0.15 + index * 0.06 }}
       >
         <button
           onClick={onClick}
-          className="group rounded-full overflow-hidden shadow-lg border border-[var(--im-border)]
-                     cursor-pointer hover:shadow-2xl hover:border-[var(--im-border-hover)]
-                     transition-all duration-300 bg-[var(--im-surface)]"
+          className="rounded-full overflow-hidden cursor-pointer shadow-md hover:shadow-2xl transition-shadow duration-300"
           style={{ width: size, height: size }}
           aria-label={`View ${project.name}`}
         >
-          <div className="relative w-full h-full rounded-full overflow-hidden group-hover:scale-110 transition-transform duration-500 flex items-center justify-center p-2">
+          {/* object-cover fills the circle cleanly — no padding to clip */}
+          <div className="relative w-full h-full">
             <Image
-              src={logoSrc}
+              src={imgSrc}
               alt={project.name}
               fill
-              className="object-contain"
-              sizes={`${size}px`}
+              className="object-cover"
+              sizes={`${imgSizeHint}px`}
               unoptimized
             />
           </div>
-          {/* Hover glow ring */}
-          <div className="absolute inset-0 rounded-full ring-0 group-hover:ring-2 ring-[var(--im-accent)] transition-all duration-300 opacity-0 group-hover:opacity-50 pointer-events-none" />
         </button>
       </motion.div>
     </motion.div>
   );
 }
 
-// ── Main orbit component ─────────────────────────────────────
+// ── Main export ──────────────────────────────────────────────────
 interface OrbitHeroProps {
   sectionRef: RefObject<HTMLElement | null>;
   onProjectClick: (project: Project) => void;
@@ -174,45 +152,50 @@ interface OrbitHeroProps {
   mouseY: MotionValue<number>;
 }
 
-export function OrbitHero({
-  sectionRef,
-  onProjectClick,
-  mouseX,
-  mouseY,
-}: OrbitHeroProps) {
-  const [entered, setEntered] = useState(false);
-  const [dims, setDims] = useState<OrbitDims>({ radiusX: 420, radiusY: 270, size: 92 });
+export function OrbitHero({ sectionRef, onProjectClick, mouseX, mouseY }: OrbitHeroProps) {
+  const [entered, setEntered]   = useState(false);
+  const [dims, setDims]         = useState<OrbitDims>({ radiusX: 385, radiusY: 252, size: 78 });
   const [frontIndex, setFrontIndex] = useState(0);
 
-  // Responsive orbit sizing
+  // Responsive sizing
   useEffect(() => {
-    function update() {
-      setDims(getOrbitDims(window.innerWidth));
-    }
+    const update = () => setDims(getOrbitDims(window.innerWidth));
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  // Trigger entrance after brief delay
-  useEffect(() => {
-    const t = setTimeout(() => setEntered(true), 300);
-    return () => clearTimeout(t);
-  }, []);
+  // ── Phase 1: intro spin → Phase 2: slow idle ──────────────────
+  const baseRotation = useMotionValue(0);
 
-  // ── Idle rotation (very slow continuous spin) ──
-  const idleAngle = useMotionValue(0);
   useEffect(() => {
-    const controls = animate(idleAngle, Math.PI * 2, {
-      duration: IDLE_DURATION,
-      repeat: Infinity,
-      repeatType: "loop",
-      ease: "linear",
+    // Kick off the intro spin immediately
+    const ctrl = animate(baseRotation, Math.PI * 2 * INTRO_REVOLUTIONS, {
+      duration: INTRO_DURATION,
+      // Fast at start, gracefully decelerates to a stop — like a flywheel
+      ease: [0.06, 0.0, 0.22, 1.0],
+      onComplete: () => {
+        // Seamlessly hand off to slow continuous idle rotation
+        const from = baseRotation.get();
+        animate(baseRotation, from + Math.PI * 2, {
+          duration: IDLE_DURATION,
+          repeat: Infinity,
+          repeatType: "loop",
+          ease: "linear",
+        });
+      },
     });
-    return () => controls.stop();
-  }, [idleAngle]);
 
-  // ── Scroll-driven rotation ──
+    // Items fade in shortly after the spin begins — they appear already spread
+    const t = setTimeout(() => setEntered(true), 180);
+
+    return () => {
+      ctrl.stop();
+      clearTimeout(t);
+    };
+  }, [baseRotation]);
+
+  // ── Scroll-driven rotation (added on top of base) ──────────────
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end end"],
@@ -223,19 +206,19 @@ export function OrbitHero({
     [0, Math.PI * 2 * SCROLL_REVOLUTIONS]
   );
 
-  // Combine idle + scroll
+  // Combined rotation
   const rotation = useTransform(
-    [idleAngle, scrollAngle],
-    ([idle, scroll]) => (idle as number) + (scroll as number)
+    [baseRotation, scrollAngle] as const,
+    ([b, s]: number[]) => b + s
   );
 
-  // ── Track which project is at the front ──
+  // Track front item for the label
   useMotionValueEvent(rotation, "change", (r) => {
     const idx = getFrontIndex(r, PROJECTS.length);
     setFrontIndex((prev) => (prev !== idx ? idx : prev));
   });
 
-  // ── Mouse-driven tilt ──
+  // ── Mouse tilt ─────────────────────────────────────────────────
   const tiltX = useTransform(mouseY, (v) => v * -TILT_AMOUNT);
   const tiltY = useTransform(mouseX, (v) => v * TILT_AMOUNT);
   const smoothTiltX = useSpring(tiltX, { stiffness: 80, damping: 20 });
@@ -248,11 +231,7 @@ export function OrbitHero({
     >
       <motion.div
         className="relative"
-        style={{
-          rotateX: smoothTiltX,
-          rotateY: smoothTiltY,
-          y: ORBIT_Y_OFFSET,
-        }}
+        style={{ rotateX: smoothTiltX, rotateY: smoothTiltY }}
       >
         {PROJECTS.map((project, i) => (
           <OrbitItem
@@ -270,15 +249,15 @@ export function OrbitHero({
         ))}
       </motion.div>
 
-      {/* Front project label */}
-      <div className="absolute bottom-[10%] sm:bottom-[13%] left-0 right-0 flex justify-center pointer-events-none z-20">
+      {/* Front project label — cross-fades as items rotate to front */}
+      <div className="absolute bottom-[9%] sm:bottom-[12%] left-0 right-0 flex justify-center pointer-events-none z-20">
         <AnimatePresence mode="wait">
           <motion.p
             key={frontIndex}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 0.5, y: 0 }}
-            exit={{ opacity: 0, y: -6 }}
-            transition={{ duration: 0.25 }}
+            initial={{ opacity: 0, y: 5 }}
+            animate={{ opacity: 0.45, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            transition={{ duration: 0.22 }}
             className="font-serif text-xs sm:text-sm tracking-widest uppercase text-[var(--im-text-muted)]"
           >
             {PROJECTS[frontIndex].name}

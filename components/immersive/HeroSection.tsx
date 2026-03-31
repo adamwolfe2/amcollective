@@ -1,20 +1,17 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { motion, useTransform, AnimatePresence } from "framer-motion";
+import { motion, useTransform } from "framer-motion";
 import {
   heroTextVariants,
   heroLetterVariants,
   fadeInUp,
 } from "@/lib/immersive/animations";
 import { useMouseParallax } from "@/lib/immersive/use-mouse-parallax";
-import { PROJECTS, type Project } from "@/content/projects";
 import { OrbitHero } from "./OrbitHero";
-import { ProjectOverlay } from "./ProjectsCarousel";
 
 export function HeroSection() {
   const [isMounted, setIsMounted] = useState(false);
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const mouse = useMouseParallax(isMounted);
   const sectionRef = useRef<HTMLElement>(null);
 
@@ -31,7 +28,7 @@ export function HeroSection() {
   const TITLE = "AM Collective";
 
   return (
-    <section ref={sectionRef} className="relative" style={{ height: "200vh" }}>
+    <section ref={sectionRef} className="relative" style={{ height: "350vh" }}>
       {/* Sticky inner — stays on screen while scrolling drives the orbit */}
       <div
         className="sticky top-0 h-screen flex items-center justify-center overflow-hidden"
@@ -78,7 +75,7 @@ export function HeroSection() {
         {/* 3D Saturn-like orbit ring */}
         <OrbitHero
           sectionRef={sectionRef}
-          onProjectClick={setSelectedProject}
+          onProjectClick={() => {}}
           mouseX={mouse.x}
           mouseY={mouse.y}
         />
@@ -168,25 +165,6 @@ export function HeroSection() {
         </motion.div>
       </div>
 
-      {/* Project detail overlay */}
-      <AnimatePresence>
-        {selectedProject && (
-          <ProjectOverlay
-            project={selectedProject}
-            onClose={() => setSelectedProject(null)}
-            onNext={() => {
-              const idx = PROJECTS.findIndex((p) => p.name === selectedProject.name);
-              setSelectedProject(PROJECTS[(idx + 1) % PROJECTS.length]);
-            }}
-            onPrev={() => {
-              const idx = PROJECTS.findIndex((p) => p.name === selectedProject.name);
-              setSelectedProject(
-                PROJECTS[(idx - 1 + PROJECTS.length) % PROJECTS.length]
-              );
-            }}
-          />
-        )}
-      </AnimatePresence>
     </section>
   );
 }
