@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { motion, useTransform } from "framer-motion";
+import { motion, useScroll, useTransform } from "framer-motion";
 import {
   heroTextVariants,
   heroLetterVariants,
@@ -14,6 +14,14 @@ export function HeroSection() {
   const [isMounted, setIsMounted] = useState(false);
   const mouse = useMouseParallax(isMounted);
   const sectionRef = useRef<HTMLElement>(null);
+
+  const { scrollYProgress } = useScroll({
+    target: sectionRef,
+    offset: ["start start", "end end"],
+  });
+
+  // Fade center content out as orbit flattens
+  const centerOpacity = useTransform(scrollYProgress, [0.20, 0.32], [1, 0], { clamp: true });
 
   // Glow blob transforms
   const glow1X = useTransform(mouse.x, (v) => v * 15);
@@ -28,7 +36,7 @@ export function HeroSection() {
   const TITLE = "AM Collective";
 
   return (
-    <section ref={sectionRef} className="relative" style={{ height: "350vh" }}>
+    <section ref={sectionRef} className="relative" style={{ height: "700vh" }}>
       {/* Sticky inner — stays on screen while scrolling drives the orbit */}
       <div
         className="sticky top-0 h-screen flex items-center justify-center overflow-hidden"
@@ -80,8 +88,11 @@ export function HeroSection() {
           mouseY={mouse.y}
         />
 
-        {/* Center content — sits above the orbit, smaller text */}
-        <div className="relative z-10 text-center px-5 max-w-2xl mx-auto pointer-events-none">
+        {/* Center content — fades out as orbit flattens into showcase */}
+        <motion.div
+          className="relative z-10 text-center px-5 max-w-2xl mx-auto pointer-events-none"
+          style={{ opacity: centerOpacity }}
+        >
           {/* Animated title */}
           <motion.h1
             variants={heroTextVariants}
@@ -146,7 +157,7 @@ export function HeroSection() {
               View portfolio
             </button>
           </motion.div>
-        </div>
+        </motion.div>
 
         {/* Scroll indicator */}
         <motion.div
