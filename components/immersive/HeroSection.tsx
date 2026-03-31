@@ -1,87 +1,20 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { motion, useTransform } from "framer-motion";
-import Image from "next/image";
+import { motion, useTransform, AnimatePresence } from "framer-motion";
 import {
   heroTextVariants,
   heroLetterVariants,
   fadeInUp,
-  EASE_SMOOTH,
 } from "@/lib/immersive/animations";
 import { useMouseParallax } from "@/lib/immersive/use-mouse-parallax";
-import { PROJECTS } from "@/content/projects";
-
-// Floating orb images — use existing venture social images
-const FLOATING_ORBS = PROJECTS.slice(0, 7).map((p, i) => ({
-  image: p.image,
-  name: p.name,
-  // Pre-defined positions so orbs don't overlap
-  positions: [
-    { top: "15%", left: "8%", size: 90 },
-    { top: "10%", left: "38%", size: 70 },
-    { top: "35%", left: "2%", size: 80 },
-    { top: "30%", right: "8%", size: 85 },
-    { top: "60%", left: "12%", size: 65 },
-    { top: "55%", right: "5%", size: 95 },
-    { top: "72%", left: "35%", size: 75 },
-  ][i],
-  parallaxMultiplier: [0.03, -0.02, 0.04, -0.03, 0.02, -0.04, 0.03][i],
-  delay: i * 0.15,
-}));
-
-function FloatingOrb({
-  orb,
-  index,
-  mouseX,
-  mouseY,
-}: {
-  orb: (typeof FLOATING_ORBS)[number];
-  index: number;
-  mouseX: ReturnType<typeof useMouseParallax>["x"];
-  mouseY: ReturnType<typeof useMouseParallax>["y"];
-}) {
-  const orbX = useTransform(mouseX, (v) => v * orb.parallaxMultiplier * 80);
-  const orbY = useTransform(mouseY, (v) => v * orb.parallaxMultiplier * 60);
-
-  return (
-    <motion.div
-      key={orb.name}
-      initial={{ opacity: 0, scale: 0.6 }}
-      animate={{ opacity: 0.7, scale: 1, y: [0, -8, 0] }}
-      transition={{
-        opacity: { duration: 0.8, delay: 0.5 + orb.delay, ease: EASE_SMOOTH },
-        scale: { duration: 0.8, delay: 0.5 + orb.delay, ease: EASE_SMOOTH },
-        y: { duration: 4 + index * 0.5, repeat: Infinity, ease: "easeInOut" },
-      }}
-      className="absolute rounded-full overflow-hidden shadow-2xl hidden sm:block"
-      style={{
-        width: orb.positions.size,
-        height: orb.positions.size,
-        top: orb.positions.top,
-        left: orb.positions.left,
-        right: (orb.positions as Record<string, unknown>).right as string | undefined,
-        x: orbX,
-        y: orbY,
-        zIndex: 5,
-      }}
-    >
-      <Image
-        src={orb.image}
-        alt={orb.name}
-        fill
-        className="object-cover"
-        sizes={`${orb.positions.size}px`}
-        unoptimized
-      />
-      {/* Glass border effect */}
-      <div className="absolute inset-0 rounded-full ring-1 ring-[var(--im-border)]" />
-    </motion.div>
-  );
-}
+import { PROJECTS, type Project } from "@/content/projects";
+import { OrbitHero } from "./OrbitHero";
+import { ProjectOverlay } from "./ProjectsCarousel";
 
 export function HeroSection() {
   const [isMounted, setIsMounted] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   const mouse = useMouseParallax(isMounted);
   const sectionRef = useRef<HTMLElement>(null);
 
@@ -141,19 +74,16 @@ export function HeroSection() {
         }}
       />
 
-      {/* Floating orb images */}
-      {FLOATING_ORBS.map((orb, index) => (
-        <FloatingOrb
-          key={orb.name}
-          orb={orb}
-          index={index}
-          mouseX={mouse.x}
-          mouseY={mouse.y}
-        />
-      ))}
+      {/* 3D Saturn-like orbit ring */}
+      <OrbitHero
+        sectionRef={sectionRef}
+        onProjectClick={setSelectedProject}
+        mouseX={mouse.x}
+        mouseY={mouse.y}
+      />
 
-      {/* Center content */}
-      <div className="relative z-10 text-center px-5 max-w-3xl mx-auto">
+      {/* Center content — sits above the orbit */}
+      <div className="relative z-10 text-center px-5 max-w-3xl mx-auto pointer-events-none">
         {/* Animated title */}
         <motion.h1
           variants={heroTextVariants}
@@ -184,13 +114,13 @@ export function HeroSection() {
           ventures for high-growth startups
         </motion.p>
 
-        {/* CTAs */}
+        {/* CTAs — need pointer events re-enabled */}
         <motion.div
           variants={fadeInUp}
           initial="hidden"
           animate="visible"
           transition={{ delay: 1.2 }}
-          className="flex flex-col sm:flex-row items-center justify-center gap-4"
+          className="flex flex-col sm:flex-row items-center justify-center gap-4 pointer-events-auto"
         >
           <button
             onClick={() => {
@@ -235,6 +165,26 @@ export function HeroSection() {
           />
         </div>
       </motion.div>
+
+      {/* Project detail overlay */}
+      <AnimatePresence>
+        {selectedProject && (
+          <ProjectOverlay
+            project={selectedProject}
+            onClose={() => setSelectedProject(null)}
+            onNext={() => {
+              const idx = PROJECTS.findIndex((p) => p.name === selectedProject.name);
+              setSelectedProject(PROJECTS[(idx + 1) % PROJECTS.length]);
+            }}
+            onPrev={() => {
+              const idx = PROJECTS.findIndex((p) => p.name === selectedProject.name);
+              setSelectedProject(
+                PROJECTS[(idx - 1 + PROJECTS.length) % PROJECTS.length]
+              );
+            }}
+          />
+        )}
+      </AnimatePresence>
     </section>
   );
 }

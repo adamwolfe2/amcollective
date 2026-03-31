@@ -158,7 +158,7 @@ export function ProjectsCarousel() {
   );
 }
 
-function ProjectOverlay({
+export function ProjectOverlay({
   project,
   onClose,
   onNext,
