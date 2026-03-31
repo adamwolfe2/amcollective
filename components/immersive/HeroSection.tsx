@@ -8,7 +8,7 @@ import {
   fadeInUp,
 } from "@/lib/immersive/animations";
 import { useMouseParallax } from "@/lib/immersive/use-mouse-parallax";
-import { OrbitHero } from "./OrbitHero";
+import { OrbitHero, ShowcaseOverlay } from "./OrbitHero";
 
 export function HeroSection() {
   const [isMounted, setIsMounted] = useState(false);
@@ -158,6 +158,9 @@ export function HeroSection() {
             </button>
           </motion.div>
         </motion.div>
+
+        {/* Showcase overlay — rendered HERE (z-30) so it's above center content (z-10) */}
+        <ShowcaseOverlay scrollYProgress={scrollYProgress} />
 
         {/* Scroll indicator */}
         <motion.div

@@ -232,7 +232,7 @@ function ProjectCard({ project }: { project: Project }) {
 }
 
 // ── 3D CoverFlow showcase ─────────────────────────────────────────────
-function ShowcaseOverlay({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) {
+export function ShowcaseOverlay({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) {
   const [activeIndex, setActiveIndex] = useState(0);
 
   const showcaseProgress = useTransform(
@@ -247,17 +247,36 @@ function ShowcaseOverlay({ scrollYProgress }: { scrollYProgress: MotionValue<num
     setActiveIndex((prev) => (prev !== idx ? idx : prev));
   });
 
-  const overlayOpacity = useTransform(
+  // Background fades in first — blanks out orbit items and center text
+  const bgOpacity = useTransform(
     scrollYProgress,
-    [SHOWCASE_START, SHOWCASE_START + 0.06],
+    [SHOWCASE_START, SHOWCASE_START + 0.04],
+    [0, 1],
+    { clamp: true }
+  );
+  // Cards appear after background is established
+  const cardOpacity = useTransform(
+    scrollYProgress,
+    [SHOWCASE_START + 0.03, SHOWCASE_START + 0.09],
     [0, 1],
     { clamp: true }
   );
 
   return (
+    <>
+    {/* Solid backdrop — covers orbit items + center text (must be sibling-level z-30) */}
     <motion.div
-      className="absolute inset-0 flex flex-col items-center justify-center z-30 pointer-events-none"
-      style={{ opacity: overlayOpacity }}
+      className="absolute inset-0"
+      style={{
+        opacity: bgOpacity,
+        background: "radial-gradient(ellipse 80% 60% at 50% 40%, var(--im-bg-alt) 0%, var(--im-bg) 100%)",
+        zIndex: 28,
+        pointerEvents: "none",
+      }}
+    />
+    <motion.div
+      className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
+      style={{ opacity: cardOpacity, zIndex: 30 }}
     >
       {/* 3D card deck */}
       <div
@@ -307,6 +326,7 @@ function ShowcaseOverlay({ scrollYProgress }: { scrollYProgress: MotionValue<num
         ))}
       </div>
     </motion.div>
+    </>
   );
 }
 
@@ -445,8 +465,6 @@ export function OrbitHero({ sectionRef, onProjectClick, mouseX, mouseY }: OrbitH
         </div>
       )}
 
-      {/* 3D CoverFlow showcase */}
-      <ShowcaseOverlay scrollYProgress={scrollYProgress} />
     </div>
   );
 }
