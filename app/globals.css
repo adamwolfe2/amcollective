@@ -118,3 +118,6 @@ html {
   }
 }
 
+/* ── Immersive mode styles (v2 landing page) ───────────────────────── */
+@import "../components/immersive/immersive.css";
+

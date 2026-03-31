@@ -10,6 +10,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { ParallaxHero } from "@/components/ParallaxHero";
+import { ImmersiveLanding } from "@/components/immersive/ImmersiveLanding";
 
 // ─── Ventures Data ──────────────────────────────────────────────────────────
 
@@ -170,6 +171,7 @@ export function MarketingPage() {
   const [activeTab, setActiveTab] = useState<Tab>("ventures");
   const [introComplete, setIntroComplete] = useState(false);
   const [heroAnimateIn, setHeroAnimateIn] = useState(false);
+  const [immersiveMode, setImmersiveMode] = useState(false);
   const welcomeRef = useRef<HTMLDivElement>(null);
 
   // Panel slides up → forest hero rises in → page auto-scrolls to Welcome.
@@ -218,6 +220,11 @@ export function MarketingPage() {
 
     return () => observer.disconnect();
   }, [activeTab]);
+
+  // Immersive mode — completely separate rendering
+  if (immersiveMode) {
+    return <ImmersiveLanding onExit={() => setImmersiveMode(false)} />;
+  }
 
   return (
     <div className="bg-white min-h-screen">
@@ -314,10 +321,17 @@ export function MarketingPage() {
 
       {/* ─── Footer ────────────────────────────────────────────────────── */}
       <footer className="bg-white border-t border-[#0A0A0A]/5 py-6 sm:py-8">
-        <div className="max-w-5xl mx-auto px-5 sm:px-6 text-center">
+        <div className="max-w-5xl mx-auto px-5 sm:px-6 text-center relative">
           <p className="font-serif text-xs text-[#0A0A0A]/25">
             AM Collective Capital &middot; Portland, OR
           </p>
+          {/* Secret toggle — triple-click the dot to enter immersive mode */}
+          <button
+            onClick={() => setImmersiveMode(true)}
+            className="absolute right-5 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-[#0A0A0A]/[0.03] hover:bg-[#0A0A0A]/[0.08] transition-colors cursor-default"
+            aria-label="Toggle immersive view"
+            title=""
+          />
         </div>
       </footer>
     </div>

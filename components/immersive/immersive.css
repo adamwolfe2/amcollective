@@ -1,0 +1,104 @@
+/* ── Immersive mode dark theme styles ──────────────────────────────── */
+/* These styles are scoped under .immersive-mode to avoid any conflicts */
+
+.immersive-mode {
+  --im-bg: #0a0a0c;
+  --im-surface: #141416;
+  --im-border: rgba(255, 255, 255, 0.06);
+  --im-text: #ffffff;
+  --im-text-muted: rgba(255, 255, 255, 0.4);
+  --im-accent: #6366f1;
+  --im-accent-soft: rgba(99, 102, 241, 0.15);
+
+  font-family: var(--font-serif), Georgia, serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Override root background when immersive is active */
+.immersive-mode,
+.immersive-mode * {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+.immersive-mode::-webkit-scrollbar {
+  width: 6px;
+}
+.immersive-mode::-webkit-scrollbar-track {
+  background: transparent;
+}
+.immersive-mode::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+/* ── Marquee animation ─────────────────────────────────────────────── */
+@keyframes marquee-immersive {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee-immersive {
+  animation: marquee-immersive 30s linear infinite;
+}
+
+.animate-marquee-immersive:hover {
+  animation-play-state: paused;
+}
+
+/* ── Hide scrollbar utility ────────────────────────────────────────── */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Glass card effect ─────────────────────────────────────────────── */
+.immersive-mode .glass-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+}
+
+.immersive-mode .glass-card:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Noise texture overlay ─────────────────────────────────────────── */
+.immersive-mode::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.015;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 256px 256px;
+}
+
+/* ── Selection color in dark mode ──────────────────────────────────── */
+.immersive-mode ::selection {
+  background: rgba(99, 102, 241, 0.4);
+  color: white;
+}
+
+/* ── Focus visible ─────────────────────────────────────────────────── */
+.immersive-mode :focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.6);
+  outline-offset: 2px;
+}
+
+/* ── Smooth transitions for all interactive elements ───────────────── */
+.immersive-mode button,
+.immersive-mode a {
+  transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
