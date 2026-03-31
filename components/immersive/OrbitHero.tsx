@@ -6,8 +6,10 @@ import {
   useScroll,
   useTransform,
   useMotionValue,
+  useMotionValueEvent,
   useSpring,
   animate,
+  AnimatePresence,
   type MotionValue,
 } from "framer-motion";
 import Image from "next/image";
@@ -15,14 +17,14 @@ import { PROJECTS, type Project } from "@/content/projects";
 
 // ── Tuning knobs ─────────────────────────────────────────────
 const IDLE_DURATION = 120; // seconds for one full idle revolution
-const SCROLL_REVOLUTIONS = 1.5; // full rotations across one viewport of scroll
-const DEPTH_SCALE_MIN = 0.55; // scale of items at the "back" of the ring
-const DEPTH_SCALE_MAX = 1.0; // scale of items at the "front"
-const DEPTH_OPACITY_MIN = 0.25; // opacity at back
+const SCROLL_REVOLUTIONS = 2.5; // full rotations across the sticky scroll range
+const DEPTH_SCALE_MIN = 0.45; // scale of items at the "back" of the ring
+const DEPTH_SCALE_MAX = 1.15; // scale of items at the "front" (slightly larger than base)
+const DEPTH_OPACITY_MIN = 0.18; // opacity at back
 const DEPTH_OPACITY_MAX = 1.0; // opacity at front
 const TILT_AMOUNT = 6; // degrees of mouse-driven tilt
 
-// ── Responsive breakpoints ───────────────────────────────────
+// ── Responsive breakpoints — wide Off Menu-style spread ──────
 interface OrbitDims {
   radiusX: number;
   radiusY: number;
@@ -30,10 +32,24 @@ interface OrbitDims {
 }
 
 function getOrbitDims(w: number): OrbitDims {
-  if (w < 480) return { radiusX: 125, radiusY: 48, size: 56 };
-  if (w < 640) return { radiusX: 150, radiusY: 58, size: 64 };
-  if (w < 1024) return { radiusX: 230, radiusY: 85, size: 78 };
-  return { radiusX: 310, radiusY: 115, size: 92 };
+  if (w < 480) return { radiusX: 150, radiusY: 95, size: 72 };
+  if (w < 640) return { radiusX: 170, radiusY: 105, size: 78 };
+  if (w < 1024) return { radiusX: 290, radiusY: 160, size: 88 };
+  return { radiusX: 400, radiusY: 190, size: 100 };
+}
+
+// ── Compute which project index is at the "front" of the orbit ──
+function getFrontIndex(rotation: number, total: number): number {
+  let maxSin = -Infinity;
+  let idx = 0;
+  for (let i = 0; i < total; i++) {
+    const s = Math.sin(rotation + (i / total) * Math.PI * 2);
+    if (s > maxSin) {
+      maxSin = s;
+      idx = i;
+    }
+  }
+  return idx;
 }
 
 // ── Per-item component (hooks-safe — one component per orbit slot) ──
@@ -151,7 +167,8 @@ export function OrbitHero({
   mouseY,
 }: OrbitHeroProps) {
   const [entered, setEntered] = useState(false);
-  const [dims, setDims] = useState<OrbitDims>({ radiusX: 310, radiusY: 115, size: 92 });
+  const [dims, setDims] = useState<OrbitDims>({ radiusX: 400, radiusY: 190, size: 100 });
+  const [frontIndex, setFrontIndex] = useState(0);
 
   // Responsive orbit sizing
   useEffect(() => {
@@ -184,7 +201,7 @@ export function OrbitHero({
   // ── Scroll-driven rotation ──
   const { scrollYProgress } = useScroll({
     target: sectionRef,
-    offset: ["start start", "end start"],
+    offset: ["start start", "end end"],
   });
   const scrollAngle = useTransform(
     scrollYProgress,
@@ -197,6 +214,12 @@ export function OrbitHero({
     [idleAngle, scrollAngle],
     ([idle, scroll]) => (idle as number) + (scroll as number)
   );
+
+  // ── Track which project is at the front ──
+  useMotionValueEvent(rotation, "change", (r) => {
+    const idx = getFrontIndex(r, PROJECTS.length);
+    setFrontIndex((prev) => (prev !== idx ? idx : prev));
+  });
 
   // ── Mouse-driven tilt (subtle perspective shift) ──
   const tiltX = useTransform(mouseY, (v) => v * -TILT_AMOUNT);
@@ -231,6 +254,22 @@ export function OrbitHero({
           />
         ))}
       </motion.div>
+
+      {/* Front project label */}
+      <div className="absolute bottom-[12%] sm:bottom-[15%] left-0 right-0 flex justify-center pointer-events-none z-20">
+        <AnimatePresence mode="wait">
+          <motion.p
+            key={frontIndex}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 0.6, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.25 }}
+            className="font-serif text-xs sm:text-sm tracking-widest uppercase text-[var(--im-text-muted)]"
+          >
+            {PROJECTS[frontIndex].name}
+          </motion.p>
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

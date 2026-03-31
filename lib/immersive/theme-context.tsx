@@ -11,9 +11,9 @@ interface ThemeContextValue {
 }
 
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: "dark",
+  theme: "light",
   toggle: () => {},
-  isDark: true,
+  isDark: false,
 });
 
 export function useImmersiveTheme() {
@@ -22,7 +22,7 @@ export function useImmersiveTheme() {
 
 export function ImmersiveThemeProvider({
   children,
-  defaultTheme = "dark",
+  defaultTheme = "light",
 }: {
   children: ReactNode;
   defaultTheme?: Theme;
