@@ -15,16 +15,28 @@ import {
 import Image from "next/image";
 import { PROJECTS, type Project } from "@/content/projects";
 
+// ── Logo images for orbit (NOT the social screenshots) ───────
+const ORBIT_LOGOS: Record<string, string> = {
+  Cursive: "/logos/cursive.png",
+  TaskSpace: "/logos/taskspace.png",
+  WholeSail: "/logos/wholesail.png",
+  MyVSL: "/logos/myvsl.png",
+  Trackr: "/logos/trackr.jpg",
+  CampusGTM: "/CampusGTM Logo.png", // no clean logo in /logos/
+  Hook: "/logos/hook.png",
+};
+
 // ── Tuning knobs ─────────────────────────────────────────────
 const IDLE_DURATION = 120; // seconds for one full idle revolution
 const SCROLL_REVOLUTIONS = 2.5; // full rotations across the sticky scroll range
-const DEPTH_SCALE_MIN = 0.45; // scale of items at the "back" of the ring
-const DEPTH_SCALE_MAX = 1.15; // scale of items at the "front" (slightly larger than base)
-const DEPTH_OPACITY_MIN = 0.18; // opacity at back
+const DEPTH_SCALE_MIN = 0.45; // scale at back
+const DEPTH_SCALE_MAX = 1.15; // scale at front (slightly larger than base)
+const DEPTH_OPACITY_MIN = 0.2; // opacity at back
 const DEPTH_OPACITY_MAX = 1.0; // opacity at front
-const TILT_AMOUNT = 6; // degrees of mouse-driven tilt
+const TILT_AMOUNT = 5; // degrees of mouse-driven tilt
+const ORBIT_Y_OFFSET = -30; // px — shift orbit center upward so items clear the CTA
 
-// ── Responsive breakpoints — wide Off Menu-style spread ──────
+// ── Responsive breakpoints — wide spread like Off Menu ───────
 interface OrbitDims {
   radiusX: number;
   radiusY: number;
@@ -32,10 +44,12 @@ interface OrbitDims {
 }
 
 function getOrbitDims(w: number): OrbitDims {
-  if (w < 480) return { radiusX: 150, radiusY: 95, size: 72 };
-  if (w < 640) return { radiusX: 170, radiusY: 105, size: 78 };
-  if (w < 1024) return { radiusX: 290, radiusY: 160, size: 88 };
-  return { radiusX: 400, radiusY: 190, size: 100 };
+  // More circular shape so items spread vertically across the viewport
+  // Items at sin~0 (center height) are pushed to screen edges via large radiusX
+  if (w < 480) return { radiusX: 155, radiusY: 195, size: 58 };
+  if (w < 640) return { radiusX: 175, radiusY: 210, size: 66 };
+  if (w < 1024) return { radiusX: 300, radiusY: 230, size: 80 };
+  return { radiusX: 420, radiusY: 270, size: 92 };
 }
 
 // ── Compute which project index is at the "front" of the orbit ──
@@ -75,6 +89,7 @@ function OrbitItem({
   entered: boolean;
 }) {
   const baseAngle = (index / total) * Math.PI * 2;
+  const logoSrc = ORBIT_LOGOS[project.name] || project.image;
 
   // Derive position from the shared rotation MotionValue — zero re-renders
   const x = useTransform(rotation, (r) => radiusX * Math.cos(r + baseAngle));
@@ -97,7 +112,6 @@ function OrbitItem({
   const itemZ = useTransform(depth, (d) => Math.round(d * 10) + 10);
 
   return (
-    // Outer div: orbit positioning (x, y, scale, opacity, zIndex)
     <motion.div
       className="absolute pointer-events-auto"
       style={{
@@ -113,7 +127,7 @@ function OrbitItem({
         willChange: "transform",
       }}
     >
-      {/* Inner div: entrance animation (fade + scale in) */}
+      {/* Entrance animation */}
       <motion.div
         initial={{ opacity: 0, scale: 0 }}
         animate={{
@@ -130,16 +144,16 @@ function OrbitItem({
           onClick={onClick}
           className="group rounded-full overflow-hidden shadow-lg border border-[var(--im-border)]
                      cursor-pointer hover:shadow-2xl hover:border-[var(--im-border-hover)]
-                     transition-all duration-300"
+                     transition-all duration-300 bg-[var(--im-surface)]"
           style={{ width: size, height: size }}
           aria-label={`View ${project.name}`}
         >
-          <div className="relative w-full h-full rounded-full overflow-hidden group-hover:scale-110 transition-transform duration-500">
+          <div className="relative w-full h-full rounded-full overflow-hidden group-hover:scale-110 transition-transform duration-500 flex items-center justify-center p-2">
             <Image
-              src={project.image}
+              src={logoSrc}
               alt={project.name}
               fill
-              className="object-cover"
+              className="object-contain"
               sizes={`${size}px`}
               unoptimized
             />
@@ -167,7 +181,7 @@ export function OrbitHero({
   mouseY,
 }: OrbitHeroProps) {
   const [entered, setEntered] = useState(false);
-  const [dims, setDims] = useState<OrbitDims>({ radiusX: 400, radiusY: 190, size: 100 });
+  const [dims, setDims] = useState<OrbitDims>({ radiusX: 420, radiusY: 270, size: 92 });
   const [frontIndex, setFrontIndex] = useState(0);
 
   // Responsive orbit sizing
@@ -209,7 +223,7 @@ export function OrbitHero({
     [0, Math.PI * 2 * SCROLL_REVOLUTIONS]
   );
 
-  // Combine idle + scroll into a single rotation value
+  // Combine idle + scroll
   const rotation = useTransform(
     [idleAngle, scrollAngle],
     ([idle, scroll]) => (idle as number) + (scroll as number)
@@ -221,7 +235,7 @@ export function OrbitHero({
     setFrontIndex((prev) => (prev !== idx ? idx : prev));
   });
 
-  // ── Mouse-driven tilt (subtle perspective shift) ──
+  // ── Mouse-driven tilt ──
   const tiltX = useTransform(mouseY, (v) => v * -TILT_AMOUNT);
   const tiltY = useTransform(mouseX, (v) => v * TILT_AMOUNT);
   const smoothTiltX = useSpring(tiltX, { stiffness: 80, damping: 20 });
@@ -237,6 +251,7 @@ export function OrbitHero({
         style={{
           rotateX: smoothTiltX,
           rotateY: smoothTiltY,
+          y: ORBIT_Y_OFFSET,
         }}
       >
         {PROJECTS.map((project, i) => (
@@ -256,12 +271,12 @@ export function OrbitHero({
       </motion.div>
 
       {/* Front project label */}
-      <div className="absolute bottom-[12%] sm:bottom-[15%] left-0 right-0 flex justify-center pointer-events-none z-20">
+      <div className="absolute bottom-[10%] sm:bottom-[13%] left-0 right-0 flex justify-center pointer-events-none z-20">
         <AnimatePresence mode="wait">
           <motion.p
             key={frontIndex}
             initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 0.6, y: 0 }}
+            animate={{ opacity: 0.5, y: 0 }}
             exit={{ opacity: 0, y: -6 }}
             transition={{ duration: 0.25 }}
             className="font-serif text-xs sm:text-sm tracking-widest uppercase text-[var(--im-text-muted)]"
