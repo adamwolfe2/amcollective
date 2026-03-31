@@ -149,7 +149,7 @@ function OrbitItem({
         {/* Raw logo — no circle, no clip, no padding */}
         <button
           onClick={onClick}
-          className="cursor-pointer relative block"
+          className="cursor-pointer relative block rounded-2xl overflow-hidden"
           style={{ width: displaySize, height: displaySize }}
           aria-label={`View ${project.name}`}
         >
