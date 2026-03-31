@@ -28,8 +28,9 @@ const DEPTH_OPACITY_MIN  = 0.22;
 const DEPTH_OPACITY_MAX  = 1.0;
 
 // Scroll phase thresholds
-const FLATTEN_START  = 0.30;  // orbit starts flattening
-const SHOWCASE_START = 0.44;  // showcase overlay fades in
+const FLATTEN_START  = 0.28;  // orbit starts flattening
+const ORBIT_GONE     = 0.44;  // orbit fully invisible
+const SHOWCASE_START = 0.48;  // showcase overlay begins appearing
 
 const N = PROJECTS.length;
 
@@ -190,7 +191,7 @@ function ShowcaseOverlay({ scrollYProgress }: { scrollYProgress: MotionValue<num
 
   const overlayOpacity = useTransform(
     scrollYProgress,
-    [SHOWCASE_START - 0.04, SHOWCASE_START + 0.05],
+    [SHOWCASE_START, SHOWCASE_START + 0.06],
     [0, 1],
     { clamp: true }
   );
@@ -324,21 +325,21 @@ export function OrbitHero({ sectionRef, onProjectClick, mouseX, mouseY }: OrbitH
   // ── Flatten factor: 1 = full orbit, 0 = flat horizontal line ───
   const flattenFactor = useTransform(
     scrollYProgress,
-    [FLATTEN_START, SHOWCASE_START],
+    [FLATTEN_START, ORBIT_GONE],
     [1, 0],
     { clamp: true }
   );
 
-  // Orbit fades out as showcase takes over
+  // Orbit fully gone well before showcase appears
   const orbitOpacity = useTransform(
     scrollYProgress,
-    [SHOWCASE_START - 0.04, SHOWCASE_START + 0.06],
+    [FLATTEN_START + 0.06, ORBIT_GONE],
     [1, 0],
     { clamp: true }
   );
 
   useMotionValueEvent(scrollYProgress, "change", (v) => {
-    setInShowcase(v >= SHOWCASE_START - 0.03);
+    setInShowcase(v >= SHOWCASE_START - 0.02);
   });
 
   useMotionValueEvent(rotation, "change", (r) => {

@@ -20,8 +20,8 @@ export function HeroSection() {
     offset: ["start start", "end end"],
   });
 
-  // Fade center content out as orbit flattens
-  const centerOpacity = useTransform(scrollYProgress, [0.20, 0.32], [1, 0], { clamp: true });
+  // Fade center content out before orbit starts flattening
+  const centerOpacity = useTransform(scrollYProgress, [0.16, 0.26], [1, 0], { clamp: true });
 
   // Glow blob transforms
   const glow1X = useTransform(mouse.x, (v) => v * 15);
