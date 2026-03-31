@@ -44,7 +44,7 @@ export function ProjectsCarousel() {
   }, []);
 
   return (
-    <section id="work" className="relative py-24 sm:py-32 bg-[#0a0a0c] overflow-hidden">
+    <section id="work" className="relative py-24 sm:py-32 bg-[var(--im-bg)] overflow-hidden">
       <div className="max-w-6xl mx-auto px-5 sm:px-8">
         {/* Section header */}
         <motion.div
@@ -55,10 +55,10 @@ export function ProjectsCarousel() {
           className="flex items-end justify-between mb-12 sm:mb-16"
         >
           <div>
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/25 mb-4">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--im-text-faint)] mb-4">
               Featured work
             </p>
-            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-white">
+            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-[var(--im-text)]">
               Portfolio
             </h2>
           </div>
@@ -67,14 +67,14 @@ export function ProjectsCarousel() {
           <div className="flex items-center gap-3">
             <button
               onClick={prev}
-              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-white/60 hover:bg-white/[0.1] hover:text-white transition-all"
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[var(--im-btn-secondary-bg)] border border-[var(--im-border)] flex items-center justify-center text-[var(--im-text-muted)] hover:bg-[var(--im-btn-secondary-bg-hover)] hover:text-[var(--im-text)] transition-all"
               aria-label="Previous project"
             >
               <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
             <button
               onClick={next}
-              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white flex items-center justify-center text-[#0a0a0c] hover:bg-white/90 transition-all"
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[var(--im-btn-primary-bg)] flex items-center justify-center text-[var(--im-btn-primary-text)] hover:opacity-90 transition-all"
               aria-label="Next project"
             >
               <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
@@ -86,7 +86,12 @@ export function ProjectsCarousel() {
       {/* Horizontal scroll carousel */}
       <div
         ref={scrollRef}
-        className="flex gap-5 sm:gap-6 overflow-x-auto snap-x snap-mandatory px-5 sm:px-8 pb-4 scrollbar-hide"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowLeft") prev();
+          if (e.key === "ArrowRight") next();
+        }}
+        className="flex gap-5 sm:gap-6 overflow-x-auto snap-x snap-proximity px-5 sm:px-8 pb-4 scrollbar-hide"
         style={{
           scrollbarWidth: "none",
           msOverflowStyle: "none",
@@ -104,7 +109,7 @@ export function ProjectsCarousel() {
             onClick={() => setSelectedProject(project)}
           >
             {/* Image container — large circle like Off Menu */}
-            <div className="relative aspect-square max-h-[500px] rounded-full overflow-hidden mb-6 mx-auto bg-white/[0.03] border border-white/[0.06] group-hover:border-white/[0.12] transition-all duration-500">
+            <div className="relative aspect-square max-h-[500px] rounded-full overflow-hidden mb-6 mx-auto bg-[var(--im-card-bg)] border border-[var(--im-border)] group-hover:border-[var(--im-border-hover)] transition-all duration-500">
               <Image
                 src={project.image}
                 alt={project.name}
@@ -114,15 +119,15 @@ export function ProjectsCarousel() {
                 unoptimized
               />
               {/* Gradient overlay on hover */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[var(--im-overlay-bg)] via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             </div>
 
             {/* Title below */}
             <div className="text-center">
-              <h3 className="font-serif text-2xl sm:text-3xl md:text-4xl font-light text-white/80 group-hover:text-white transition-colors mb-2">
+              <h3 className="font-serif text-2xl sm:text-3xl md:text-4xl font-light text-[var(--im-text-secondary)] group-hover:text-[var(--im-text)] transition-colors mb-2">
                 {project.name}
               </h3>
-              <p className="font-serif text-sm text-white/30 group-hover:text-white/50 transition-colors">
+              <p className="font-serif text-sm text-[var(--im-text-faint)] group-hover:text-[var(--im-text-muted)] transition-colors">
                 {project.tagline}
               </p>
             </div>
@@ -174,7 +179,7 @@ function ProjectOverlay({
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/80 backdrop-blur-md"
+        className="absolute inset-0 bg-[var(--im-overlay-bg)] backdrop-blur-md"
         onClick={onClose}
       />
 
@@ -184,31 +189,31 @@ function ProjectOverlay({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 20, scale: 0.97 }}
         transition={{ duration: 0.4, ease: EASE_SMOOTH }}
-        className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[#141416] border border-white/[0.08] shadow-2xl"
+        className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-2xl bg-[var(--im-surface)] border border-[var(--im-border)] shadow-2xl"
       >
         {/* Close / Nav */}
-        <div className="sticky top-0 z-10 flex items-center justify-between p-4 sm:p-6 bg-[#141416]/90 backdrop-blur-sm border-b border-white/[0.04]">
+        <div className="sticky top-0 z-10 flex items-center justify-between p-4 sm:p-6 bg-[var(--im-surface)] backdrop-blur-sm border-b border-[var(--im-border)]">
           <button
             onClick={onPrev}
-            className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center text-white/50 hover:bg-white/[0.1] hover:text-white transition-all"
+            className="w-9 h-9 rounded-full bg-[var(--im-btn-secondary-bg)] flex items-center justify-center text-[var(--im-text-muted)] hover:bg-[var(--im-btn-secondary-bg-hover)] hover:text-[var(--im-text)] transition-all"
             aria-label="Previous"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
 
-          <h3 className="font-serif text-lg text-white/80">{project.name}</h3>
+          <h3 className="font-serif text-lg text-[var(--im-text-secondary)]">{project.name}</h3>
 
           <div className="flex items-center gap-2">
             <button
               onClick={onNext}
-              className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center text-white/50 hover:bg-white/[0.1] hover:text-white transition-all"
+              className="w-9 h-9 rounded-full bg-[var(--im-btn-secondary-bg)] flex items-center justify-center text-[var(--im-text-muted)] hover:bg-[var(--im-btn-secondary-bg-hover)] hover:text-[var(--im-text)] transition-all"
               aria-label="Next"
             >
               <ArrowRight className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              className="w-9 h-9 rounded-full bg-white/[0.06] flex items-center justify-center text-white/50 hover:bg-white/[0.1] hover:text-white transition-all"
+              className="w-9 h-9 rounded-full bg-[var(--im-btn-secondary-bg)] flex items-center justify-center text-[var(--im-text-muted)] hover:bg-[var(--im-btn-secondary-bg-hover)] hover:text-[var(--im-text)] transition-all"
               aria-label="Close"
             >
               <X className="w-4 h-4" />
@@ -240,24 +245,24 @@ function ProjectOverlay({
               {project.tags.map((tag) => (
                 <span
                   key={tag}
-                  className="px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider text-white/30 border border-white/[0.08]"
+                  className="px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider text-[var(--im-text-faint)] border border-[var(--im-border)]"
                 >
                   {tag}
                 </span>
               ))}
             </div>
 
-            <h2 className="font-serif text-2xl sm:text-3xl text-white mb-2">
+            <h2 className="font-serif text-2xl sm:text-3xl text-[var(--im-text)] mb-2">
               {project.name}
             </h2>
-            <p className="font-serif text-base text-white/50 mb-6">
+            <p className="font-serif text-base text-[var(--im-text-muted)] mb-6">
               {project.tagline}
             </p>
           </motion.div>
 
           <motion.p
             variants={fadeInUp}
-            className="font-serif text-sm text-white/40 leading-relaxed mb-8"
+            className="font-serif text-sm text-[var(--im-text-muted)] leading-relaxed mb-8"
           >
             {project.longDescription}
           </motion.p>
@@ -271,12 +276,12 @@ function ProjectOverlay({
               {project.metrics.map((metric) => (
                 <div
                   key={metric.label}
-                  className="text-center p-4 rounded-xl bg-white/[0.02] border border-white/[0.04]"
+                  className="text-center p-4 rounded-xl bg-[var(--im-card-bg)] border border-[var(--im-border)]"
                 >
-                  <p className="font-mono text-lg sm:text-xl text-white font-medium">
+                  <p className="font-mono text-lg sm:text-xl text-[var(--im-text)] font-medium">
                     {metric.value}
                   </p>
-                  <p className="font-mono text-[10px] uppercase tracking-wider text-white/25 mt-1">
+                  <p className="font-mono text-[10px] uppercase tracking-wider text-[var(--im-text-faint)] mt-1">
                     {metric.label}
                   </p>
                 </div>
@@ -290,7 +295,7 @@ function ProjectOverlay({
               href={project.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white text-[#0a0a0c] font-serif text-sm hover:bg-white/90 transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[var(--im-btn-primary-bg)] text-[var(--im-btn-primary-text)] font-serif text-sm hover:opacity-90 transition-colors"
             >
               Visit {project.name}
               <ExternalLink className="w-3.5 h-3.5" />

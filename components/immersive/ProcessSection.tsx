@@ -45,7 +45,7 @@ export function ProcessSection() {
     <section
       id="process"
       ref={sectionRef}
-      className="relative py-24 sm:py-32 bg-[#0a0a0c] overflow-hidden"
+      className="relative py-24 sm:py-32 bg-[var(--im-bg)] overflow-hidden"
     >
       <div className="max-w-4xl mx-auto px-5 sm:px-8">
         {/* Header */}
@@ -56,20 +56,20 @@ export function ProcessSection() {
           viewport={{ once: true, margin: "-80px" }}
           className="text-center mb-16 sm:mb-20"
         >
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/25 mb-4">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--im-text-faint)] mb-4">
             How it works
           </p>
-          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-white">
+          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-[var(--im-text)]">
             From conversation
             <br />
-            <span className="text-white/40">to product</span>
+            <span className="text-[var(--im-text-muted)]">to product</span>
           </h2>
         </motion.div>
 
         {/* Timeline */}
         <div className="relative">
           {/* Vertical line track */}
-          <div className="absolute left-[19px] sm:left-[23px] top-0 bottom-0 w-px bg-white/[0.06]">
+          <div className="absolute left-[19px] sm:left-[23px] top-0 bottom-0 w-px bg-[var(--im-border)]">
             {/* Filled portion */}
             <motion.div
               className="w-full bg-gradient-to-b from-indigo-500/60 to-violet-500/40"
@@ -93,8 +93,8 @@ export function ProcessSection() {
               >
                 {/* Step indicator */}
                 <div className="relative z-10 flex-shrink-0">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#141416] border border-white/[0.08] flex items-center justify-center group-hover:border-white/[0.2] group-hover:bg-white/[0.04] transition-all duration-500">
-                    <span className="font-mono text-xs text-white/40 group-hover:text-white/70 transition-colors">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[var(--im-step-bg)] border border-[var(--im-step-border)] flex items-center justify-center group-hover:border-[var(--im-border-hover)] group-hover:bg-[var(--im-card-bg-hover)] transition-all duration-500">
+                    <span className="font-mono text-xs text-[var(--im-text-muted)] group-hover:text-[var(--im-text-secondary)] transition-colors">
                       {step.number}
                     </span>
                   </div>
@@ -102,10 +102,10 @@ export function ProcessSection() {
 
                 {/* Content */}
                 <div className="pt-1.5 sm:pt-2.5">
-                  <h3 className="font-serif text-xl sm:text-2xl text-white mb-2 group-hover:text-white transition-colors">
+                  <h3 className="font-serif text-xl sm:text-2xl text-[var(--im-text)] mb-2 group-hover:text-[var(--im-text)] transition-colors">
                     {step.title}
                   </h3>
-                  <p className="font-serif text-sm sm:text-base text-white/35 leading-relaxed max-w-lg group-hover:text-white/50 transition-colors">
+                  <p className="font-serif text-sm sm:text-base text-[var(--im-text-muted)] leading-relaxed max-w-lg group-hover:text-[var(--im-text-secondary)] transition-colors">
                     {step.description}
                   </p>
                 </div>

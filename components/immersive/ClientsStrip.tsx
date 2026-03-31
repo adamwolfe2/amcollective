@@ -19,14 +19,14 @@ const MARQUEE_LOGOS = [...VENTURE_LOGOS, ...VENTURE_LOGOS];
 
 export function ClientsStrip() {
   return (
-    <section className="relative py-16 sm:py-20 overflow-hidden bg-[#0a0a0c]">
+    <section className="relative py-16 sm:py-20 overflow-hidden bg-[var(--im-bg)]">
       {/* Section label */}
       <motion.p
         variants={fadeInUp}
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, margin: "-50px" }}
-        className="text-center font-mono text-xs uppercase tracking-[0.2em] text-white/25 mb-10"
+        className="text-center font-mono text-xs uppercase tracking-[0.2em] text-[var(--im-text-faint)] mb-10"
       >
         Portfolio Ventures
       </motion.p>
@@ -34,8 +34,8 @@ export function ClientsStrip() {
       {/* Marquee */}
       <div className="relative">
         {/* Edge fade gradients */}
-        <div className="absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-[#0a0a0c] to-transparent" />
-        <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[#0a0a0c] to-transparent" />
+        <div className="absolute left-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-r from-[var(--im-gradient-edge)] to-transparent" />
+        <div className="absolute right-0 top-0 bottom-0 w-24 z-10 bg-gradient-to-l from-[var(--im-gradient-edge)] to-transparent" />
 
         {/* Scrolling track */}
         <div className="flex animate-marquee-immersive">

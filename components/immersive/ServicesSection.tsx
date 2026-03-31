@@ -20,13 +20,13 @@ export function ServicesSection() {
   return (
     <section
       id="services"
-      className="relative py-24 sm:py-32 bg-[#0a0a0c] overflow-hidden"
+      className="relative py-24 sm:py-32 bg-[var(--im-bg)] overflow-hidden"
     >
       {/* Ambient glow */}
       <div
         className="absolute w-[500px] h-[500px] rounded-full opacity-10 blur-[120px] pointer-events-none"
         style={{
-          background: "radial-gradient(circle, rgba(99, 102, 241, 0.3) 0%, transparent 70%)",
+          background: `radial-gradient(circle, var(--im-glow-1) 0%, transparent 70%)`,
           top: "20%",
           right: "-10%",
         }}
@@ -41,13 +41,13 @@ export function ServicesSection() {
             whileInView="visible"
             viewport={{ once: true, margin: "-80px" }}
           >
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/25 mb-4">
+            <p className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--im-text-faint)] mb-4">
               What we build
             </p>
-            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-white leading-[1.15]">
+            <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-[var(--im-text)] leading-[1.15]">
               Technical AI execution
               <br />
-              <span className="text-white/40">meets strategic growth</span>
+              <span className="text-[var(--im-text-muted)]">meets strategic growth</span>
             </h2>
           </motion.div>
 
@@ -56,7 +56,7 @@ export function ServicesSection() {
             initial="hidden"
             whileInView="visible"
             viewport={{ once: true, margin: "-80px" }}
-            className="font-serif text-base sm:text-lg text-white/40 leading-relaxed self-end"
+            className="font-serif text-base sm:text-lg text-[var(--im-text-muted)] leading-relaxed self-end"
           >
             Each venture starts as proven consulting, then becomes product.
             Those products deepen the value we deliver to every company we
@@ -78,22 +78,22 @@ export function ServicesSection() {
               <motion.div
                 key={service.name}
                 variants={fadeInUp}
-                className="group relative rounded-2xl border border-white/[0.06] bg-white/[0.02] p-6 sm:p-8 hover:bg-white/[0.04] hover:border-white/[0.12] transition-all duration-500"
+                className="group relative rounded-2xl border border-[var(--im-border)] bg-[var(--im-card-bg)] p-6 sm:p-8 hover:bg-[var(--im-card-bg-hover)] hover:border-[var(--im-border-hover)] transition-all duration-500"
               >
                 {/* Icon */}
-                <div className="w-10 h-10 rounded-xl bg-white/[0.06] flex items-center justify-center mb-5 group-hover:bg-white/[0.1] transition-colors">
+                <div className="w-10 h-10 rounded-xl bg-[var(--im-btn-secondary-bg)] flex items-center justify-center mb-5 group-hover:bg-[var(--im-btn-secondary-bg-hover)] transition-colors">
                   {IconComponent && (
-                    <IconComponent className="w-5 h-5 text-white/50 group-hover:text-white/80 transition-colors" />
+                    <IconComponent className="w-5 h-5 text-[var(--im-text-muted)] group-hover:text-[var(--im-text-secondary)] transition-colors" />
                   )}
                 </div>
 
                 {/* Title */}
-                <h3 className="font-serif text-xl font-medium text-white mb-3">
+                <h3 className="font-serif text-xl font-medium text-[var(--im-text)] mb-3">
                   {service.name}
                 </h3>
 
                 {/* Description */}
-                <p className="font-serif text-sm text-white/40 leading-relaxed mb-5">
+                <p className="font-serif text-sm text-[var(--im-text-muted)] leading-relaxed mb-5">
                   {service.description}
                 </p>
 
@@ -102,9 +102,9 @@ export function ServicesSection() {
                   {service.bullets.map((bullet) => (
                     <li
                       key={bullet}
-                      className="flex items-start gap-2 text-sm font-serif text-white/30"
+                      className="flex items-start gap-2 text-sm font-serif text-[var(--im-text-faint)]"
                     >
-                      <span className="w-1 h-1 rounded-full bg-white/20 mt-2 flex-shrink-0" />
+                      <span className="w-1 h-1 rounded-full bg-[var(--im-text-faint)] mt-2 flex-shrink-0" />
                       {bullet}
                     </li>
                   ))}
@@ -115,7 +115,7 @@ export function ServicesSection() {
                   {service.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider text-white/30 border border-white/[0.06] bg-white/[0.02]"
+                      className="px-2.5 py-1 rounded-full text-[10px] font-mono uppercase tracking-wider text-[var(--im-text-faint)] border border-[var(--im-border)] bg-[var(--im-card-bg)]"
                     >
                       {tag}
                     </span>
@@ -124,7 +124,7 @@ export function ServicesSection() {
 
                 {/* Hover glow */}
                 <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none">
-                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-white/[0.02] to-transparent" />
+                  <div className="absolute inset-0 rounded-2xl bg-gradient-to-b from-[var(--im-card-bg)] to-transparent" />
                 </div>
               </motion.div>
             );

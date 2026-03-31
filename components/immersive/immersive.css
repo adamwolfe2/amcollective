@@ -1,25 +1,112 @@
-/* ── Immersive mode dark theme styles ──────────────────────────────── */
-/* These styles are scoped under .immersive-mode to avoid any conflicts */
+/* ── Immersive mode theme styles ───────────────────────────────────── */
+/* Scoped under .immersive-mode. Theme via [data-im-theme] attribute. */
 
-.immersive-mode {
+/* ── Dark theme (default) ──────────────────────────────────────────── */
+.immersive-mode,
+.immersive-mode[data-im-theme="dark"] {
   --im-bg: #0a0a0c;
+  --im-bg-alt: #0f0f12;
   --im-surface: #141416;
+  --im-surface-hover: #1a1a1e;
   --im-border: rgba(255, 255, 255, 0.06);
+  --im-border-hover: rgba(255, 255, 255, 0.12);
   --im-text: #ffffff;
-  --im-text-muted: rgba(255, 255, 255, 0.4);
+  --im-text-secondary: rgba(255, 255, 255, 0.80);
+  --im-text-muted: rgba(255, 255, 255, 0.40);
+  --im-text-faint: rgba(255, 255, 255, 0.25);
+  --im-text-ghost: rgba(255, 255, 255, 0.10);
   --im-accent: #6366f1;
   --im-accent-soft: rgba(99, 102, 241, 0.15);
+  --im-btn-primary-bg: #ffffff;
+  --im-btn-primary-text: #0a0a0c;
+  --im-btn-secondary-bg: rgba(255, 255, 255, 0.06);
+  --im-btn-secondary-text: rgba(255, 255, 255, 0.70);
+  --im-btn-secondary-border: rgba(255, 255, 255, 0.08);
+  --im-card-bg: rgba(255, 255, 255, 0.02);
+  --im-card-bg-hover: rgba(255, 255, 255, 0.04);
+  --im-overlay-bg: rgba(0, 0, 0, 0.80);
+  --im-glow-1: rgba(99, 102, 241, 0.4);
+  --im-glow-2: rgba(167, 139, 250, 0.3);
+  --im-gradient-edge: #0a0a0c;
+  --im-nav-bg: rgba(10, 10, 12, 0.85);
+  --im-menu-bg: rgba(26, 26, 30, 0.95);
+  --im-noise-opacity: 0.015;
+  --im-grid-opacity: 0.03;
+  --im-orb-opacity: 0.7;
+  --im-indicator-bg: #ffffff;
+  --im-indicator-border: transparent;
+  --im-tag-bg: rgba(255, 255, 255, 0.02);
+  --im-tag-border: rgba(255, 255, 255, 0.06);
+  --im-tag-text: rgba(255, 255, 255, 0.30);
+  --im-step-bg: #141416;
+  --im-step-border: rgba(255, 255, 255, 0.08);
+  --im-featured-badge-bg: #ffffff;
+  --im-featured-badge-text: #0a0a0c;
+  --im-text-link: rgba(255, 255, 255, 0.50);
+  --im-text-link-hover: rgba(255, 255, 255, 0.80);
+  --im-decoration: rgba(255, 255, 255, 0.20);
+  --im-decoration-hover: rgba(255, 255, 255, 0.40);
+  --im-btn-secondary-bg-hover: rgba(255, 255, 255, 0.10);
+  --im-overlay-backdrop: rgba(0, 0, 0, 0.40);
 
   font-family: var(--font-serif), Georgia, serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Override root background when immersive is active */
+/* ── Light theme ───────────────────────────────────────────────────── */
+.immersive-mode[data-im-theme="light"] {
+  --im-bg: #f8f7f4;
+  --im-bg-alt: #f0eeea;
+  --im-surface: #ffffff;
+  --im-surface-hover: #f5f3ef;
+  --im-border: rgba(0, 0, 0, 0.08);
+  --im-border-hover: rgba(0, 0, 0, 0.15);
+  --im-text: #0f1523;
+  --im-text-secondary: rgba(15, 21, 35, 0.80);
+  --im-text-muted: rgba(15, 21, 35, 0.50);
+  --im-text-faint: rgba(15, 21, 35, 0.30);
+  --im-text-ghost: rgba(15, 21, 35, 0.08);
+  --im-accent: #4f46e5;
+  --im-accent-soft: rgba(79, 70, 229, 0.10);
+  --im-btn-primary-bg: #0f1523;
+  --im-btn-primary-text: #ffffff;
+  --im-btn-secondary-bg: rgba(0, 0, 0, 0.04);
+  --im-btn-secondary-text: rgba(15, 21, 35, 0.70);
+  --im-btn-secondary-border: rgba(0, 0, 0, 0.10);
+  --im-card-bg: rgba(0, 0, 0, 0.02);
+  --im-card-bg-hover: rgba(0, 0, 0, 0.04);
+  --im-overlay-bg: rgba(0, 0, 0, 0.50);
+  --im-glow-1: rgba(79, 70, 229, 0.15);
+  --im-glow-2: rgba(139, 92, 246, 0.12);
+  --im-gradient-edge: #f8f7f4;
+  --im-nav-bg: rgba(248, 247, 244, 0.90);
+  --im-menu-bg: rgba(255, 255, 255, 0.97);
+  --im-noise-opacity: 0.02;
+  --im-grid-opacity: 0.04;
+  --im-orb-opacity: 0.85;
+  --im-indicator-bg: #0f1523;
+  --im-indicator-border: rgba(0, 0, 0, 0.1);
+  --im-tag-bg: rgba(0, 0, 0, 0.03);
+  --im-tag-border: rgba(0, 0, 0, 0.08);
+  --im-tag-text: rgba(15, 21, 35, 0.45);
+  --im-step-bg: #ffffff;
+  --im-step-border: rgba(0, 0, 0, 0.10);
+  --im-featured-badge-bg: #0f1523;
+  --im-featured-badge-text: #ffffff;
+  --im-text-link: rgba(15, 21, 35, 0.50);
+  --im-text-link-hover: rgba(15, 21, 35, 0.80);
+  --im-decoration: rgba(15, 21, 35, 0.15);
+  --im-decoration-hover: rgba(15, 21, 35, 0.30);
+  --im-btn-secondary-bg-hover: rgba(0, 0, 0, 0.08);
+  --im-overlay-backdrop: rgba(0, 0, 0, 0.25);
+}
+
+/* ── Scrollbar theming ─────────────────────────────────────────────── */
 .immersive-mode,
 .immersive-mode * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+  scrollbar-color: var(--im-border-hover) transparent;
 }
 
 .immersive-mode::-webkit-scrollbar {
@@ -29,7 +116,7 @@
   background: transparent;
 }
 .immersive-mode::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--im-border-hover);
   border-radius: 3px;
 }
 
@@ -60,18 +147,6 @@
   display: none;
 }
 
-/* ── Glass card effect ─────────────────────────────────────────────── */
-.immersive-mode .glass-card {
-  background: rgba(255, 255, 255, 0.02);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  backdrop-filter: blur(12px);
-}
-
-.immersive-mode .glass-card:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
 /* ── Noise texture overlay ─────────────────────────────────────────── */
 .immersive-mode::before {
   content: "";
@@ -79,21 +154,21 @@
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.015;
+  opacity: var(--im-noise-opacity);
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
   background-repeat: repeat;
   background-size: 256px 256px;
 }
 
-/* ── Selection color in dark mode ──────────────────────────────────── */
+/* ── Selection ─────────────────────────────────────────────────────── */
 .immersive-mode ::selection {
-  background: rgba(99, 102, 241, 0.4);
-  color: white;
+  background: var(--im-accent-soft);
+  color: var(--im-text);
 }
 
 /* ── Focus visible ─────────────────────────────────────────────────── */
 .immersive-mode :focus-visible {
-  outline: 2px solid rgba(99, 102, 241, 0.6);
+  outline: 2px solid var(--im-accent);
   outline-offset: 2px;
 }
 
@@ -101,4 +176,9 @@
 .immersive-mode button,
 .immersive-mode a {
   transition-timing-function: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ── Theme transition ──────────────────────────────────────────────── */
+.immersive-mode {
+  transition: background-color 0.5s ease, color 0.5s ease;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, useTransform } from "framer-motion";
 import Image from "next/image";
 import {
   heroTextVariants,
@@ -30,10 +30,66 @@ const FLOATING_ORBS = PROJECTS.slice(0, 7).map((p, i) => ({
   delay: i * 0.15,
 }));
 
+function FloatingOrb({
+  orb,
+  index,
+  mouseX,
+  mouseY,
+}: {
+  orb: (typeof FLOATING_ORBS)[number];
+  index: number;
+  mouseX: ReturnType<typeof useMouseParallax>["x"];
+  mouseY: ReturnType<typeof useMouseParallax>["y"];
+}) {
+  const orbX = useTransform(mouseX, (v) => v * orb.parallaxMultiplier * 80);
+  const orbY = useTransform(mouseY, (v) => v * orb.parallaxMultiplier * 60);
+
+  return (
+    <motion.div
+      key={orb.name}
+      initial={{ opacity: 0, scale: 0.6 }}
+      animate={{ opacity: 0.7, scale: 1, y: [0, -8, 0] }}
+      transition={{
+        opacity: { duration: 0.8, delay: 0.5 + orb.delay, ease: EASE_SMOOTH },
+        scale: { duration: 0.8, delay: 0.5 + orb.delay, ease: EASE_SMOOTH },
+        y: { duration: 4 + index * 0.5, repeat: Infinity, ease: "easeInOut" },
+      }}
+      className="absolute rounded-full overflow-hidden shadow-2xl hidden sm:block"
+      style={{
+        width: orb.positions.size,
+        height: orb.positions.size,
+        top: orb.positions.top,
+        left: orb.positions.left,
+        right: (orb.positions as Record<string, unknown>).right as string | undefined,
+        x: orbX,
+        y: orbY,
+        zIndex: 5,
+      }}
+    >
+      <Image
+        src={orb.image}
+        alt={orb.name}
+        fill
+        className="object-cover"
+        sizes={`${orb.positions.size}px`}
+        unoptimized
+      />
+      {/* Glass border effect */}
+      <div className="absolute inset-0 rounded-full ring-1 ring-[var(--im-border)]" />
+    </motion.div>
+  );
+}
+
 export function HeroSection() {
   const [isMounted, setIsMounted] = useState(false);
   const mouse = useMouseParallax(isMounted);
   const sectionRef = useRef<HTMLElement>(null);
+
+  // Glow blob transforms
+  const glow1X = useTransform(mouse.x, (v) => v * 15);
+  const glow1Y = useTransform(mouse.y, (v) => v * 10);
+  const glow2X = useTransform(mouse.x, (v) => v * -10);
+  const glow2Y = useTransform(mouse.y, (v) => v * -8);
 
   useEffect(() => {
     setIsMounted(true);
@@ -47,13 +103,14 @@ export function HeroSection() {
       className="relative min-h-screen flex items-center justify-center overflow-hidden"
       style={{
         background:
-          "radial-gradient(ellipse 80% 60% at 50% 40%, rgba(30, 30, 40, 1) 0%, rgba(10, 10, 12, 1) 100%)",
+          "radial-gradient(ellipse 80% 60% at 50% 40%, var(--im-bg-alt) 0%, var(--im-bg) 100%)",
       }}
     >
       {/* Subtle grid overlay */}
       <div
-        className="absolute inset-0 opacity-[0.03]"
+        className="absolute inset-0"
         style={{
+          opacity: "var(--im-grid-opacity)",
           backgroundImage: `
             linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
@@ -63,67 +120,36 @@ export function HeroSection() {
       />
 
       {/* Ambient glow blobs */}
-      <div
+      <motion.div
         className="absolute w-[600px] h-[600px] rounded-full opacity-20 blur-[120px]"
         style={{
-          background: "radial-gradient(circle, rgba(99, 102, 241, 0.4) 0%, transparent 70%)",
+          background: "radial-gradient(circle, var(--im-glow-1) 0%, transparent 70%)",
           top: "10%",
           left: "20%",
-          transform: isMounted
-            ? `translate(${mouse.x * 15}px, ${mouse.y * 10}px)`
-            : undefined,
-          transition: "transform 0.3s ease-out",
+          x: glow1X,
+          y: glow1Y,
         }}
       />
-      <div
+      <motion.div
         className="absolute w-[400px] h-[400px] rounded-full opacity-15 blur-[100px]"
         style={{
-          background: "radial-gradient(circle, rgba(167, 139, 250, 0.3) 0%, transparent 70%)",
+          background: "radial-gradient(circle, var(--im-glow-2) 0%, transparent 70%)",
           bottom: "15%",
           right: "15%",
-          transform: isMounted
-            ? `translate(${mouse.x * -10}px, ${mouse.y * -8}px)`
-            : undefined,
-          transition: "transform 0.3s ease-out",
+          x: glow2X,
+          y: glow2Y,
         }}
       />
 
-      {/* Floating orb images (like Off Menu) */}
-      {FLOATING_ORBS.map((orb) => (
-        <motion.div
+      {/* Floating orb images */}
+      {FLOATING_ORBS.map((orb, index) => (
+        <FloatingOrb
           key={orb.name}
-          initial={{ opacity: 0, scale: 0.6 }}
-          animate={{ opacity: 0.7, scale: 1 }}
-          transition={{
-            duration: 0.8,
-            delay: 0.5 + orb.delay,
-            ease: EASE_SMOOTH,
-          }}
-          className="absolute rounded-full overflow-hidden shadow-2xl hidden sm:block"
-          style={{
-            width: orb.positions.size,
-            height: orb.positions.size,
-            top: orb.positions.top,
-            left: orb.positions.left,
-            right: (orb.positions as Record<string, unknown>).right as string | undefined,
-            transform: isMounted
-              ? `translate(${mouse.x * orb.parallaxMultiplier * 80}px, ${mouse.y * orb.parallaxMultiplier * 60}px)`
-              : undefined,
-            transition: "transform 0.4s ease-out",
-            zIndex: 5,
-          }}
-        >
-          <Image
-            src={orb.image}
-            alt={orb.name}
-            fill
-            className="object-cover"
-            sizes={`${orb.positions.size}px`}
-            unoptimized
-          />
-          {/* Glass border effect */}
-          <div className="absolute inset-0 rounded-full ring-1 ring-white/10" />
-        </motion.div>
+          orb={orb}
+          index={index}
+          mouseX={mouse.x}
+          mouseY={mouse.y}
+        />
       ))}
 
       {/* Center content */}
@@ -133,7 +159,7 @@ export function HeroSection() {
           variants={heroTextVariants}
           initial="hidden"
           animate="visible"
-          className="font-serif text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-light text-white mb-6 flex flex-wrap justify-center"
+          className="font-serif text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-light text-[var(--im-text)] mb-6 flex flex-wrap justify-center"
         >
           {TITLE.split("").map((char, i) => (
             <motion.span
@@ -152,7 +178,7 @@ export function HeroSection() {
           initial="hidden"
           animate="visible"
           transition={{ delay: 1 }}
-          className="font-serif text-base sm:text-lg md:text-xl text-white/50 max-w-xl mx-auto mb-10 leading-relaxed"
+          className="font-serif text-base sm:text-lg md:text-xl text-[var(--im-text-muted)] max-w-xl mx-auto mb-10 leading-relaxed"
         >
           AI-native studio building agentic products, interfaces, and
           ventures for high-growth startups
@@ -170,13 +196,13 @@ export function HeroSection() {
             onClick={() => {
               document.getElementById("contact")?.scrollIntoView({ behavior: "smooth" });
             }}
-            className="group flex items-center gap-3 bg-white text-[#0a0a0c] font-serif text-sm sm:text-base px-7 py-3.5 rounded-full hover:bg-white/90 transition-all duration-300"
+            className="group flex items-center gap-3 bg-[var(--im-btn-primary-bg)] text-[var(--im-btn-primary-text)] font-serif text-sm sm:text-base px-7 py-3.5 rounded-full hover:opacity-90 transition-all duration-300"
           >
             <span className="grid grid-cols-2 gap-0.5 w-5 h-5">
               {[...Array(4)].map((_, j) => (
                 <span
                   key={j}
-                  className="w-2 h-2 rounded-full bg-[#0a0a0c]/60 group-hover:bg-[#0a0a0c] transition-colors"
+                  className="w-2 h-2 rounded-full bg-[var(--im-btn-primary-text)] opacity-60 group-hover:opacity-100 transition-opacity"
                 />
               ))}
             </span>
@@ -187,7 +213,7 @@ export function HeroSection() {
             onClick={() => {
               document.getElementById("work")?.scrollIntoView({ behavior: "smooth" });
             }}
-            className="font-serif text-sm sm:text-base text-white/50 hover:text-white/80 transition-colors underline underline-offset-4 decoration-white/20 hover:decoration-white/40"
+            className="font-serif text-sm sm:text-base text-[var(--im-text-muted)] hover:text-[var(--im-text-secondary)] transition-colors underline underline-offset-4 decoration-1 decoration-current/20 hover:decoration-current/40"
           >
             View portfolio
           </button>
@@ -201,11 +227,11 @@ export function HeroSection() {
         transition={{ delay: 2, duration: 1 }}
         className="absolute bottom-8 left-1/2 -translate-x-1/2"
       >
-        <div className="w-5 h-8 rounded-full border border-white/20 flex items-start justify-center p-1">
+        <div className="w-5 h-8 rounded-full border border-[var(--im-border)] flex items-start justify-center p-1">
           <motion.div
             animate={{ y: [0, 10, 0] }}
             transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-            className="w-1.5 h-1.5 rounded-full bg-white/50"
+            className="w-1.5 h-1.5 rounded-full bg-[var(--im-text-muted)]"
           />
         </div>
       </motion.div>

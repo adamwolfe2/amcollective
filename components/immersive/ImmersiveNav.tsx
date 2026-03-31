@@ -2,7 +2,9 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { Sun, Moon } from "lucide-react";
 import { EASE_SMOOTH } from "@/lib/immersive/animations";
+import { useImmersiveTheme } from "@/lib/immersive/theme-context";
 
 const NAV_LINKS = [
   { label: "Work", href: "#work" },
@@ -24,6 +26,7 @@ interface ImmersiveNavProps {
 }
 
 export function ImmersiveNav({ onExit }: ImmersiveNavProps) {
+  const { toggle, isDark } = useImmersiveTheme();
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -54,7 +57,7 @@ export function ImmersiveNav({ onExit }: ImmersiveNavProps) {
         className="fixed top-0 left-0 right-0 z-[100] px-5 sm:px-8 py-4 flex items-center justify-between"
         style={{
           background: scrolled
-            ? "rgba(10, 10, 12, 0.85)"
+            ? "var(--im-nav-bg)"
             : "transparent",
           backdropFilter: scrolled ? "blur(20px) saturate(1.4)" : "none",
           transition: "background 0.4s ease, backdrop-filter 0.4s ease",
@@ -63,15 +66,21 @@ export function ImmersiveNav({ onExit }: ImmersiveNavProps) {
         {/* Logo */}
         <button
           onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          className="text-white font-serif text-xl sm:text-2xl font-bold tracking-tight hover:opacity-80 transition-opacity"
+          className="text-[var(--im-text)] font-serif text-xl sm:text-2xl font-bold tracking-tight hover:opacity-80 transition-opacity"
         >
           AM
         </button>
 
         {/* Right controls */}
         <div className="flex items-center gap-3">
-          {/* Dark/Light toggle indicator (decorative) */}
-          <div className="w-6 h-6 rounded-full bg-white/90 hidden sm:block" />
+          {/* Theme toggle */}
+          <button
+            onClick={toggle}
+            className="w-7 h-7 rounded-full flex items-center justify-center bg-[var(--im-btn-secondary-bg)] border border-[var(--im-border)] hover:bg-[var(--im-btn-secondary-bg-hover)] transition-all hidden sm:flex"
+            aria-label="Toggle theme"
+          >
+            {isDark ? <Sun className="w-3.5 h-3.5 text-[var(--im-text-muted)]" /> : <Moon className="w-3.5 h-3.5 text-[var(--im-text-muted)]" />}
+          </button>
 
           {/* Menu toggle */}
           <button
@@ -80,15 +89,15 @@ export function ImmersiveNav({ onExit }: ImmersiveNavProps) {
             aria-label="Toggle menu"
           >
             <span
-              className="block w-1.5 h-1.5 rounded-full bg-white/70 group-hover:bg-white transition-colors"
+              className="block w-1.5 h-1.5 rounded-full bg-[var(--im-text-secondary)] group-hover:bg-[var(--im-text)] transition-colors"
             />
             <span className="flex gap-1">
-              <span className="block w-1.5 h-1.5 rounded-full bg-white/70 group-hover:bg-white transition-colors" />
-              <span className="block w-1.5 h-1.5 rounded-full bg-white/70 group-hover:bg-white transition-colors" />
+              <span className="block w-1.5 h-1.5 rounded-full bg-[var(--im-text-secondary)] group-hover:bg-[var(--im-text)] transition-colors" />
+              <span className="block w-1.5 h-1.5 rounded-full bg-[var(--im-text-secondary)] group-hover:bg-[var(--im-text)] transition-colors" />
             </span>
             <span className="flex gap-1">
-              <span className="block w-1.5 h-1.5 rounded-full bg-white/40 group-hover:bg-white/70 transition-colors" />
-              <span className="block w-1.5 h-1.5 rounded-full bg-white/40 group-hover:bg-white/70 transition-colors" />
+              <span className="block w-1.5 h-1.5 rounded-full bg-[var(--im-text-muted)] group-hover:bg-[var(--im-text-secondary)] transition-colors" />
+              <span className="block w-1.5 h-1.5 rounded-full bg-[var(--im-text-muted)] group-hover:bg-[var(--im-text-secondary)] transition-colors" />
             </span>
           </button>
         </div>
@@ -101,7 +110,7 @@ export function ImmersiveNav({ onExit }: ImmersiveNavProps) {
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 100 }}
-            transition={{ duration: 0.35, ease: EASE_SMOOTH }}
+            transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className="fixed inset-0 z-[200] flex items-start justify-end"
           >
             {/* Backdrop */}
@@ -109,12 +118,12 @@ export function ImmersiveNav({ onExit }: ImmersiveNavProps) {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-black/40"
+              className="absolute inset-0 bg-[var(--im-overlay-backdrop)]"
               onClick={() => setMenuOpen(false)}
             />
 
             {/* Menu panel */}
-            <div className="relative w-full max-w-sm h-auto m-4 mt-16 rounded-2xl bg-[#1a1a1e]/95 backdrop-blur-xl border border-white/5 p-8 shadow-2xl">
+            <div className="relative w-full max-w-sm h-auto m-4 mt-16 rounded-2xl bg-[var(--im-menu-bg)] backdrop-blur-xl border border-[var(--im-border)] p-8 shadow-2xl">
               <nav className="space-y-1">
                 {NAV_LINKS.map((link, i) => (
                   <motion.button
@@ -123,15 +132,15 @@ export function ImmersiveNav({ onExit }: ImmersiveNavProps) {
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: 0.05 + i * 0.04 }}
                     onClick={() => handleNavClick(link.href)}
-                    className="block w-full text-left text-2xl font-serif text-white/90 hover:text-white py-2 transition-colors"
+                    className="block w-full text-left text-2xl font-serif text-[var(--im-text-secondary)] hover:text-[var(--im-text)] py-2 transition-colors"
                   >
                     {link.label}
                   </motion.button>
                 ))}
               </nav>
 
-              <div className="mt-8 pt-6 border-t border-white/10">
-                <p className="text-xs font-mono uppercase tracking-widest text-white/30 mb-3">
+              <div className="mt-8 pt-6 border-t border-[var(--im-border)]">
+                <p className="text-xs font-mono uppercase tracking-widest text-[var(--im-text-faint)] mb-3">
                   Resources
                 </p>
                 {RESOURCES.map((link) => (
@@ -140,7 +149,7 @@ export function ImmersiveNav({ onExit }: ImmersiveNavProps) {
                     href={link.href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="block text-sm font-serif text-white/60 hover:text-white py-1.5 transition-colors"
+                    className="block text-sm font-serif text-[var(--im-text-muted)] hover:text-[var(--im-text)] py-1.5 transition-colors"
                   >
                     {link.label}
                   </a>
@@ -148,7 +157,7 @@ export function ImmersiveNav({ onExit }: ImmersiveNavProps) {
                 {onExit && (
                   <button
                     onClick={onExit}
-                    className="block text-sm font-serif text-white/40 hover:text-white/70 py-1.5 mt-2 transition-colors"
+                    className="block text-sm font-serif text-[var(--im-text-muted)] hover:text-[var(--im-text-secondary)] py-1.5 mt-2 transition-colors"
                   >
                     Exit immersive mode
                   </button>

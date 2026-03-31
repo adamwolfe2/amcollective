@@ -6,7 +6,7 @@ import { fadeInUp, staggerContainer } from "@/lib/immersive/animations";
 
 export function ImmersiveFooter() {
   return (
-    <footer className="relative bg-[#0a0a0c] overflow-hidden">
+    <footer className="relative bg-[var(--im-bg)] overflow-hidden">
       {/* Final CTA Section */}
       <section id="contact" className="py-24 sm:py-32">
         <div className="max-w-3xl mx-auto px-5 sm:px-8 text-center">
@@ -18,14 +18,14 @@ export function ImmersiveFooter() {
           >
             <motion.p
               variants={fadeInUp}
-              className="font-mono text-xs uppercase tracking-[0.2em] text-white/25 mb-6"
+              className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--im-text-faint)] mb-6"
             >
               Get in touch
             </motion.p>
 
             <motion.h2
               variants={fadeInUp}
-              className="font-serif text-4xl sm:text-5xl md:text-6xl font-light text-white mb-6 leading-[1.1]"
+              className="font-serif text-4xl sm:text-5xl md:text-6xl font-light text-[var(--im-text)] mb-6 leading-[1.1]"
             >
               Ready to build
               <br />
@@ -34,7 +34,7 @@ export function ImmersiveFooter() {
 
             <motion.p
               variants={fadeInUp}
-              className="font-serif text-base sm:text-lg text-white/35 max-w-lg mx-auto mb-10 leading-relaxed"
+              className="font-serif text-base sm:text-lg text-[var(--im-text-muted)] max-w-lg mx-auto mb-10 leading-relaxed"
             >
               We&apos;re always looking for ambitious founders and teams
               building at the frontier. Let&apos;s talk.
@@ -46,7 +46,7 @@ export function ImmersiveFooter() {
             >
               <a
                 href="mailto:adam@amcollectivecapital.com"
-                className="group flex items-center gap-3 bg-white text-[#0a0a0c] font-serif text-base px-8 py-4 rounded-full hover:bg-white/90 transition-all duration-300"
+                className="group flex items-center gap-3 bg-[var(--im-btn-primary-bg)] text-[var(--im-btn-primary-text)] font-serif text-base px-8 py-4 rounded-full hover:opacity-90 transition-all duration-300"
               >
                 <Mail className="w-4 h-4" />
                 adam@amcollectivecapital.com
@@ -58,13 +58,13 @@ export function ImmersiveFooter() {
       </section>
 
       {/* Bottom bar */}
-      <div className="border-t border-white/[0.04] py-6 sm:py-8">
+      <div className="border-t border-[var(--im-border)] py-6 sm:py-8">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-6">
-            <span className="font-serif text-sm text-white/20">
+            <span className="font-serif text-sm text-[var(--im-text-ghost)]">
               AM Collective Capital
             </span>
-            <span className="font-serif text-sm text-white/10">
+            <span className="font-serif text-sm text-[var(--im-text-ghost)]">
               Portland, OR
             </span>
           </div>
@@ -74,7 +74,7 @@ export function ImmersiveFooter() {
               href="https://x.com/adamwolfe2"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-serif text-xs text-white/20 hover:text-white/50 transition-colors"
+              className="font-serif text-xs text-[var(--im-text-ghost)] hover:text-[var(--im-text-muted)] transition-colors"
             >
               Twitter / X
             </a>
@@ -82,7 +82,7 @@ export function ImmersiveFooter() {
               href="https://linkedin.com/in/adamwolfe2"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-serif text-xs text-white/20 hover:text-white/50 transition-colors"
+              className="font-serif text-xs text-[var(--im-text-ghost)] hover:text-[var(--im-text-muted)] transition-colors"
             >
               LinkedIn
             </a>
@@ -90,13 +90,13 @@ export function ImmersiveFooter() {
               href="https://github.com/adamwolfe2"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-serif text-xs text-white/20 hover:text-white/50 transition-colors"
+              className="font-serif text-xs text-[var(--im-text-ghost)] hover:text-[var(--im-text-muted)] transition-colors"
             >
               GitHub
             </a>
           </div>
 
-          <p className="font-mono text-[10px] text-white/10 uppercase tracking-wider">
+          <p className="font-mono text-[10px] text-[var(--im-text-ghost)] uppercase tracking-wider">
             &copy; {new Date().getFullYear()} AM Collective
           </p>
         </div>

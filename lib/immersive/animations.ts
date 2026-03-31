@@ -86,3 +86,14 @@ export const heroLetterVariants = {
     transition: { duration: 0.5, ease: EASE_SPRING },
   },
 };
+
+// Spring transition configs
+export const springTransition = { type: "spring" as const, stiffness: 300, damping: 30 };
+export const springBouncy = { type: "spring" as const, stiffness: 400, damping: 25 };
+export const springGentle = { type: "spring" as const, stiffness: 200, damping: 25 };
+
+// Hover effects
+export const hoverLift = {
+  y: -3,
+  transition: { type: "spring" as const, stiffness: 300, damping: 30 },
+};

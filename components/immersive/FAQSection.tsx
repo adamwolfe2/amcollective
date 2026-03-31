@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown } from "lucide-react";
-import { fadeInUp, staggerContainer, EASE_SMOOTH } from "@/lib/immersive/animations";
+import { fadeInUp, staggerContainer } from "@/lib/immersive/animations";
 import { FAQS } from "@/content/faqs";
 
 export function FAQSection() {
@@ -12,7 +12,7 @@ export function FAQSection() {
   return (
     <section
       id="faq"
-      className="relative py-24 sm:py-32 bg-[#0a0a0c] overflow-hidden"
+      className="relative py-24 sm:py-32 bg-[var(--im-bg)] overflow-hidden"
     >
       <div className="max-w-3xl mx-auto px-5 sm:px-8">
         {/* Header */}
@@ -23,10 +23,10 @@ export function FAQSection() {
           viewport={{ once: true, margin: "-80px" }}
           className="text-center mb-14 sm:mb-18"
         >
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/25 mb-4">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--im-text-faint)] mb-4">
             FAQ
           </p>
-          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-white">
+          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-[var(--im-text)]">
             Common questions
           </h2>
         </motion.div>
@@ -43,7 +43,7 @@ export function FAQSection() {
             <motion.div
               key={i}
               variants={fadeInUp}
-              className="border border-white/[0.06] rounded-xl overflow-hidden hover:border-white/[0.1] transition-colors"
+              className="border border-[var(--im-border)] rounded-xl overflow-hidden hover:border-[var(--im-border-hover)] transition-colors"
             >
               <button
                 onClick={() => setOpenIndex(openIndex === i ? null : i)}
@@ -51,11 +51,11 @@ export function FAQSection() {
                 aria-expanded={openIndex === i}
                 aria-controls={`faq-answer-${i}`}
               >
-                <span className="font-serif text-base sm:text-lg text-white/80 group-hover:text-white transition-colors pr-4">
+                <span className="font-serif text-base sm:text-lg text-[var(--im-text-secondary)] group-hover:text-[var(--im-text)] transition-colors pr-4">
                   {faq.question}
                 </span>
                 <ChevronDown
-                  className={`w-4 h-4 text-white/30 flex-shrink-0 transition-transform duration-300 ${
+                  className={`w-4 h-4 text-[var(--im-text-faint)] flex-shrink-0 transition-transform duration-300 ${
                     openIndex === i ? "rotate-180" : ""
                   }`}
                 />
@@ -69,13 +69,13 @@ export function FAQSection() {
                     animate={{ height: "auto", opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{
-                      height: { duration: 0.3, ease: EASE_SMOOTH },
+                      height: { type: "spring", stiffness: 400, damping: 35 },
                       opacity: { duration: 0.2 },
                     }}
                     className="overflow-hidden"
                   >
                     <div className="px-5 sm:px-6 pb-5 sm:pb-6">
-                      <p className="font-serif text-sm text-white/35 leading-relaxed">
+                      <p className="font-serif text-sm text-[var(--im-text-muted)] leading-relaxed">
                         {faq.answer}
                       </p>
                     </div>

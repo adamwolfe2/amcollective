@@ -9,13 +9,13 @@ export function PricingSection() {
   return (
     <section
       id="pricing"
-      className="relative py-24 sm:py-32 bg-[#0a0a0c] overflow-hidden"
+      className="relative py-24 sm:py-32 bg-[var(--im-bg)] overflow-hidden"
     >
       {/* Ambient glow */}
       <div
         className="absolute w-[500px] h-[500px] rounded-full opacity-10 blur-[120px] pointer-events-none"
         style={{
-          background: "radial-gradient(circle, rgba(167, 139, 250, 0.3) 0%, transparent 70%)",
+          background: `radial-gradient(circle, var(--im-glow-2) 0%, transparent 70%)`,
           bottom: "10%",
           left: "-5%",
         }}
@@ -30,15 +30,15 @@ export function PricingSection() {
           viewport={{ once: true, margin: "-80px" }}
           className="text-center mb-14 sm:mb-18"
         >
-          <p className="font-mono text-xs uppercase tracking-[0.2em] text-white/25 mb-4">
+          <p className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--im-text-faint)] mb-4">
             Engagement
           </p>
-          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-white mb-4">
+          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-light text-[var(--im-text)] mb-4">
             Two ways to work
             <br />
-            <span className="text-white/40">with us</span>
+            <span className="text-[var(--im-text-muted)]">with us</span>
           </h2>
-          <p className="font-serif text-base text-white/35 max-w-lg mx-auto">
+          <p className="font-serif text-base text-[var(--im-text-muted)] max-w-lg mx-auto">
             Whether you need a focused build or a long-term partner, we have a
             model that fits.
           </p>
@@ -56,27 +56,29 @@ export function PricingSection() {
             <motion.div
               key={plan.name}
               variants={fadeInUp}
+              whileHover={{ y: -3 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className={`relative group rounded-2xl p-6 sm:p-8 transition-all duration-500 ${
                 plan.featured
-                  ? "bg-white/[0.06] border border-white/[0.12] hover:border-white/[0.2]"
-                  : "bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.1]"
+                  ? "bg-[var(--im-btn-secondary-bg)] border border-[var(--im-border-hover)] hover:border-[var(--im-border-hover)]"
+                  : "bg-[var(--im-card-bg)] border border-[var(--im-border)] hover:border-[var(--im-border-hover)]"
               }`}
             >
               {/* Featured badge */}
               {plan.featured && (
-                <div className="absolute -top-3 left-6 px-3 py-1 rounded-full bg-white text-[#0a0a0c] text-[10px] font-mono uppercase tracking-wider">
+                <div className="absolute -top-3 left-6 px-3 py-1 rounded-full bg-[var(--im-featured-badge-bg)] text-[var(--im-featured-badge-text)] text-[10px] font-mono uppercase tracking-wider">
                   Recommended
                 </div>
               )}
 
               {/* Plan info */}
-              <h3 className="font-serif text-xl text-white mb-1">
+              <h3 className="font-serif text-xl text-[var(--im-text)] mb-1">
                 {plan.name}
               </h3>
-              <p className="font-mono text-xs text-white/30 uppercase tracking-wider mb-4">
+              <p className="font-mono text-xs text-[var(--im-text-faint)] uppercase tracking-wider mb-4">
                 {plan.priceLabel}
               </p>
-              <p className="font-serif text-sm text-white/40 leading-relaxed mb-6">
+              <p className="font-serif text-sm text-[var(--im-text-muted)] leading-relaxed mb-6">
                 {plan.description}
               </p>
 
@@ -85,9 +87,9 @@ export function PricingSection() {
                 {plan.bullets.map((bullet) => (
                   <li
                     key={bullet}
-                    className="flex items-start gap-3 text-sm font-serif text-white/50"
+                    className="flex items-start gap-3 text-sm font-serif text-[var(--im-text-muted)]"
                   >
-                    <Check className="w-4 h-4 text-white/25 mt-0.5 flex-shrink-0" />
+                    <Check className="w-4 h-4 text-[var(--im-text-faint)] mt-0.5 flex-shrink-0" />
                     {bullet}
                   </li>
                 ))}
@@ -100,8 +102,8 @@ export function PricingSection() {
                 }}
                 className={`w-full flex items-center justify-center gap-2 py-3 rounded-full font-serif text-sm transition-all duration-300 ${
                   plan.featured
-                    ? "bg-white text-[#0a0a0c] hover:bg-white/90"
-                    : "bg-white/[0.06] text-white/70 border border-white/[0.08] hover:bg-white/[0.1] hover:text-white"
+                    ? "bg-[var(--im-btn-primary-bg)] text-[var(--im-btn-primary-text)] hover:opacity-90"
+                    : "bg-[var(--im-btn-secondary-bg)] text-[var(--im-text-secondary)] border border-[var(--im-border)] hover:bg-[var(--im-btn-secondary-bg-hover)] hover:text-[var(--im-text)]"
                 }`}
               >
                 {plan.ctaLabel}

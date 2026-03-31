@@ -1,50 +1,37 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useMotionValue, useSpring, type MotionValue } from "framer-motion";
 
-interface MousePosition {
-  x: number; // -1 to 1, center = 0
-  y: number; // -1 to 1, center = 0
+interface SpringMousePosition {
+  x: MotionValue<number>;
+  y: MotionValue<number>;
 }
 
 /**
- * Tracks mouse position relative to viewport center.
- * Returns normalized coordinates for parallax effects.
+ * Spring-physics mouse parallax. Returns MotionValues for 60fps
+ * smooth tracking with zero React re-renders.
  */
-export function useMouseParallax(enabled = true): MousePosition {
-  const [pos, setPos] = useState<MousePosition>({ x: 0, y: 0 });
+export function useMouseParallax(enabled = true): SpringMousePosition {
+  const rawX = useMotionValue(0);
+  const rawY = useMotionValue(0);
+
+  const x = useSpring(rawX, { stiffness: 50, damping: 20, mass: 0.5 });
+  const y = useSpring(rawY, { stiffness: 50, damping: 20, mass: 0.5 });
 
   useEffect(() => {
     if (!enabled) return;
 
-    let ticking = false;
-    let mouseX = 0;
-    let mouseY = 0;
-
-    function update() {
+    function onMouseMove(e: MouseEvent) {
       const cx = window.innerWidth / 2;
       const cy = window.innerHeight / 2;
-      setPos({
-        x: (mouseX - cx) / cx,
-        y: (mouseY - cy) / cy,
-      });
-    }
-
-    function onMouseMove(e: MouseEvent) {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
-      if (!ticking) {
-        ticking = true;
-        requestAnimationFrame(() => {
-          update();
-          ticking = false;
-        });
-      }
+      rawX.set((e.clientX - cx) / cx);
+      rawY.set((e.clientY - cy) / cy);
     }
 
     window.addEventListener("mousemove", onMouseMove, { passive: true });
     return () => window.removeEventListener("mousemove", onMouseMove);
-  }, [enabled]);
+  }, [enabled, rawX, rawY]);
 
-  return pos;
+  return { x, y };
 }
