@@ -16,17 +16,28 @@ import Image from "next/image";
 import { PROJECTS, type Project } from "@/content/projects";
 
 // ── Config ───────────────────────────────────────────────────────
-const INTRO_REVOLUTIONS = 2.5;   // fast clockwise spins on load
-const INTRO_DURATION    = 1.9;   // seconds for intro spin
-const IDLE_DURATION     = 85;    // seconds per slow idle revolution
+const INTRO_REVOLUTIONS  = 2.5;  // fast clockwise spins on load
+const INTRO_DURATION     = 1.9;  // seconds for intro spin
+const IDLE_DURATION      = 85;   // seconds per slow idle revolution
 const SCROLL_REVOLUTIONS = 3.0;  // total rotations over full scroll range
-const TILT_AMOUNT       = 4;     // degrees of mouse-driven tilt
+const TILT_AMOUNT        = 4;    // degrees of mouse-driven tilt
 
-// Depth scaling — the front item grows dramatically
-const DEPTH_SCALE_MIN   = 0.28;  // back items (almost hidden)
-const DEPTH_SCALE_MAX   = 4.2;   // front item (~4× base size = ~320px circle)
-const DEPTH_OPACITY_MIN = 0.08;
-const DEPTH_OPACITY_MAX = 1.0;
+// Depth scaling — modest difference keeps items from visually overlapping
+const DEPTH_SCALE_MIN    = 0.45; // back items
+const DEPTH_SCALE_MAX    = 1.9;  // front item (~1.9× base size)
+const DEPTH_OPACITY_MIN  = 0.15;
+const DEPTH_OPACITY_MAX  = 1.0;
+
+// Logo images — clean icons instead of social screenshots
+const ORBIT_LOGOS: Record<string, string> = {
+  Cursive:   "/logos/cursive.png",
+  TaskSpace: "/logos/taskspace.png",
+  WholeSail: "/logos/wholesail.png",
+  MyVSL:     "/logos/myvsl.png",
+  Trackr:    "/logos/trackr.jpg",
+  CampusGTM: "/CampusGTM Logo.png",
+  Hook:      "/logos/hook.png",
+};
 
 interface OrbitDims { radiusX: number; radiusY: number; size: number }
 
@@ -73,7 +84,7 @@ function OrbitItem({
     ([yv, d]: number[]) => {
       // Only pull when depth > 0.25 (approaching front)
       const pull = Math.pow(Math.max(0, (d - 0.25) / 0.75), 2.8);
-      return yv * (1 - pull * 0.80);
+      return yv * (1 - pull * 0.45);
     }
   );
 
@@ -90,9 +101,7 @@ function OrbitItem({
 
   const itemZ = useTransform(depthRaw, (d) => Math.round(d * 10) + 10);
 
-  // Use social screenshot image (object-cover, no padding) to prevent clipping
-  const imgSrc = project.image;
-  // Size hint that accounts for the maximum scale
+  const imgSrc = ORBIT_LOGOS[project.name] ?? project.image;
   const imgSizeHint = Math.round(size * DEPTH_SCALE_MAX * 0.9);
 
   return (
@@ -123,17 +132,16 @@ function OrbitItem({
       >
         <button
           onClick={onClick}
-          className="rounded-full overflow-hidden cursor-pointer shadow-md hover:shadow-2xl transition-shadow duration-300"
-          style={{ width: size, height: size }}
+          className="rounded-full overflow-hidden cursor-pointer shadow-md hover:shadow-xl transition-shadow duration-300 bg-white"
+          style={{ width: size, height: size, padding: "10%" }}
           aria-label={`View ${project.name}`}
         >
-          {/* object-cover fills the circle cleanly — no padding to clip */}
           <div className="relative w-full h-full">
             <Image
               src={imgSrc}
               alt={project.name}
               fill
-              className="object-cover"
+              className="object-contain"
               sizes={`${imgSizeHint}px`}
               unoptimized
             />
