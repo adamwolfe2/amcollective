@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type RefObject } from "react";
+import { useEffect, useState, useRef, type RefObject } from "react";
 import {
   motion,
   useScroll,
@@ -27,7 +27,7 @@ const DEPTH_SCALE_MAX    = 1.65;
 const DEPTH_OPACITY_MIN  = 0.70;
 const DEPTH_OPACITY_MAX  = 1.0;
 
-// Scroll phases
+// Desktop scroll phases (mobile computes tighter values)
 const FLATTEN_START  = 0.28;
 const ORBIT_GONE     = 0.44;
 const SHOWCASE_START = 0.48;
@@ -45,12 +45,21 @@ export const ORBIT_LOGOS: Record<string, string> = {
 };
 
 interface OrbitDims { radiusX: number; radiusY: number; size: number }
+interface Phases { flattenStart: number; orbitGone: number; showcaseStart: number }
 
+// Flat horizontal axis on mobile — radiusX >> radiusY
 function getOrbitDims(w: number): OrbitDims {
-  if (w < 480)  return { radiusX: 118, radiusY: 148, size: 56 };
-  if (w < 640)  return { radiusX: 148, radiusY: 162, size: 68 };
+  if (w < 480)  return { radiusX: 135, radiusY: 40,  size: 52 };
+  if (w < 640)  return { radiusX: 155, radiusY: 55,  size: 62 };
   if (w < 1024) return { radiusX: 265, radiusY: 198, size: 80 };
   return                { radiusX: 385, radiusY: 252, size: 92 };
+}
+
+// Mobile reaches showcase much faster — less scrolling required
+function getPhases(w: number): Phases {
+  return w < 640
+    ? { flattenStart: 0.15, orbitGone: 0.28, showcaseStart: 0.33 }
+    : { flattenStart: FLATTEN_START, orbitGone: ORBIT_GONE, showcaseStart: SHOWCASE_START };
 }
 
 function getFrontIndex(rotation: number, total: number): number {
@@ -220,14 +229,15 @@ function ProjectCard({ project, onClick }: { project: Project; onClick: () => vo
   );
 }
 
-// ── Showcase card — continuous MotionValue driven (no state, no choppy steps) ──
+// ── Showcase card — continuous MotionValue driven ──────────────────────
 function ShowcaseCard({
-  project, index, showcaseProgress, onOpen,
+  project, index, showcaseProgress, onOpen, carouselRadius,
 }: {
   project: Project;
   index: number;
   showcaseProgress: MotionValue<number>;
   onOpen: (p: Project) => void;
+  carouselRadius: number;
 }) {
   // Normalize position: 0 = at front, ±0.5 = at sides, ±1 = at back
   const pos = useTransform(showcaseProgress, (p) => {
@@ -236,30 +246,20 @@ function ShowcaseCard({
     return v / (N / 2);                // -1 to 1
   });
 
-  const angle  = useTransform(pos, (v) => v * Math.PI);       // -π to π
-  const depth  = useTransform(angle, Math.cos);                // 1=front, -1=back
+  const angle  = useTransform(pos, (v) => v * Math.PI);
+  const depth  = useTransform(angle, Math.cos);
   const sinVal = useTransform(angle, Math.sin);
 
-  // x offset — how far horizontally from center
-  const RADIUS = 320;
-  const x = useTransform(sinVal, (s) => s * RADIUS);
+  const x = useTransform(sinVal, (s) => s * carouselRadius);
 
-  // Scale: front is large, sides/back shrink
   const scale = useTransform(depth, (d) => {
-    const t = (d + 1) / 2; // 0 to 1
+    const t = (d + 1) / 2;
     return 0.42 + 0.58 * Math.pow(t, 1.6);
   });
 
-  // Opacity: front fully visible, sides peek in, back hidden
-  const opacity = useTransform(depth, (d) => Math.max(0, (d + 0.25) / 1.25));
-
-  // Tilt: cards lean toward center as they move to sides
-  const rotateY = useTransform(sinVal, (s) => -s * 38);
-
-  // zIndex: front card on top
-  const zIndex = useTransform(depth, (d) => Math.round(d * 20) + 20);
-
-  // Only allow clicks when near front (depth > 0.5)
+  const opacity  = useTransform(depth, (d) => Math.max(0, (d + 0.25) / 1.25));
+  const rotateY  = useTransform(sinVal, (s) => -s * 38);
+  const zIndex   = useTransform(depth, (d) => Math.round(d * 20) + 20);
   const isNearFront = useTransform(depth, (d) => d > 0.5);
 
   return (
@@ -267,11 +267,7 @@ function ShowcaseCard({
       className="absolute"
       style={{ x, scale, opacity, rotateY, zIndex }}
     >
-      <motion.div
-        style={{
-          pointerEvents: isNearFront as unknown as "auto" | "none",
-        }}
-      >
+      <motion.div style={{ pointerEvents: isNearFront as unknown as "auto" | "none" }}>
         <ProjectCard project={project} onClick={() => onOpen(project)} />
       </motion.div>
     </motion.div>
@@ -282,35 +278,36 @@ function ShowcaseCard({
 export function ShowcaseOverlay({
   scrollYProgress,
   onProjectOpen,
+  showcaseStart = SHOWCASE_START,
+  carouselRadius = 320,
 }: {
   scrollYProgress: MotionValue<number>;
   onProjectOpen: (project: Project) => void;
+  showcaseStart?: number;
+  carouselRadius?: number;
 }) {
   const [activeIndex, setActiveIndex] = useState(0);
 
-  // Background fades in fully BEFORE cards appear — covers orbit + center text
   const bgOpacity = useTransform(
     scrollYProgress,
-    [SHOWCASE_START, SHOWCASE_START + 0.04],
+    [showcaseStart, showcaseStart + 0.04],
     [0, 1],
     { clamp: true }
   );
   const cardOpacity = useTransform(
     scrollYProgress,
-    [SHOWCASE_START + 0.03, SHOWCASE_START + 0.08],
+    [showcaseStart + 0.03, showcaseStart + 0.08],
     [0, 1],
     { clamp: true }
   );
 
-  // Continuous: 0 to N as scroll goes from SHOWCASE_START to 1.0
   const showcaseProgress = useTransform(
     scrollYProgress,
-    [SHOWCASE_START, 1.0],
+    [showcaseStart, 1.0],
     [0, N],
     { clamp: true }
   );
 
-  // Only track activeIndex for the dot indicator (state is fine for dots)
   useMotionValueEvent(showcaseProgress, "change", (v) => {
     const idx = Math.min(Math.round(v), N - 1);
     setActiveIndex((prev) => (prev !== idx ? idx : prev));
@@ -318,10 +315,6 @@ export function ShowcaseOverlay({
 
   return (
     <>
-      {/*
-        position: fixed — escapes ALL stacking contexts.
-        Even z-index: 10 inside a sticky div can't beat fixed z-40.
-      */}
       <motion.div
         className="fixed inset-0"
         style={{
@@ -333,7 +326,6 @@ export function ShowcaseOverlay({
         }}
       />
 
-      {/* Card carousel — also fixed */}
       <motion.div
         className="fixed inset-0 flex items-center justify-center pointer-events-none"
         style={{ opacity: cardOpacity, zIndex: 41, perspective: "1100px" }}
@@ -346,11 +338,11 @@ export function ShowcaseOverlay({
               index={i}
               showcaseProgress={showcaseProgress}
               onOpen={onProjectOpen}
+              carouselRadius={carouselRadius}
             />
           ))}
         </div>
 
-        {/* Dot progress */}
         <div className="absolute bottom-12 left-0 right-0 flex justify-center items-center gap-2">
           {PROJECTS.map((_, i) => (
             <motion.div
@@ -381,11 +373,20 @@ interface OrbitHeroProps {
 export function OrbitHero({ sectionRef, onProjectClick, mouseX, mouseY }: OrbitHeroProps) {
   const [entered, setEntered]       = useState(false);
   const [dims, setDims]             = useState<OrbitDims>({ radiusX: 385, radiusY: 252, size: 92 });
+  const [phases, setPhases]         = useState<Phases>({ flattenStart: FLATTEN_START, orbitGone: ORBIT_GONE, showcaseStart: SHOWCASE_START });
   const [frontIndex, setFrontIndex] = useState(0);
   const [inShowcase, setInShowcase] = useState(false);
+  // Ref so closures always read latest phases without stale capture
+  const phasesRef                   = useRef(phases);
 
   useEffect(() => {
-    const update = () => setDims(getOrbitDims(window.innerWidth));
+    const update = () => {
+      const w = window.innerWidth;
+      setDims(getOrbitDims(w));
+      const p = getPhases(w);
+      phasesRef.current = p;
+      setPhases(p);
+    };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
@@ -418,7 +419,7 @@ export function OrbitHero({ sectionRef, onProjectClick, mouseX, mouseY }: OrbitH
 
   const scrollAngle = useTransform(
     scrollYProgress,
-    [0, FLATTEN_START],
+    [0, phases.flattenStart],
     [0, Math.PI * 2 * SCROLL_REVOLUTIONS],
     { clamp: true }
   );
@@ -430,20 +431,20 @@ export function OrbitHero({ sectionRef, onProjectClick, mouseX, mouseY }: OrbitH
 
   const flattenFactor = useTransform(
     scrollYProgress,
-    [FLATTEN_START, ORBIT_GONE],
+    [phases.flattenStart, phases.orbitGone],
     [1, 0],
     { clamp: true }
   );
 
   const orbitOpacity = useTransform(
     scrollYProgress,
-    [FLATTEN_START + 0.06, ORBIT_GONE],
+    [phases.flattenStart + 0.06, phases.orbitGone],
     [1, 0],
     { clamp: true }
   );
 
   useMotionValueEvent(scrollYProgress, "change", (v) => {
-    setInShowcase(v >= SHOWCASE_START - 0.02);
+    setInShowcase(v >= phasesRef.current.showcaseStart - 0.02);
   });
 
   useMotionValueEvent(rotation, "change", (r) => {

@@ -16,14 +16,12 @@ import type { Project } from "@/content/projects";
 function ProjectModal({ project, onClose }: { project: Project; onClose: () => void }) {
   const logo = ORBIT_LOGOS[project.name] ?? project.image;
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  // Lock body scroll while open
   useEffect(() => {
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = ""; };
@@ -37,13 +35,11 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
     >
-      {/* Backdrop */}
       <motion.div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
 
-      {/* Card */}
       <motion.div
         className="relative z-10 bg-white rounded-[28px] overflow-hidden w-full max-w-md shadow-2xl"
         style={{ maxHeight: "88vh", overflowY: "auto" }}
@@ -52,7 +48,6 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
         exit={{ opacity: 0, scale: 0.88, y: 28 }}
         transition={{ type: "spring", stiffness: 320, damping: 28, mass: 0.8 }}
       >
-        {/* Hero screenshot */}
         <div className="relative w-full" style={{ aspectRatio: "16 / 9" }}>
           <Image
             src={project.image}
@@ -62,7 +57,6 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
             sizes="(max-width: 640px) 100vw, 448px"
             unoptimized
           />
-          {/* Close button */}
           <button
             onClick={onClose}
             className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center text-xs hover:bg-black/60 transition-colors"
@@ -72,9 +66,7 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
           </button>
         </div>
 
-        {/* Content */}
         <div className="px-6 pt-5 pb-7">
-          {/* Logo + name */}
           <div className="flex items-center gap-3 mb-4">
             <div
               className="relative rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 shrink-0"
@@ -98,17 +90,14 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
             </div>
           </div>
 
-          {/* Tagline */}
           <p className="font-serif text-[15px] text-gray-800 leading-snug mb-3">
             {project.tagline}
           </p>
 
-          {/* Description */}
           <p className="text-[13px] text-gray-500 leading-relaxed mb-5">
             {project.description}
           </p>
 
-          {/* Metrics */}
           {project.metrics && (
             <div className="flex border-t border-b border-gray-100 py-4 mb-5">
               {project.metrics.slice(0, 3).map((m, i) => (
@@ -123,7 +112,6 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
             </div>
           )}
 
-          {/* CTA */}
           <a
             href={project.url}
             target="_blank"
@@ -140,34 +128,47 @@ function ProjectModal({ project, onClose }: { project: Project; onClose: () => v
 
 // ── HeroSection ────────────────────────────────────────────────────────
 export function HeroSection() {
-  const [isMounted, setIsMounted] = useState(false);
+  const [isMounted, setIsMounted]         = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [isMobile, setIsMobile]           = useState(false);
   const mouse = useMouseParallax(isMounted);
   const sectionRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    const update = () => setIsMobile(window.innerWidth < 640);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  // Responsive values derived from isMobile
+  const sectionHeight   = isMobile ? "450vh" : "700vh";
+  const showcaseStart   = isMobile ? 0.33 : 0.48;
+  const carouselRadius  = isMobile ? 200 : 320;
+  const fadeStart       = isMobile ? 0.08 : 0.16;
+  const fadeEnd         = isMobile ? 0.15 : 0.26;
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end end"],
   });
 
-  // Fade center content out before orbit starts flattening
-  const centerOpacity = useTransform(scrollYProgress, [0.16, 0.26], [1, 0], { clamp: true });
+  const centerOpacity = useTransform(scrollYProgress, [fadeStart, fadeEnd], [1, 0], { clamp: true });
 
-  // Glow blob transforms
   const glow1X = useTransform(mouse.x, (v) => v * 15);
   const glow1Y = useTransform(mouse.y, (v) => v * 10);
   const glow2X = useTransform(mouse.x, (v) => v * -10);
   const glow2Y = useTransform(mouse.y, (v) => v * -8);
 
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
   const TITLE = "AM Collective";
 
   return (
     <>
-      <section ref={sectionRef} className="relative" style={{ height: "700vh" }}>
+      <section ref={sectionRef} className="relative" style={{ height: sectionHeight }}>
         {/* Sticky inner */}
         <div
           className="sticky top-0 h-screen flex items-center justify-center overflow-hidden"
@@ -287,6 +288,8 @@ export function HeroSection() {
           <ShowcaseOverlay
             scrollYProgress={scrollYProgress}
             onProjectOpen={setSelectedProject}
+            showcaseStart={showcaseStart}
+            carouselRadius={carouselRadius}
           />
 
           {/* Scroll indicator */}
