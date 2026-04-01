@@ -283,8 +283,11 @@ export function HeroSection() {
             </motion.div>
           </motion.div>
 
-          {/* Showcase overlay — sibling of center content so z-30 > z-10 works */}
-          <ShowcaseOverlay scrollYProgress={scrollYProgress} />
+          {/* Showcase overlay — fixed position escapes all stacking contexts */}
+          <ShowcaseOverlay
+            scrollYProgress={scrollYProgress}
+            onProjectOpen={setSelectedProject}
+          />
 
           {/* Scroll indicator */}
           <motion.div

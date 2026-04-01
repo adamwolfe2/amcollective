@@ -22,20 +22,18 @@ const IDLE_DURATION      = 85;
 const SCROLL_REVOLUTIONS = 2.0;
 const TILT_AMOUNT        = 4;
 
-// Back items must NOT be transparent — range is tight so all items are visible
 const DEPTH_SCALE_MIN    = 0.52;
 const DEPTH_SCALE_MAX    = 1.65;
-const DEPTH_OPACITY_MIN  = 0.70;  // was 0.22 — fully opaque minimum
+const DEPTH_OPACITY_MIN  = 0.70;
 const DEPTH_OPACITY_MAX  = 1.0;
 
-// Scroll phase thresholds (fraction of total scrollYProgress)
-const FLATTEN_START  = 0.28;  // orbit starts flattening
-const ORBIT_GONE     = 0.44;  // orbit fully invisible
-const SHOWCASE_START = 0.48;  // 3D coverflow fades in
+// Scroll phases
+const FLATTEN_START  = 0.28;
+const ORBIT_GONE     = 0.44;
+const SHOWCASE_START = 0.48;
 
 const N = PROJECTS.length;
 
-// Root-level logo files — highest quality available
 export const ORBIT_LOGOS: Record<string, string> = {
   Cursive:   "/cursive-logo.png",
   TaskSpace: "/taskspace logo NEW.png",
@@ -80,8 +78,7 @@ function OrbitItem({
   entered: boolean;
   flattenFactor: MotionValue<number>;
 }) {
-  const baseAngle  = (index / total) * Math.PI * 2;
-  // Render at max visual size so GPU only shrinks (sharp at all depths)
+  const baseAngle   = (index / total) * Math.PI * 2;
   const displaySize = Math.round(size * DEPTH_SCALE_MAX);
 
   const x        = useTransform(rotation, (r) => radiusX * Math.cos(r + baseAngle));
@@ -99,7 +96,7 @@ function OrbitItem({
   const itemScale = useTransform(
     [depthRaw, flattenFactor] as const,
     ([d, ff]: number[]) => {
-      const t         = Math.pow((d + 1) / 2, 2.8);
+      const t          = Math.pow((d + 1) / 2, 2.8);
       const orbitScale = DEPTH_SCALE_MIN + (DEPTH_SCALE_MAX - DEPTH_SCALE_MIN) * t;
       const flatScale  = 0.74;
       return (orbitScale * ff + flatScale * (1 - ff)) / DEPTH_SCALE_MAX;
@@ -109,14 +106,14 @@ function OrbitItem({
   const itemOpacity = useTransform(
     [depthRaw, flattenFactor] as const,
     ([d, ff]: number[]) => {
-      const t        = (d + 1) / 2;
-      const orbitOp  = DEPTH_OPACITY_MIN + (DEPTH_OPACITY_MAX - DEPTH_OPACITY_MIN) * t;
+      const t       = (d + 1) / 2;
+      const orbitOp = DEPTH_OPACITY_MIN + (DEPTH_OPACITY_MAX - DEPTH_OPACITY_MIN) * t;
       return orbitOp * ff + 0.8 * (1 - ff);
     }
   );
 
-  const itemZ    = useTransform(depthRaw, (d) => Math.round(d * 10) + 10);
-  const imgSrc   = ORBIT_LOGOS[project.name] ?? project.image;
+  const itemZ   = useTransform(depthRaw, (d) => Math.round(d * 10) + 10);
+  const imgSrc  = ORBIT_LOGOS[project.name] ?? project.image;
 
   return (
     <motion.div
@@ -157,17 +154,19 @@ function OrbitItem({
   );
 }
 
-// ── Apple-style project card ──────────────────────────────────────────
-function ProjectCard({ project }: { project: Project }) {
+// ── Apple-style project card (used in showcase) ───────────────────────
+function ProjectCard({ project, onClick }: { project: Project; onClick: () => void }) {
   const logo = ORBIT_LOGOS[project.name] ?? project.image;
 
   return (
-    <div
-      className="bg-white rounded-[28px] overflow-hidden select-none"
+    <button
+      onClick={onClick}
+      className="text-left w-full bg-white rounded-[28px] overflow-hidden shadow-2xl cursor-pointer"
       style={{
-        width: "min(400px, 90vw)",
-        boxShadow: "0 32px 80px rgba(0,0,0,0.22), 0 8px 24px rgba(0,0,0,0.12)",
+        width: "min(400px, 88vw)",
+        boxShadow: "0 32px 80px rgba(0,0,0,0.20), 0 8px 24px rgba(0,0,0,0.10)",
       }}
+      aria-label={`View ${project.name}`}
     >
       {/* Hero screenshot */}
       <div className="relative w-full overflow-hidden" style={{ aspectRatio: "16 / 9" }}>
@@ -176,26 +175,18 @@ function ProjectCard({ project }: { project: Project }) {
           alt={project.name}
           fill
           className="object-cover"
-          sizes="(max-width: 640px) 90vw, 400px"
+          sizes="(max-width: 640px) 88vw, 400px"
           unoptimized
         />
       </div>
 
-      {/* Content */}
       <div className="px-6 pt-5 pb-6">
-        {/* Logo + name */}
         <div className="flex items-center gap-3 mb-3">
           <div
-            className="relative rounded-xl overflow-hidden bg-gray-50 shrink-0 border border-gray-100"
+            className="relative rounded-xl overflow-hidden bg-gray-50 border border-gray-100 shrink-0"
             style={{ width: 44, height: 44 }}
           >
-            <Image
-              src={logo}
-              alt=""
-              fill
-              className="object-contain p-1.5"
-              unoptimized
-            />
+            <Image src={logo} alt="" fill className="object-contain p-1.5" unoptimized />
           </div>
           <div className="min-w-0">
             <p className="font-serif text-base font-semibold text-gray-900 leading-tight">
@@ -207,12 +198,10 @@ function ProjectCard({ project }: { project: Project }) {
           </div>
         </div>
 
-        {/* Tagline */}
         <p className="text-[13px] text-gray-500 leading-relaxed mb-4">
           {project.tagline}
         </p>
 
-        {/* Metrics */}
         {project.metrics && (
           <div className="flex border-t border-gray-100 pt-4">
             {project.metrics.slice(0, 3).map((m, i) => (
@@ -227,14 +216,93 @@ function ProjectCard({ project }: { project: Project }) {
           </div>
         )}
       </div>
-    </div>
+    </button>
   );
 }
 
-// ── 3D CoverFlow showcase ─────────────────────────────────────────────
-export function ShowcaseOverlay({ scrollYProgress }: { scrollYProgress: MotionValue<number> }) {
+// ── Showcase card — continuous MotionValue driven (no state, no choppy steps) ──
+function ShowcaseCard({
+  project, index, showcaseProgress, onOpen,
+}: {
+  project: Project;
+  index: number;
+  showcaseProgress: MotionValue<number>;
+  onOpen: (p: Project) => void;
+}) {
+  // Normalize position: 0 = at front, ±0.5 = at sides, ±1 = at back
+  const pos = useTransform(showcaseProgress, (p) => {
+    let v = ((index - p) % N + N) % N; // 0 to N
+    if (v > N / 2) v -= N;             // -N/2 to N/2
+    return v / (N / 2);                // -1 to 1
+  });
+
+  const angle  = useTransform(pos, (v) => v * Math.PI);       // -π to π
+  const depth  = useTransform(angle, Math.cos);                // 1=front, -1=back
+  const sinVal = useTransform(angle, Math.sin);
+
+  // x offset — how far horizontally from center
+  const RADIUS = 320;
+  const x = useTransform(sinVal, (s) => s * RADIUS);
+
+  // Scale: front is large, sides/back shrink
+  const scale = useTransform(depth, (d) => {
+    const t = (d + 1) / 2; // 0 to 1
+    return 0.42 + 0.58 * Math.pow(t, 1.6);
+  });
+
+  // Opacity: front fully visible, sides peek in, back hidden
+  const opacity = useTransform(depth, (d) => Math.max(0, (d + 0.25) / 1.25));
+
+  // Tilt: cards lean toward center as they move to sides
+  const rotateY = useTransform(sinVal, (s) => -s * 38);
+
+  // zIndex: front card on top
+  const zIndex = useTransform(depth, (d) => Math.round(d * 20) + 20);
+
+  // Only allow clicks when near front (depth > 0.5)
+  const isNearFront = useTransform(depth, (d) => d > 0.5);
+
+  return (
+    <motion.div
+      className="absolute"
+      style={{ x, scale, opacity, rotateY, zIndex }}
+    >
+      <motion.div
+        style={{
+          pointerEvents: isNearFront as unknown as "auto" | "none",
+        }}
+      >
+        <ProjectCard project={project} onClick={() => onOpen(project)} />
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ── Showcase overlay — fixed position to escape all stacking contexts ─
+export function ShowcaseOverlay({
+  scrollYProgress,
+  onProjectOpen,
+}: {
+  scrollYProgress: MotionValue<number>;
+  onProjectOpen: (project: Project) => void;
+}) {
   const [activeIndex, setActiveIndex] = useState(0);
 
+  // Background fades in fully BEFORE cards appear — covers orbit + center text
+  const bgOpacity = useTransform(
+    scrollYProgress,
+    [SHOWCASE_START, SHOWCASE_START + 0.04],
+    [0, 1],
+    { clamp: true }
+  );
+  const cardOpacity = useTransform(
+    scrollYProgress,
+    [SHOWCASE_START + 0.03, SHOWCASE_START + 0.08],
+    [0, 1],
+    { clamp: true }
+  );
+
+  // Continuous: 0 to N as scroll goes from SHOWCASE_START to 1.0
   const showcaseProgress = useTransform(
     scrollYProgress,
     [SHOWCASE_START, 1.0],
@@ -242,90 +310,62 @@ export function ShowcaseOverlay({ scrollYProgress }: { scrollYProgress: MotionVa
     { clamp: true }
   );
 
+  // Only track activeIndex for the dot indicator (state is fine for dots)
   useMotionValueEvent(showcaseProgress, "change", (v) => {
-    const idx = Math.min(Math.floor(v), N - 1);
+    const idx = Math.min(Math.round(v), N - 1);
     setActiveIndex((prev) => (prev !== idx ? idx : prev));
   });
 
-  // Background fades in first — blanks out orbit items and center text
-  const bgOpacity = useTransform(
-    scrollYProgress,
-    [SHOWCASE_START, SHOWCASE_START + 0.04],
-    [0, 1],
-    { clamp: true }
-  );
-  // Cards appear after background is established
-  const cardOpacity = useTransform(
-    scrollYProgress,
-    [SHOWCASE_START + 0.03, SHOWCASE_START + 0.09],
-    [0, 1],
-    { clamp: true }
-  );
-
   return (
     <>
-    {/* Solid backdrop — covers orbit items + center text (must be sibling-level z-30) */}
-    <motion.div
-      className="absolute inset-0"
-      style={{
-        opacity: bgOpacity,
-        background: "radial-gradient(ellipse 80% 60% at 50% 40%, var(--im-bg-alt) 0%, var(--im-bg) 100%)",
-        zIndex: 28,
-        pointerEvents: "none",
-      }}
-    />
-    <motion.div
-      className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none"
-      style={{ opacity: cardOpacity, zIndex: 30 }}
-    >
-      {/* 3D card deck */}
-      <div
-        className="relative flex items-center justify-center"
-        style={{ perspective: "1100px", width: "100%", height: "100%" }}
+      {/*
+        position: fixed — escapes ALL stacking contexts.
+        Even z-index: 10 inside a sticky div can't beat fixed z-40.
+      */}
+      <motion.div
+        className="fixed inset-0"
+        style={{
+          opacity: bgOpacity,
+          background:
+            "radial-gradient(ellipse 80% 60% at 50% 40%, var(--im-bg-alt) 0%, var(--im-bg) 100%)",
+          zIndex: 40,
+          pointerEvents: "none",
+        }}
+      />
+
+      {/* Card carousel — also fixed */}
+      <motion.div
+        className="fixed inset-0 flex items-center justify-center pointer-events-none"
+        style={{ opacity: cardOpacity, zIndex: 41, perspective: "1100px" }}
       >
-        {PROJECTS.map((project, i) => {
-          // Signed offset from active (-N/2 to +N/2)
-          let offset = i - activeIndex;
-          if (offset > N / 2) offset -= N;
-          if (offset < -N / 2) offset += N;
-          const absOffset = Math.abs(offset);
-
-          return (
-            <motion.div
+        <div className="relative flex items-center justify-center">
+          {PROJECTS.map((project, i) => (
+            <ShowcaseCard
               key={project.name}
-              className="absolute"
-              animate={{
-                rotateY: offset * -46,
-                x: offset * 218,
-                z: absOffset === 0 ? 60 : 0,
-                scale: absOffset === 0 ? 1.0 : absOffset === 1 ? 0.74 : 0.55,
-                opacity: absOffset === 0 ? 1 : absOffset === 1 ? 0.55 : 0,
-              }}
-              style={{ zIndex: 20 - absOffset * 4 }}
-              transition={{ type: "spring", stiffness: 280, damping: 30, mass: 0.8 }}
-            >
-              <ProjectCard project={project} />
-            </motion.div>
-          );
-        })}
-      </div>
+              project={project}
+              index={i}
+              showcaseProgress={showcaseProgress}
+              onOpen={onProjectOpen}
+            />
+          ))}
+        </div>
 
-      {/* Progress indicator */}
-      <div className="absolute bottom-14 flex items-center gap-2">
-        {PROJECTS.map((_, i) => (
-          <motion.div
-            key={i}
-            className="rounded-full bg-[var(--im-text-muted)]"
-            animate={{
-              width: i === activeIndex ? 20 : 5,
-              height: 5,
-              opacity: i === activeIndex ? 0.85 : 0.25,
-            }}
-            transition={{ duration: 0.3 }}
-          />
-        ))}
-      </div>
-    </motion.div>
+        {/* Dot progress */}
+        <div className="absolute bottom-12 left-0 right-0 flex justify-center items-center gap-2">
+          {PROJECTS.map((_, i) => (
+            <motion.div
+              key={i}
+              className="rounded-full bg-[var(--im-text-muted)]"
+              animate={{
+                width: i === activeIndex ? 20 : 5,
+                height: 5,
+                opacity: i === activeIndex ? 0.85 : 0.25,
+              }}
+              transition={{ duration: 0.3 }}
+            />
+          ))}
+        </div>
+      </motion.div>
     </>
   );
 }
@@ -351,7 +391,6 @@ export function OrbitHero({ sectionRef, onProjectClick, mouseX, mouseY }: OrbitH
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  // ── Intro spin → slow idle ────────────────────────────────────
   const baseRotation = useMotionValue(0);
 
   useEffect(() => {
@@ -372,13 +411,11 @@ export function OrbitHero({ sectionRef, onProjectClick, mouseX, mouseY }: OrbitH
     return () => { ctrl.stop(); clearTimeout(t); };
   }, [baseRotation]);
 
-  // ── Scroll ─────────────────────────────────────────────────────
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end end"],
   });
 
-  // Orbit rotation clamped to orbit phase only
   const scrollAngle = useTransform(
     scrollYProgress,
     [0, FLATTEN_START],
@@ -414,9 +451,8 @@ export function OrbitHero({ sectionRef, onProjectClick, mouseX, mouseY }: OrbitH
     setFrontIndex((prev) => (prev !== idx ? idx : prev));
   });
 
-  // ── Mouse tilt ──────────────────────────────────────────────────
-  const tiltX      = useTransform(mouseY, (v) => v * -TILT_AMOUNT);
-  const tiltY      = useTransform(mouseX, (v) => v * TILT_AMOUNT);
+  const tiltX       = useTransform(mouseY, (v) => v * -TILT_AMOUNT);
+  const tiltY       = useTransform(mouseX, (v) => v * TILT_AMOUNT);
   const smoothTiltX = useSpring(tiltX, { stiffness: 80, damping: 20 });
   const smoothTiltY = useSpring(tiltY, { stiffness: 80, damping: 20 });
 
@@ -425,7 +461,6 @@ export function OrbitHero({ sectionRef, onProjectClick, mouseX, mouseY }: OrbitH
       className="absolute inset-0 flex items-center justify-center pointer-events-none z-[5]"
       style={{ perspective: 900 }}
     >
-      {/* Orbit ring */}
       <motion.div
         className="relative"
         style={{ rotateX: smoothTiltX, rotateY: smoothTiltY, opacity: orbitOpacity }}
@@ -447,7 +482,6 @@ export function OrbitHero({ sectionRef, onProjectClick, mouseX, mouseY }: OrbitH
         ))}
       </motion.div>
 
-      {/* Front item label */}
       {!inShowcase && (
         <div className="absolute bottom-[9%] sm:bottom-[12%] left-0 right-0 flex justify-center pointer-events-none z-20">
           <AnimatePresence mode="wait">
@@ -464,7 +498,6 @@ export function OrbitHero({ sectionRef, onProjectClick, mouseX, mouseY }: OrbitH
           </AnimatePresence>
         </div>
       )}
-
     </div>
   );
 }
