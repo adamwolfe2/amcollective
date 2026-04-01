@@ -36,7 +36,7 @@ const SHOWCASE_START = 0.48;  // 3D coverflow fades in
 const N = PROJECTS.length;
 
 // Root-level logo files — highest quality available
-const ORBIT_LOGOS: Record<string, string> = {
+export const ORBIT_LOGOS: Record<string, string> = {
   Cursive:   "/cursive-logo.png",
   TaskSpace: "/taskspace logo NEW.png",
   WholeSail: "/wholesail logo.png",
