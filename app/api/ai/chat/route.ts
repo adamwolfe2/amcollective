@@ -329,11 +329,11 @@ export async function POST(req: NextRequest) {
     } catch { /* RAG not configured */ }
   }
 
-  // Build system prompt
-  const baseSystem = ceoUser
-    ? `You are ClaudeBot, the AI CEO of AM Collective Capital — strategic operating partner for Adam (CTO) and Maggie (COO).
-
-Current user: **${ceoUser.name}** (${ceoUser.role}) — focused on ${ceoUser.focus}.
+  // Build system prompt as an array of SystemModelMessages so the large static
+  // prefix can be cached via Anthropic prompt caching (providerOptions.anthropic.cacheControl).
+  // Block 0: large static prefix (cacheable)
+  // Block 1: dynamic per-request context (user name/role, today's date, memory/RAG)
+  const staticCeoPrefix = `You are ClaudeBot, the AI CEO of AM Collective Capital — strategic operating partner for Adam (CTO) and Maggie (COO).
 
 ## Portfolio
 - **TBGC** — B2B wholesale food distribution portal
@@ -374,11 +374,51 @@ Link to these pages when relevant:
 - Use write_memory to persist important decisions, preferences, or facts (not credentials)
 - Use get_company_snapshot for broad status questions
 - Use get_current_sprint for weekly planning questions
-- Call multiple tools in parallel for complex questions
-- Today: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}`
-    : SYSTEM_PROMPT;
+- Call multiple tools in parallel for complex questions`;
 
-  const systemWithContext = contextBlock ? baseSystem + contextBlock : baseSystem;
+  const todayStr = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  // Static cacheable prefix — same string every request (within same deploy)
+  const staticSystemText = ceoUser ? staticCeoPrefix : SYSTEM_PROMPT;
+
+  // Dynamic suffix — user name/role/focus (CEO only), today's date, and any
+  // memory/RAG context. Kept small so it is cheap even when un-cached.
+  const dynamicSuffixParts: string[] = [];
+  if (ceoUser) {
+    dynamicSuffixParts.push(
+      `\n\nCurrent user: **${ceoUser.name}** (${ceoUser.role}) — focused on ${ceoUser.focus}.`
+    );
+    dynamicSuffixParts.push(`\nToday: ${todayStr}`);
+  }
+  if (contextBlock) {
+    dynamicSuffixParts.push(contextBlock);
+  }
+  const dynamicSuffixText = dynamicSuffixParts.join("");
+
+  const systemWithContext: Array<{
+    role: "system";
+    content: string;
+    providerOptions?: { anthropic: { cacheControl: { type: "ephemeral" } } };
+  }> = [
+    {
+      role: "system",
+      content: staticSystemText,
+      providerOptions: {
+        anthropic: { cacheControl: { type: "ephemeral" } },
+      },
+    },
+  ];
+  if (dynamicSuffixText.length > 0) {
+    systemWithContext.push({
+      role: "system",
+      content: dynamicSuffixText,
+    });
+  }
 
   // Store user message
   await db.insert(schema.aiMessages).values({

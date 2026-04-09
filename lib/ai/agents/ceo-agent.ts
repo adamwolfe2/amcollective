@@ -204,13 +204,11 @@ function selectToolsForQuery(message: string): Anthropic.Tool[] {
 
 // ─── System Prompt ────────────────────────────────────────────────────────────
 
-function buildSystemPrompt(
-  userRole: string,
-  userFocus: string,
-  userName: string,
-  memoryContext: string
-): string {
-  return `You are ClaudeBot, the AI CEO of AM Collective Capital — a holding company that builds and sells B2B software products.
+// The large, fully static portion of ClaudeBot's system prompt. Hoisted to a
+// module-level constant so it is a literally-identical string across every
+// request — required for Anthropic prompt caching (the cached block must match
+// byte-for-byte on subsequent calls to score a cache hit).
+const CEO_STATIC_SYSTEM_PROMPT = `You are ClaudeBot, the AI CEO of AM Collective Capital — a holding company that builds and sells B2B software products.
 
 You are the strategic operating partner for Adam Wolfe (CTO — building & selling) and Maggie (COO — operations & selling). You have full access to company data, can take real actions (create tasks, send messages, update sprints), delegate work, and remember everything across conversations.
 
@@ -220,9 +218,6 @@ You are the strategic operating partner for Adam Wolfe (CTO — building & selli
 - Proactively surface important information and risks
 - Remember context across conversations and build on previous knowledge
 - Delegate and track work like a real executive
-
-## Current User
-**${userName}** (${userRole}) — focused on: ${userFocus}
 
 ## Portfolio
 | Product | Domain | Stack | Status |
@@ -267,10 +262,56 @@ Never write to memory: passwords, API keys, tokens, raw credentials, or data tha
 - Use bullet points for lists and action items
 - Lead with the answer, then explain if needed
 - Format numbers as $X,XXX (currency) or X% (percentages)
-- NEVER use emojis in any response — not in text, headers, lists, or formatting
-- Today's date: ${new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
+- NEVER use emojis in any response — not in text, headers, lists, or formatting`;
+
+/**
+ * Builds the system prompt as an array of blocks so the large static portion
+ * can be cached across tool-use loop iterations (~10 calls per request) and
+ * across same-user repeat requests:
+ *
+ *   - block 0: CEO_STATIC_SYSTEM_PROMPT (cache_control: ephemeral)
+ *   - block 1: dynamic per-request context — current user, today's date,
+ *              and any retrieved memory snippets
+ *
+ * Concatenating the two blocks produces semantically equivalent system-prompt
+ * content to the previous monolithic string. The only structural change is
+ * that the dynamic user/date/memory context is appended to the end instead of
+ * being interleaved — this lets the large prefix hit the prompt cache.
+ */
+function buildSystemPrompt(
+  userRole: string,
+  userFocus: string,
+  userName: string,
+  memoryContext: string
+): Anthropic.TextBlockParam[] {
+  const today = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+
+  const dynamicBlock = `
+
+## Current User
+**${userName}** (${userRole}) — focused on: ${userFocus}
+
+## Today
+Today's date: ${today}
 
 ${memoryContext ? `## Relevant Memory Context\n${memoryContext}` : ""}`;
+
+  return [
+    {
+      type: "text",
+      text: CEO_STATIC_SYSTEM_PROMPT,
+      cache_control: { type: "ephemeral" },
+    },
+    {
+      type: "text",
+      text: dynamicBlock,
+    },
+  ];
 }
 
 // ─── Main Agent ───────────────────────────────────────────────────────────────
@@ -378,6 +419,17 @@ export async function runCeoAgent(
   // Select tools relevant to this message (~14–35 instead of all 73)
   const selectedTools = selectToolsForQuery(message);
 
+  // Prompt caching: mark the final selected tool as a cache breakpoint so the
+  // whole tool list (which can be re-sent up to 10 times in the loop below)
+  // is cached across iterations after the first call.
+  const cachedTools: Anthropic.Tool[] =
+    selectedTools.length > 0
+      ? [
+          ...selectedTools.slice(0, -1),
+          { ...selectedTools[selectedTools.length - 1], cache_control: { type: "ephemeral" } },
+        ]
+      : selectedTools;
+
   // Run CEO agent loop (up to 10 iterations)
   // Sonnet (!! prefix) gets more tokens for complex analysis
   const maxTokens = useSonnet ? 1024 : 512;
@@ -387,7 +439,7 @@ export async function runCeoAgent(
       model: activeModel,
       max_tokens: maxTokens,
       system: systemPrompt,
-      tools: selectedTools,
+      tools: cachedTools,
       messages: anthropicMessages,
     });
   } catch (err) {
@@ -426,13 +478,16 @@ export async function runCeoAgent(
     try {
       // NOTE: tools must be re-sent on every iteration because the Anthropic
       // API requires tools to be defined when messages contain tool_use blocks.
-      // Omitting tools here would cause a 400 error. Token savings are handled
-      // upstream by selectToolsForQuery() which limits tools to ~14-35 per request.
+      // Omitting tools here would cause a 400 error. Token savings come from
+      // (a) selectToolsForQuery() limiting tools to ~14-35 per request and
+      // (b) prompt caching via cachedTools marking the final tool as a cache
+      // breakpoint, so the tool list + system prompt are cached across loop
+      // iterations after the first call.
       response = await anthropic.messages.create({
         model: activeModel,
         max_tokens: maxTokens,
         system: systemPrompt,
-        tools: selectedTools,
+        tools: cachedTools,
         messages: anthropicMessages,
       });
     } catch (err) {

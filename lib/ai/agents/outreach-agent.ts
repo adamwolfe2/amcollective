@@ -215,7 +215,15 @@ export async function draftColdEmail(req: DraftRequest): Promise<DraftResult> {
   const message = await client.messages.create({
     model,
     max_tokens: 800,
-    system: COLD_EMAIL_SKILL,
+    // Prompt caching: the cold email skill is a large static constant — cache it
+    // so sequence drafts (5 parallel calls) and repeat campaigns hit the cache
+    system: [
+      {
+        type: "text",
+        text: COLD_EMAIL_SKILL,
+        cache_control: { type: "ephemeral" },
+      },
+    ],
     messages: [{ role: "user", content: buildUserPrompt(req) }],
   });
 

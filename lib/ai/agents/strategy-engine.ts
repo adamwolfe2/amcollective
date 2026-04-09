@@ -708,7 +708,14 @@ Rules:
       model,
       max_tokens: 3000,
       messages: [{ role: "user", content: userPrompt }],
-      system: systemPrompt,
+      // Prompt caching: system prompt is module-level static — cache it
+      system: [
+        {
+          type: "text",
+          text: systemPrompt,
+          cache_control: { type: "ephemeral" },
+        },
+      ],
     });
 
     trackAIUsage({

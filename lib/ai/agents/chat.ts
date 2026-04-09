@@ -146,12 +146,29 @@ export async function chat(
     CHAT_CORE_TOOLS
   );
 
+  // Prompt caching: wrap system + mark last tool so tools + system are cached
+  // across the tool-use loop iterations below.
+  const cachedSystem: Anthropic.TextBlockParam[] = [
+    {
+      type: "text",
+      text: SYSTEM_PROMPT,
+      cache_control: { type: "ephemeral" },
+    },
+  ];
+  const cachedTools: Anthropic.Tool[] =
+    selectedTools.length > 0
+      ? [
+          ...selectedTools.slice(0, -1),
+          { ...selectedTools[selectedTools.length - 1], cache_control: { type: "ephemeral" } },
+        ]
+      : selectedTools;
+
   // Call Claude with tools — handle tool use loop
   let response = await anthropic.messages.create({
     model: MODEL_SONNET,
     max_tokens: 2000,
-    system: SYSTEM_PROMPT,
-    tools: selectedTools,
+    system: cachedSystem,
+    tools: cachedTools,
     messages: anthropicMessages,
   });
 
@@ -186,8 +203,8 @@ export async function chat(
     response = await anthropic.messages.create({
       model: MODEL_SONNET,
       max_tokens: 2000,
-      system: SYSTEM_PROMPT,
-      tools: selectedTools,
+      system: cachedSystem,
+      tools: cachedTools,
       messages: anthropicMessages,
     });
   }
