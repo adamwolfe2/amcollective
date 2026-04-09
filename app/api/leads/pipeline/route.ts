@@ -9,6 +9,9 @@ import { eq, and, sql, gte } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 
+export const runtime = "edge";
+export const preferredRegion = "iad1";
+
 export async function GET() {
   try {
     const userId = await checkAdmin();

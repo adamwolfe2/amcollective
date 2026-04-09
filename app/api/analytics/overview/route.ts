@@ -18,6 +18,9 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { aj } from "@/lib/middleware/arcjet";
 
+export const runtime = "edge";
+export const preferredRegion = "iad1";
+
 export async function GET(req: NextRequest) {
   if (aj) {
     const decision = await aj.protect(req, { requested: 1 });
