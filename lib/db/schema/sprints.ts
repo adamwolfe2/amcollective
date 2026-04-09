@@ -74,6 +74,8 @@ export const sprintSections = pgTable(
   },
   (table) => [
     index("sprint_sections_sprint_id_idx").on(table.sprintId),
+    index("sprint_sections_project_id_idx").on(table.projectId),
+    index("sprint_sections_assignee_id_idx").on(table.assigneeId),
     index("sprint_sections_sort_order_idx").on(table.sortOrder),
   ]
 );

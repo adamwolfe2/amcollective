@@ -107,14 +107,16 @@ export async function getProjectClients(projectId: string) {
 }
 
 export async function getProjectStats(projectId: string) {
-  const [teamCount] = await db
-    .select({ value: count() })
-    .from(teamAssignments)
-    .where(eq(teamAssignments.projectId, projectId));
-  const [clientCount] = await db
-    .select({ value: count() })
-    .from(clientProjects)
-    .where(eq(clientProjects.projectId, projectId));
+  const [[teamCount], [clientCount]] = await Promise.all([
+    db
+      .select({ value: count() })
+      .from(teamAssignments)
+      .where(eq(teamAssignments.projectId, projectId)),
+    db
+      .select({ value: count() })
+      .from(clientProjects)
+      .where(eq(clientProjects.projectId, projectId)),
+  ]);
   return {
     teamCount: teamCount?.value ?? 0,
     clientCount: clientCount?.value ?? 0,
