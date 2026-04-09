@@ -14,6 +14,8 @@ import { detectAnomalies, formatAnomalyContext } from "@/lib/ai/agents/anomaly-d
 import { sendProactiveMessage } from "@/lib/ai/agents/proactive";
 import { buildProactiveContext } from "@/lib/ai/context";
 import { createAuditLog } from "@/lib/db/repositories/audit";
+import { db } from "@/lib/db";
+import * as schema from "@/lib/db/schema";
 
 export const morningBriefing = inngest.createFunction(
   {
@@ -61,6 +63,26 @@ export const morningBriefing = inngest.createFunction(
     // Step 5: Store daily metrics snapshot (enables MRR delta next run)
     await step.run("snapshot-metrics", async () => {
       await storeDailySnapshot(data);
+    });
+
+    // Step 5b: Persist the briefing text so the dashboard can render it
+    await step.run("store-briefing", async () => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      await db
+        .insert(schema.dailyBriefings)
+        .values({
+          date: today,
+          briefingText: briefing,
+          isScheduled: true,
+        })
+        .onConflictDoUpdate({
+          target: schema.dailyBriefings.date,
+          set: {
+            briefingText: briefing,
+            updatedAt: new Date(),
+          },
+        });
     });
 
     // Step 6: Audit log
