@@ -89,15 +89,6 @@ async function seed() {
         status: "active",
         healthScore: 72,
       },
-      {
-        name: "AIMS",
-        slug: "aims",
-        domain: "aimanagingservices.com",
-        vercelProjectId: "prj_8z1knXDv9ylzTNxgQxmgDa3jq6iS",
-        githubRepo: null,
-        status: "active",
-        healthScore: 80,
-      },
     ])
     .returning();
   console.log(`  ✓ ${projects.length} projects created`);
@@ -178,27 +169,19 @@ async function seed() {
   console.log("Creating team assignments...");
   const adam = members[0];
   const sabbir = members[1];
-  const sheenam = members[2];
-  const kumar = members[3];
-  const maureen = members[4];
 
   const taskspace = projects.find((p) => p.slug === "taskspace")!;
   const trackr = projects.find((p) => p.slug === "trackr")!;
-  const aims = projects.find((p) => p.slug === "aims")!;
   const campusgtm = projects.find((p) => p.slug === "campusgtm")!;
   const hook = projects.find((p) => p.slug === "hook")!;
 
   await db.insert(schema.teamAssignments).values([
     { teamMemberId: adam.id, projectId: taskspace.id, role: "Lead", hoursPerWeek: "10" },
     { teamMemberId: adam.id, projectId: trackr.id, role: "Lead", hoursPerWeek: "8" },
-    { teamMemberId: adam.id, projectId: aims.id, role: "Lead", hoursPerWeek: "15" },
     { teamMemberId: sabbir.id, projectId: campusgtm.id, role: "GHL Build", hoursPerWeek: "20" },
-    { teamMemberId: sheenam.id, projectId: aims.id, role: "SEO", hoursPerWeek: "15" },
-    { teamMemberId: kumar.id, projectId: aims.id, role: "Automation", hoursPerWeek: "20" },
-    { teamMemberId: maureen.id, projectId: aims.id, role: "RevOps", hoursPerWeek: "25" },
     { teamMemberId: members[7].id, projectId: hook.id, role: "Voice AI", hoursPerWeek: "15" },
   ]);
-  console.log("  ✓ 8 team assignments created");
+  console.log("  ✓ 4 team assignments created");
 
   // ─── Clients (sample placeholders) ─────────────────────────────────
   console.log("Creating sample clients...");
@@ -251,10 +234,9 @@ async function seed() {
     { clientId: clientRows[0].id, projectId: taskspace.id, role: "Sponsor", status: "active" },
     { clientId: clientRows[0].id, projectId: trackr.id, role: "Beta User", status: "active" },
     { clientId: clientRows[1].id, projectId: campusgtm.id, role: "Customer", status: "active" },
-    { clientId: clientRows[2].id, projectId: aims.id, role: "Prospect", status: "active" },
     { clientId: clientRows[3].id, projectId: hook.id, role: "Customer", status: "active" },
   ]);
-  console.log("  ✓ 5 client-project links created");
+  console.log("  ✓ 4 client-project links created");
 
   // ─── Engagements ───────────────────────────────────────────────────
   console.log("Creating engagements...");
@@ -390,17 +372,8 @@ async function seed() {
       isActive: true,
       sortOrder: 6,
     },
-    {
-      name: "Full AIMS Package",
-      description: "Complete AI Managing Services package — voice, email, CRM, automation, SEO.",
-      category: "Package",
-      basePrice: 500000,
-      pricePeriod: "monthly",
-      isActive: true,
-      sortOrder: 7,
-    },
   ]);
-  console.log("  ✓ 7 services created");
+  console.log("  ✓ 6 services created");
 
   // ─── Tool Accounts (for cost tracking) ───────────────────────────
   console.log("Creating tool accounts...");

@@ -400,7 +400,6 @@ NEXT ACTIONS:
     notes: `CONTACTS:
 - Connor (VendHub lead, has exclusive access to some legacy accounts)
 - Anthony
-- Mike (Modern Amenities)
 
 DEAL CONTEXT:
 - Building entire GHL snapshot, Vend Marketing integration, MSA hub, and contract generator
@@ -410,8 +409,7 @@ DEAL CONTEXT:
 - Major active engagement — HUGE revenue line previously missing from pipeline
 
 NEXT ACTIONS:
-- Resolve access limitations on legacy Supabase/Upstash accounts (Connor has exclusive access)
-- Set up AIMS tech stack independently (Resend, Supabase, Upstash, Vercel)`,
+- Resolve access limitations on legacy Supabase/Upstash accounts (Connor has exclusive access)`,
   });
   await addActivity(vendhub.id, "note", "GHL snapshot + Vend Marketing integration + MSA hub + contract generator. Stripe Connect 1.5% take rate projected $150K/mo.");
 
@@ -420,51 +418,6 @@ NEXT ACTIONS:
     companyName: "VendHub / Vend Marketing",
     notes: "GHL snapshot, MSA hub, contract generator build. Stripe Connect projected $150K/mo at 1.5%.",
     currentMrr: 1500000,
-  });
-
-  // --- AIMS / Modern Amenities ---
-  const aims = await upsertLead({
-    contactName: "AIMS Team",
-    companyName: "AIMS / Modern Amenities",
-    stage: "closed_won",
-    source: "inbound",
-    assignedTo: "Adam",
-    estimatedValue: 1000000, // $10K/mo retainer target
-    probability: 100,
-    industry: "AI Services / SEO / Automation",
-    tags: ["retainer", "seo", "voice", "n8n", "active-engagement"],
-    lastContactedAt: "2026-03-17",
-    notes: `CONTACTS:
-- Cody/Kody (SEO fulfillment)
-- Sheenam (SEO — went unresponsive since November)
-- Ahmad (n8n + Keeper access)
-- Christelle (n8n + Keeper access)
-- Ivan (Voice specialist, webinar text blasts)
-- Alysia (Webinar coordination)
-- Joe, Matt (BTC project — user creation for BreakThrough Closing)
-
-DEAL CONTEXT:
-- Multiple SEO/AEO clients including MedPro (A2P registration blocker)
-- Transitioning from hands-on to consultant role
-- Set up shared Claude Max org for AIMS team
-- Resolved SMS verification blockers using Textverified
-- Created Asana tasks for Internal AI Tool Requests: Lead Gen Google Maps Interactive Map Tool, Calculator Chatbot Javascript Modal, Mockup AI Tool
-- DNS record configurations (SPF/DMARC) for reliable email/SMS delivery
-- Building AIMS EOD Dashboard and automated EOS page in Asana
-- Adam targeting $120K+ as Head of AI & Innovation
-
-NEXT ACTIONS:
-- Set up Resend, Supabase, Upstash, Vercel accounts with separate AIMS billing
-- Review SEO reporting with Sheenam and Kody for "near me" keyword organic gains
-- Build out AIMS EOD Dashboard`,
-  });
-  await addActivity(aims.id, "note", "Retainer engagement. Head of AI & Innovation role targeting $120K+. Multiple SEO/voice/automation workstreams.");
-
-  const aimsClient = await upsertClient({
-    name: "AIMS Team",
-    companyName: "AIMS / Modern Amenities",
-    notes: "Ongoing retainer. SEO, voice, n8n automation, AI tools. Adam = Head of AI & Innovation ($120K+ target).",
-    currentMrr: 1000000,
   });
 
   // --- Trackr (Internal Product — Won/Active) ---
@@ -499,38 +452,6 @@ NEXT ACTIONS:
 - Recruit 2-3 AI-native student reps via CampusGTM (AI clubs, referral code, rev share)
 - Confirm outbound running daily (Instantly campaigns live, no quarantines)`,
   });
-
-  // --- Car Dealership Voice Agents ---
-  const carDealership = await upsertLead({
-    contactName: "Aaron & Mark",
-    companyName: "Car Dealership Voice Agents",
-    stage: "closed_won",
-    source: "referral",
-    assignedTo: "Adam",
-    estimatedValue: 500000, // estimated $5K/mo
-    probability: 85,
-    industry: "Automotive / Voice AI",
-    tags: ["voice-agent", "automotive", "active-engagement", "repeatable-playbook"],
-    lastContactedAt: "2026-03-17",
-    nextFollowUpAt: "2026-03-19",
-    notes: `CONTACTS:
-- Aaron
-- Mark
-
-DEAL CONTEXT:
-- Already using Shift Digital for inbound, want Adam's outbound system
-- X-Time integration needed
-- Active technical discussion, ready to start with recall lists this week
-- Built functional voice agent with inventory integration
-- Demo exceeded expectations despite last-minute prep (Ford dealership)
-- Could become repeatable SMB productized service
-
-NEXT ACTIONS:
-- Start with recall lists this week
-- Complete X-Time integration
-- Document as repeatable playbook for other dealerships`,
-  });
-  await addActivity(carDealership.id, "note", "Voice agent with inventory integration built. Demo exceeded expectations. Starting with recall lists this week.");
 
   // ═══════════════════════════════════════════════════════════════════════
   // INTENT
@@ -746,29 +667,6 @@ NEXT ACTIONS:
 - Identify first 3 target sororities for pilot outreach`,
   });
   await addActivity(soho.id, "note", "Maggie meeting Wednesday at Soho House. BofA wants in → entire 40u40 group follows. Q3 timeline for BofA connection.");
-
-  // --- Ford Dealership Demo ---
-  const fordDemo = await upsertLead({
-    contactName: "Ford Dealership Contact",
-    companyName: "Ford Dealership Voice Agent Demo",
-    stage: "consideration",
-    source: "referral",
-    assignedTo: "Adam",
-    estimatedValue: 500000,
-    probability: 40,
-    industry: "Automotive / Voice AI",
-    tags: ["voice-agent", "automotive", "demo-completed"],
-    lastContactedAt: "2026-03-14",
-    nextFollowUpAt: "2026-03-20",
-    notes: `DEAL CONTEXT:
-- Built functional voice agent with inventory integration
-- Demo exceeded expectations despite last-minute prep
-- Could expand into broader automotive vertical with Car Dealership work (Aaron/Mark)
-
-NEXT ACTIONS:
-- Follow up on demo results
-- Package with Car Dealership Voice Agents (Aaron/Mark) as a vertical play`,
-  });
 
   // --- Accelerator / NIL Platform ---
   const accelerator = await upsertLead({
@@ -1144,28 +1042,6 @@ NEXT ACTIONS:
         valuePeriod: "monthly",
       });
       console.log("  + Engagement: VendHub GHL + Stripe Connect Platform");
-    }
-  }
-
-  // AIMS engagement
-  if (aimsClient) {
-    const existingEng = await db
-      .select()
-      .from(schema.engagements)
-      .where(eq(schema.engagements.clientId, aimsClient.id))
-      .limit(1);
-    if (existingEng.length === 0) {
-      await db.insert(schema.engagements).values({
-        clientId: aimsClient.id,
-        title: "AIMS Head of AI & Innovation Retainer",
-        description: "Ongoing retainer — SEO/AEO clients, voice agents, n8n automation, AI tools, EOD dashboard. Targeting $120K+ annually. Multiple workstreams: MedPro SEO, BTC user creation, Asana EOS integration.",
-        type: "retainer",
-        status: "active",
-        startDate: new Date("2025-09-01"),
-        value: 1000000,
-        valuePeriod: "monthly",
-      });
-      console.log("  + Engagement: AIMS Head of AI & Innovation Retainer");
     }
   }
 
