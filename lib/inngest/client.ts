@@ -3,9 +3,13 @@
  *
  * Lazy-initialized singleton pattern adapted from Cursive's Inngest setup.
  * Avoids build-time initialization issues with env vars.
+ *
+ * Middleware: runHistoryMiddleware captures every function invocation into
+ * the `inngest_run_history` table, powering the /admin/jobs dashboard.
  */
 
 import { Inngest } from "inngest";
+import { runHistoryMiddleware } from "./middleware";
 
 // ─── Lazy Singleton (Cursive pattern) ────────────────────────────────────────
 
@@ -16,6 +20,7 @@ function getInngest(): Inngest {
     inngestInstance = new Inngest({
       id: "am-collective",
       name: "AM Collective",
+      middleware: [runHistoryMiddleware],
     });
   }
   return inngestInstance;
