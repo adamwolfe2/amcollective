@@ -14,6 +14,9 @@ export default defineConfig({
         "lib/db/repositories/**",
         "lib/auth/**",
         "lib/ai/tools-ceo/**",
+        "lib/ai/pricing.ts",
+        "lib/ai/usage-recorder.ts",
+        "lib/ai/tracked-client.ts",
         "app/api/**",
       ],
       thresholds: {
