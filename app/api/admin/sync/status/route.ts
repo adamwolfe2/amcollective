@@ -11,7 +11,8 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc } from "drizzle-orm";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
+export const preferredRegion = "iad1";
 
 export async function GET(req: NextRequest) {
   const userId = await checkAdmin();

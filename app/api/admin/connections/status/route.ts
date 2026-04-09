@@ -10,7 +10,8 @@ import { NextResponse } from "next/server";
 import { checkAdmin } from "@/lib/auth";
 import { neon } from "@neondatabase/serverless";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
+export const preferredRegion = "iad1";
 
 type ConnectionStatus =
   | "connected"   // env var set AND live check passed (db only at this level)
