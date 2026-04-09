@@ -29,3 +29,6 @@ export * from "./sprints";
 export * from "./strategy";
 export * from "./inngest";
 export * from "./ai-usage";
+export * from "./email";
+export * from "./search-history";
+export * from "./daily-briefings";

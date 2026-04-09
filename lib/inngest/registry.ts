@@ -61,5 +61,7 @@ export const JOB_REGISTRY: JobRegistration[] = [
   { id: "sync-cash-snapshot",      name: "Sync Cash Snapshot",          cron: "30 6 * * *",      events: [] },
   { id: "lead-followup-reminder",  name: "Lead Followup Reminder",      cron: "0 14 * * 1-5",    events: [] },
   { id: "sync-emailbison-inbox",   name: "Sync EmailBison Inbox",       cron: "*/15 * * * *",    events: [] },
-  { id: "job-failure-watchdog",    name: "Job Failure Watchdog",        cron: "*/15 * * * *",    events: [] },
+  { id: "job-failure-watchdog",         name: "Job Failure Watchdog",         cron: "*/15 * * * *",    events: [] },
+  { id: "connector-freshness-alert",    name: "Connector Freshness Alert",    cron: "*/30 * * * *",    events: [] },
+  { id: "dunning-sequence",             name: "Dunning Email Sequence",        cron: null,               events: ["stripe/invoice.payment_failed"] },
 ];

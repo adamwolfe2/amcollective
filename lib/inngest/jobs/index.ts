@@ -45,3 +45,5 @@ export { syncEmailbisonInbox } from "./sync-emailbison-inbox";
 export { jobFailureWatchdog } from "./job-failure-watchdog";
 export { aiUsageRollup } from "./ai-usage-rollup";
 export { aiUsageAlert } from "./ai-usage-alert";
+export { connectorFreshnessAlert } from "./connector-freshness-alert";
+export { dunningSequence } from "./dunning-sequence";

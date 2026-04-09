@@ -53,6 +53,8 @@ import {
   jobFailureWatchdog,
   aiUsageRollup,
   aiUsageAlert,
+  connectorFreshnessAlert,
+  dunningSequence,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -103,5 +105,7 @@ export const { GET, POST, PUT } = serve({
     jobFailureWatchdog,
     aiUsageRollup,
     aiUsageAlert,
+    connectorFreshnessAlert,
+    dunningSequence,
   ],
 });
