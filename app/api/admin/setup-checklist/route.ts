@@ -12,7 +12,7 @@ import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { count } from "drizzle-orm";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const preferredRegion = "iad1";
 
 export interface ChecklistItem {

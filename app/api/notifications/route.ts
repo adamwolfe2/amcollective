@@ -11,7 +11,7 @@ import {
   getUnreadCount,
 } from "@/lib/db/repositories/notifications";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const preferredRegion = "iad1";
 
 export async function GET(req: NextRequest) {

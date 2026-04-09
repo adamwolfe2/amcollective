@@ -10,7 +10,7 @@ import { NextResponse } from "next/server";
 import { checkAdmin } from "@/lib/auth";
 import { neon } from "@neondatabase/serverless";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const preferredRegion = "iad1";
 
 type ConnectionStatus =

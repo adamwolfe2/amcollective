@@ -12,7 +12,7 @@ import * as schema from "@/lib/db/schema";
 import { and, eq } from "drizzle-orm";
 import { captureError } from "@/lib/errors";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const preferredRegion = "iad1";
 
 export async function GET() {

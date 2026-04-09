@@ -18,7 +18,7 @@ import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 import { aj } from "@/lib/middleware/arcjet";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const preferredRegion = "iad1";
 
 export async function GET(req: NextRequest) {
