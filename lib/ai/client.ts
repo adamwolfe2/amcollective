@@ -5,8 +5,6 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { db } from "@/lib/db";
-import { apiUsage } from "@/lib/db/schema";
 
 // ─── Model Constants ─────────────────────────────────────────────────────────
 
@@ -18,14 +16,6 @@ export const MODEL_SONNET = "claude-sonnet-4-5-20250929";
 
 /** Classification, briefings, health scores, cheap tasks */
 export const MODEL_HAIKU = "claude-haiku-4-5-20251001";
-
-// ─── Cost per million tokens (cents) — approximate as of Mar 2026 ────────────
-
-const COST_PER_M_TOKENS: Record<string, { input: number; output: number }> = {
-  [MODEL_HAIKU]: { input: 80, output: 400 },    // $0.80/$4.00 per M tokens
-  [MODEL_SONNET]: { input: 300, output: 1500 },  // $3.00/$15.00 per M tokens
-  [MODEL_OPUS]: { input: 1500, output: 7500 },   // $15.00/$75.00 per M tokens
-};
 
 // ─── Singleton Client ────────────────────────────────────────────────────────
 

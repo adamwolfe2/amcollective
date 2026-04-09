@@ -51,6 +51,8 @@ import {
   leadFollowupReminder,
   syncEmailbisonInbox,
   jobFailureWatchdog,
+  aiUsageRollup,
+  aiUsageAlert,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -99,5 +101,7 @@ export const { GET, POST, PUT } = serve({
     leadFollowupReminder,
     syncEmailbisonInbox,
     jobFailureWatchdog,
+    aiUsageRollup,
+    aiUsageAlert,
   ],
 });

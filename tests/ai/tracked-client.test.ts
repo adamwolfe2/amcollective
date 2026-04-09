@@ -31,8 +31,8 @@ vi.mock("next/server", () => ({
   after: vi.fn((cb: () => void) => {
     // In test context, run the callback synchronously
     try {
-      const result = cb();
-      if (result instanceof Promise) {
+      const result: unknown = cb();
+      if (result !== null && typeof result === "object" && typeof (result as Promise<unknown>).then === "function") {
         return result;
       }
     } catch {

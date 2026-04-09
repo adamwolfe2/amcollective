@@ -11,6 +11,7 @@
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
+import { after } from "next/server";
 import { getAnthropicClient } from "./client";
 import { recordUsage, type RecordUsageInput } from "./usage-recorder";
 import { captureError } from "@/lib/errors";
@@ -60,18 +61,19 @@ function extractResponsePreview(response: Anthropic.Message): string | null {
 /**
  * Schedule a fire-and-forget task using next/server after() when available,
  * falling back to a plain Promise with .catch() in cron/non-request contexts.
+ *
+ * after() throws outside a Next.js request context (Inngest jobs, etc.),
+ * so we wrap in try/catch and fall back to a plain fire-and-forget Promise.
  */
 function scheduleFireAndForget(task: () => Promise<void>): void {
   try {
-    // Dynamic import to avoid breaking cron contexts where next/server is unavailable
-    const { after } = require("next/server") as { after: (cb: () => unknown) => void };
     after(() => {
       task().catch((err) =>
         captureError(err, { tags: { source: "ai_usage_after_failed" } })
       );
     });
   } catch {
-    // after() not available — plain fire-and-forget
+    // after() not available (Inngest cron, unit tests, etc.) — plain fire-and-forget
     task().catch((err) =>
       captureError(err, { tags: { source: "ai_usage_promise_failed" } })
     );
@@ -159,8 +161,8 @@ export function getTrackedAnthropicClient(ctx: TrackingContext): Anthropic {
           organizationId: ctx.organizationId,
           inputTokens: response.usage.input_tokens,
           outputTokens: response.usage.output_tokens,
-          cacheReadTokens: (response.usage as Record<string, number>).cache_read_input_tokens ?? 0,
-          cacheCreationTokens: (response.usage as Record<string, number>).cache_creation_input_tokens ?? 0,
+          cacheReadTokens: ((response.usage as unknown) as Record<string, number>).cache_read_input_tokens ?? 0,
+          cacheCreationTokens: ((response.usage as unknown) as Record<string, number>).cache_creation_input_tokens ?? 0,
           latencyMs,
           success: true,
           errorCode: null,
