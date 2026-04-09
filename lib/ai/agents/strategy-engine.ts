@@ -16,7 +16,8 @@
  * Output: 5-9 recommendations + computed strategy metrics, stored in DB.
  */
 
-import { getAnthropicClient, MODEL_SONNET, MODEL_OPUS, trackAIUsage } from "../client";
+import { MODEL_SONNET, MODEL_OPUS } from "../client";
+import { getTrackedAnthropicClient } from "../tracked-client";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as mercuryConnector from "@/lib/connectors/mercury";
 import * as trackrConnector from "@/lib/connectors/trackr";
@@ -597,7 +598,7 @@ export async function generateStrategyRecommendations(
   data: StrategyEngineData,
   useOpus = false
 ): Promise<StrategyEngineResult> {
-  const anthropic = getAnthropicClient();
+  const anthropic = getTrackedAnthropicClient({ agent: "strategy-engine" });
   const healthScore = computeHealthScore(data);
   const riskLevel = computeRiskLevel(data);
   const revenueForecast = buildRevenueForecast(data.totalMrrCents, data.mrrGrowthPct);
@@ -718,13 +719,7 @@ Rules:
       ],
     });
 
-    trackAIUsage({
-      model,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      agent: "strategy-engine",
-    });
-
+    // Usage is tracked automatically by the tracked client proxy.
     const text = response.content[0].type === "text" ? response.content[0].text : "";
 
     // Strip markdown code fences if present

@@ -7,7 +7,8 @@
  *   - storeDailySnapshot(): called by the Inngest job to persist today's metrics
  */
 
-import { getAnthropicClient, MODEL_HAIKU, trackAIUsage } from "../client";
+import { MODEL_HAIKU } from "../client";
+import { getTrackedAnthropicClient } from "../tracked-client";
 import { searchSimilar } from "../embeddings";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as vercelConnector from "@/lib/connectors/vercel";
@@ -237,7 +238,7 @@ export async function generateBriefing(
   memoryContext?: string,
   ragContext?: string
 ): Promise<string> {
-  const anthropic = getAnthropicClient();
+  const anthropic = getTrackedAnthropicClient({ agent: "morning-briefing" });
   if (!anthropic) return formatFallbackBriefing(data);
 
   const c = data.composio;
@@ -318,7 +319,7 @@ Instructions: Lead with the single most important item from above. End with one 
     messages: [{ role: "user", content: prompt }],
   });
 
-  trackAIUsage({ model: MODEL_HAIKU, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, agent: "morning-briefing" });
+  // Usage is tracked automatically by the tracked client proxy.
   return response.content[0].type === "text" ? response.content[0].text : formatFallbackBriefing(data);
 }
 

@@ -14,7 +14,8 @@
  * node-cron or setInterval — this function needs zero changes.
  */
 
-import { getAnthropicClient, MODEL_HAIKU, trackAIUsage } from "../client";
+import { MODEL_HAIKU } from "../client";
+import { getTrackedAnthropicClient } from "../tracked-client";
 import { sendMessage as blooSendMessage } from "@/lib/integrations/blooio";
 import { buildProactiveContext, writeProactiveMessage } from "@/lib/ai/context";
 import { storeEmbedding } from "@/lib/ai/embeddings";
@@ -87,7 +88,7 @@ export async function sendProactiveMessage(opts: ProactiveMessageOpts): Promise<
   ].filter(Boolean).join("\n");
 
   // Generate message via Claude Haiku
-  const anthropic = getAnthropicClient();
+  const anthropic = getTrackedAnthropicClient({ agent: `proactive-${trigger}` });
   let message: string;
 
   if (anthropic) {
@@ -98,13 +99,7 @@ export async function sendProactiveMessage(opts: ProactiveMessageOpts): Promise<
       messages: [{ role: "user", content: fullPrompt }],
     });
 
-    trackAIUsage({
-      model: MODEL_HAIKU,
-      inputTokens: response.usage.input_tokens,
-      outputTokens: response.usage.output_tokens,
-      agent: `proactive-${trigger}`,
-    });
-
+    // Usage is tracked automatically by the tracked client proxy.
     message = response.content[0].type === "text" ? response.content[0].text : context;
   } else {
     // Fallback: send raw context if Claude is unavailable

@@ -4,7 +4,8 @@
  * Uses Claude Sonnet to analyze infrastructure spending patterns.
  */
 
-import { getAnthropicClient, MODEL_HAIKU } from "../client";
+import { MODEL_HAIKU } from "../client";
+import { getTrackedAnthropicClient } from "../tracked-client";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
@@ -78,7 +79,7 @@ export async function analyzeCosts(): Promise<{
   `);
 
   // Generate analysis with Claude
-  const anthropic = getAnthropicClient();
+  const anthropic = getTrackedAnthropicClient({ agent: "cost-analysis" });
   let analysis = "Cost analysis unavailable — AI not configured.";
 
   if (anthropic) {

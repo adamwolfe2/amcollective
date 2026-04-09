@@ -3,6 +3,12 @@
  *
  * POST: Send messages, get a streaming response (UIMessageStream for useChat).
  * GET: Retrieve conversation history.
+ *
+ * TODO(follow-up): This route uses the Vercel AI SDK for streaming, which wraps
+ * Anthropic differently from anthropic.messages.create(). Usage tracking for
+ * streaming calls is not covered by the current getTrackedAnthropicClient() proxy.
+ * Track streaming usage in a follow-up PR using streamText's onFinish callback
+ * to call recordUsage() with the final token counts.
  */
 
 import { NextRequest, NextResponse } from "next/server";

@@ -10,10 +10,9 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import {
-  getAnthropicClient,
   isAIConfigured,
-  trackAIUsage,
 } from "../client";
+import { getTrackedAnthropicClient } from "../tracked-client";
 import { TOOL_DEFINITIONS, executeTool } from "../tools";
 import { CEO_TOOL_DEFINITIONS, executeCeoTool } from "../tools-ceo";
 import { searchMemory, isMemoryConfigured, bootstrapMemory } from "../memory";
@@ -345,7 +344,7 @@ export async function runCeoAgent(
   const message = useSonnet ? input.message.slice(2).trimStart() : input.message;
   const activeModel = useSonnet ? CEO_MODEL_SONNET : CEO_MODEL;
 
-  const anthropic = getAnthropicClient()!;
+  const anthropic = getTrackedAnthropicClient({ agent: "ceo", userId })!;
 
   // Bootstrap memory repo on first run (fire-and-forget)
   if (isMemoryConfigured()) {
@@ -498,13 +497,7 @@ export async function runCeoAgent(
     }
   }
 
-  // Track usage
-  trackAIUsage({
-    model: activeModel,
-    inputTokens: response.usage.input_tokens,
-    outputTokens: response.usage.output_tokens,
-    agent: "ceo-agent",
-  });
+  // Usage is tracked automatically by the tracked client proxy.
 
   // Extract text
   const textBlocks = response.content.filter(

@@ -43,40 +43,27 @@ export function isAIConfigured(): boolean {
   return !!process.env.ANTHROPIC_API_KEY;
 }
 
-// ─── Usage Tracking ──────────────────────────────────────────────────────────
+// ─── Usage Tracking (DEPRECATED) ─────────────────────────────────────────────
 
 /**
- * Record AI API usage into the api_usage table. Fire-and-forget — never throws.
+ * @deprecated Use getTrackedAnthropicClient() from lib/ai/tracked-client instead.
+ * This function will be removed after 2026-05-01.
  *
- * Call after every anthropic.messages.create() with the response's usage object.
+ * Stub retained for one release to avoid breaking any callers not yet migrated.
  */
-export async function trackAIUsage(opts: {
+let _trackAIUsageWarnedOnce = false;
+
+export async function trackAIUsage(_opts: {
   model: string;
   inputTokens: number;
   outputTokens: number;
-  agent: string; // e.g. "morning-briefing", "chat", "client-health"
+  agent: string;
 }): Promise<void> {
-  try {
-    const totalTokens = opts.inputTokens + opts.outputTokens;
-    const rates = COST_PER_M_TOKENS[opts.model] ?? COST_PER_M_TOKENS[MODEL_HAIKU];
-    const costCents = Math.round(
-      (opts.inputTokens / 1_000_000) * rates.input +
-      (opts.outputTokens / 1_000_000) * rates.output
+  if (!_trackAIUsageWarnedOnce) {
+    _trackAIUsageWarnedOnce = true;
+    console.warn(
+      "[DEPRECATED] trackAIUsage() is replaced by getTrackedAnthropicClient proxy. Remove after 2026-05-01."
     );
-
-    await db.insert(apiUsage).values({
-      provider: "anthropic",
-      tokensUsed: totalTokens,
-      cost: costCents,
-      date: new Date(),
-      metadata: {
-        model: opts.model,
-        inputTokens: opts.inputTokens,
-        outputTokens: opts.outputTokens,
-        agent: opts.agent,
-      },
-    });
-  } catch {
-    // Fire-and-forget — never block the caller
   }
+  // No-op: getTrackedAnthropicClient() now handles all recording via ai_usage table.
 }

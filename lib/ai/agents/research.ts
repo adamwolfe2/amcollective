@@ -4,7 +4,8 @@
  * Adapted from Trackr's research pipeline (~/trackr/lib/actions/research.ts)
  */
 
-import { getAnthropicClient, MODEL_SONNET } from "../client";
+import { MODEL_SONNET } from "../client";
+import { getTrackedAnthropicClient } from "../tracked-client";
 import { storeEmbedding } from "../embeddings";
 import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
@@ -58,7 +59,7 @@ export async function runResearch(
   const searchResults = await tavilySearch(query);
 
   // Step 2: Synthesize with Claude Sonnet
-  const anthropic = getAnthropicClient();
+  const anthropic = getTrackedAnthropicClient({ agent: "research", userId: actorId });
   let summary: string;
 
   if (anthropic && searchResults.results.length > 0) {

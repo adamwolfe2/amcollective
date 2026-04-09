@@ -8,7 +8,8 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { getAnthropicClient, MODEL_SONNET, isAIConfigured, trackAIUsage } from "../client";
+import { isAIConfigured, MODEL_SONNET } from "../client";
+import { getTrackedAnthropicClient } from "../tracked-client";
 import { TOOL_DEFINITIONS, executeTool } from "../tools";
 import { selectToolsForQuery, type ToolModule } from "./shared/select-tools";
 import { searchSimilar } from "../embeddings";
@@ -100,7 +101,7 @@ export async function chat(
     };
   }
 
-  const anthropic = getAnthropicClient()!;
+  const anthropic = getTrackedAnthropicClient({ agent: "chat", userId })!;
 
   // Create or use existing conversation
   let convId = conversationId;
@@ -209,8 +210,7 @@ export async function chat(
     });
   }
 
-  // Track total usage across all iterations
-  trackAIUsage({ model: MODEL_SONNET, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, agent: "chat" });
+  // Usage is tracked automatically by the tracked client proxy.
 
   // Extract text response
   const textBlocks = response.content.filter(

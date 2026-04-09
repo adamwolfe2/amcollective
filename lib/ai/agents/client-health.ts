@@ -6,7 +6,8 @@
  * Uses Claude Haiku for a one-line health summary.
  */
 
-import { getAnthropicClient, MODEL_HAIKU, trackAIUsage } from "../client";
+import { MODEL_HAIKU } from "../client";
+import { getTrackedAnthropicClient } from "../tracked-client";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { eq, desc, sql, and, gte } from "drizzle-orm";
@@ -162,7 +163,7 @@ async function generateBatchedHealthSummaries(
   const map = new Map<string, string>();
   if (clients.length === 0) return map;
 
-  const anthropic = getAnthropicClient();
+  const anthropic = getTrackedAnthropicClient({ agent: "client-health" });
   if (!anthropic) {
     clients.forEach(({ clientId, score }) => map.set(clientId, defaultSummary(score)));
     return map;
@@ -191,8 +192,7 @@ Return format: {"<id>": "<one sentence>", ...}`,
       ],
     });
 
-    trackAIUsage({ model: MODEL_HAIKU, inputTokens: response.usage.input_tokens, outputTokens: response.usage.output_tokens, agent: "client-health" });
-
+    // Usage is tracked automatically by the tracked client proxy.
     const text = response.content[0].type === "text" ? response.content[0].text : "{}";
     const parsed = JSON.parse(text) as Record<string, string>;
     Object.entries(parsed).forEach(([id, summary]) => map.set(id, summary));

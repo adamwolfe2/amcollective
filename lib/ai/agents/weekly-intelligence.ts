@@ -5,7 +5,8 @@
  * uses Claude Sonnet to generate strategic insights and recommendations.
  */
 
-import { getAnthropicClient, MODEL_HAIKU } from "../client";
+import { MODEL_HAIKU } from "../client";
+import { getTrackedAnthropicClient } from "../tracked-client";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as vercelConnector from "@/lib/connectors/vercel";
 import { getUnresolvedCount } from "@/lib/db/repositories/alerts";
@@ -234,7 +235,7 @@ export interface WeeklyIntelResult {
 export async function generateWeeklyIntelligence(
   data: WeeklyIntelData
 ): Promise<WeeklyIntelResult> {
-  const anthropic = getAnthropicClient();
+  const anthropic = getTrackedAnthropicClient({ agent: "weekly-intelligence" });
   if (!anthropic) {
     return generateFallback(data);
   }

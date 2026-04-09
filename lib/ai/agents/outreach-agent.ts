@@ -12,7 +12,8 @@
  * stored in outreach_campaigns.knowledge_base — loaded at draft time.
  */
 
-import { getAnthropicClient, MODEL_SONNET, MODEL_HAIKU, isAIConfigured } from "../client";
+import { isAIConfigured, MODEL_SONNET, MODEL_HAIKU } from "../client";
+import { getTrackedAnthropicClient } from "../tracked-client";
 import type { CampaignKnowledgeBase } from "@/lib/db/schema/outreach";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -209,7 +210,7 @@ export async function draftColdEmail(req: DraftRequest): Promise<DraftResult> {
     };
   }
 
-  const client = getAnthropicClient()!;
+  const client = getTrackedAnthropicClient({ agent: "outreach" })!;
   const model = req.useHighQuality ? MODEL_SONNET : MODEL_HAIKU;
 
   const message = await client.messages.create({
