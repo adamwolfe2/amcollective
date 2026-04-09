@@ -18,7 +18,7 @@ import { eq, and, sql, desc, lte, gte, isNull } from "drizzle-orm";
 import { checkAdmin } from "@/lib/auth";
 import { captureError } from "@/lib/errors";
 
-export const runtime = "nodejs";
+export const runtime = "edge";
 export const preferredRegion = "iad1";
 
 export type PriorityUrgency = "critical" | "high" | "normal";
