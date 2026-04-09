@@ -41,7 +41,9 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(schema.emailDrafts.createdAt))
       .limit(limit);
 
-    return NextResponse.json(drafts);
+    return NextResponse.json(drafts, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error, { tags: { route: "GET /api/email/drafts" } });
     return NextResponse.json({ error: "Failed to fetch drafts" }, { status: 500 });

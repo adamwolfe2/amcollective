@@ -246,6 +246,8 @@ export async function GET(req: NextRequest) {
       clientGrowth: formattedClientGrowth,
       tasksByPriority: formattedPriority,
       conversionsLast30d: recentConversions[0]?.count ?? 0,
+    }, {
+      headers: { "Cache-Control": "private, max-age=300, stale-while-revalidate=600" },
     });
   } catch (error) {
     captureError(error);

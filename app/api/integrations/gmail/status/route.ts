@@ -21,6 +21,8 @@ export async function GET() {
       return NextResponse.json({
         configured: false,
         connected: false,
+      }, {
+        headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
       });
     }
 
@@ -42,6 +44,8 @@ export async function GET() {
       email: account?.email ?? null,
       lastSyncAt: account?.lastSyncAt ?? null,
       accountId: account?.id ?? null,
+    }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
     });
   } catch (error) {
     captureError(error, { tags: { component: "gmail-status" } });

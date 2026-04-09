@@ -88,7 +88,9 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(schema.leads.updatedAt))
       .limit(200);
 
-    return NextResponse.json(rows);
+    return NextResponse.json(rows, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error);
     return NextResponse.json(

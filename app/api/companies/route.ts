@@ -36,7 +36,9 @@ export async function GET() {
       .orderBy(asc(schema.companies.name))
       .limit(200);
 
-    return NextResponse.json(companies);
+    return NextResponse.json(companies, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error);
     return NextResponse.json(

@@ -38,7 +38,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       .limit(1);
 
     if (!draft) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json(draft);
+    return NextResponse.json(draft, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error, { tags: { route: "GET /api/email/drafts/:id" } });
     return NextResponse.json({ error: "Failed to fetch draft" }, { status: 500 });

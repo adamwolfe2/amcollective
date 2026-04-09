@@ -90,6 +90,8 @@ export async function GET() {
         value: recentWins[0]?.value ?? 0,
       },
       conversionRate90d: rate,
+    }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
     });
   } catch (error) {
     captureError(error);

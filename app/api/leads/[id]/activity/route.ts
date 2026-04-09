@@ -28,7 +28,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
       .orderBy(desc(schema.leadActivities.createdAt))
       .limit(100);
 
-    return NextResponse.json(activities);
+    return NextResponse.json(activities, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error);
     return NextResponse.json(

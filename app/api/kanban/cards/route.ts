@@ -66,7 +66,9 @@ export async function GET(req: NextRequest) {
     .where(eq(schema.kanbanCards.clientId, clientId))
     .orderBy(asc(schema.kanbanCards.position));
 
-  return NextResponse.json(cards);
+  return NextResponse.json(cards, {
+    headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+  });
 }
 
 export async function POST(req: NextRequest) {

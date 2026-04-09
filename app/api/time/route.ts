@@ -65,7 +65,9 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(schema.timeEntries.date))
       .limit(limit);
 
-    return NextResponse.json(entries);
+    return NextResponse.json(entries, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error, { tags: { route: "GET /api/time" } });
     return NextResponse.json({ error: "Failed to fetch time entries" }, { status: 500 });

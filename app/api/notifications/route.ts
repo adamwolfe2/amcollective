@@ -31,7 +31,9 @@ export async function GET(req: NextRequest) {
       getUnreadCount(userId),
     ]);
 
-    return NextResponse.json({ notifications, unreadCount });
+    return NextResponse.json({ notifications, unreadCount }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error, {
       tags: { source: "api", route: "notifications" },

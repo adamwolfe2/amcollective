@@ -67,7 +67,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
       .orderBy(asc(schema.taskComments.createdAt))
       .limit(100);
 
-    return NextResponse.json({ ...row, comments });
+    return NextResponse.json({ ...row, comments }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error);
     return NextResponse.json(

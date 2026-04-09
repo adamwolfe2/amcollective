@@ -54,7 +54,10 @@ export async function GET(
     });
 
     return new NextResponse(html, {
-      headers: { "Content-Type": "text/html; charset=utf-8" },
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "private, max-age=60, stale-while-revalidate=120",
+      },
     });
   } catch (error) {
     captureError(error, { tags: { source: "invoice-preview" } });

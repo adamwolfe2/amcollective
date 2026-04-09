@@ -67,6 +67,8 @@ export async function GET() {
 
     return NextResponse.json({
       clients: Array.from(clientMap.values()),
+    }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
     });
   } catch (error) {
     captureError(error, { tags: { route: "GET /api/time/unbilled" } });

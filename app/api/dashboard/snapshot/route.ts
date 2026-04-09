@@ -5,7 +5,7 @@
  * GET: Return recent snapshots for trend display.
  */
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -148,13 +148,18 @@ export async function GET(req: NextRequest) {
     .orderBy(desc(schema.dailyMetricsSnapshots.date))
     .limit(30);
 
-  return apiSuccess({
-    snapshots: snapshots.map((s) => ({
-      ...s,
-      mrr: s.mrr / 100,
-      arr: s.arr / 100,
-      totalCash: s.totalCash / 100,
-      overdueAmount: s.overdueAmount / 100,
-    })),
+  return NextResponse.json({
+    success: true,
+    data: {
+      snapshots: snapshots.map((s) => ({
+        ...s,
+        mrr: s.mrr / 100,
+        arr: s.arr / 100,
+        totalCash: s.totalCash / 100,
+        overdueAmount: s.overdueAmount / 100,
+      })),
+    },
+  }, {
+    headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
   });
 }

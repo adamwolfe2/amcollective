@@ -25,7 +25,9 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(schema.sentEmails.createdAt))
       .limit(limit);
 
-    return NextResponse.json(emails);
+    return NextResponse.json(emails, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error, { tags: { route: "GET /api/email/sent" } });
     return NextResponse.json({ error: "Failed to fetch sent emails" }, { status: 500 });

@@ -34,7 +34,9 @@ export async function GET(
       .where(eq(schema.invoices.recurringInvoiceId, id))
       .orderBy(desc(schema.invoices.createdAt));
 
-    return NextResponse.json(invoices);
+    return NextResponse.json(invoices, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error, {
       tags: { source: "api", route: "recurring/[id]/invoices" },

@@ -61,6 +61,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       latestByService,
       recentRuns,
+    }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
     });
   } catch (err) {
     captureError(err, { tags: { route: "GET /api/admin/sync/status" } });

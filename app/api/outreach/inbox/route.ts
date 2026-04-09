@@ -37,6 +37,8 @@ export async function GET(req: NextRequest) {
       replies: rows,
       total: totalRow?.count ?? 0,
       unreadCount: unreadRow?.count ?? 0,
+    }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
     });
   } catch (error) {
     captureError(error, { tags: { component: "outreach-inbox-get" } });

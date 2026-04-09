@@ -50,7 +50,9 @@ export async function GET(req: NextRequest) {
           .orderBy(desc(schema.subscriptionCosts.createdAt))
           .limit(200);
 
-    return NextResponse.json({ costs });
+    return NextResponse.json({ costs }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (err) {
     captureError(err, { tags: { route: "GET /api/costs" } });
     return NextResponse.json(

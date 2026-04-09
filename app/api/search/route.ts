@@ -8,7 +8,7 @@
  * Falls back to ilike if pg_trgm is not available.
  */
 
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
@@ -77,7 +77,9 @@ export async function GET(req: NextRequest) {
     // Sort by score (highest first), then group by type
     results.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
-    return apiSuccess({ results });
+    return NextResponse.json({ success: true, data: { results } }, {
+      headers: { "Cache-Control": "private, max-age=30" },
+    });
   } catch (error) {
     captureError(error, {
       tags: { source: "api", route: "search" },

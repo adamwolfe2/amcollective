@@ -77,6 +77,8 @@ export async function GET() {
         nextRenewal: r.nextRenewal?.toISOString() ?? null,
         companyTag: r.companyTag,
       })),
+    }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
     });
   } catch (err) {
     captureError(err, { tags: { route: "GET /api/costs/summary" } });

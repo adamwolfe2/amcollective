@@ -35,7 +35,9 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(schema.surveys.createdAt))
       .limit(100);
 
-    return NextResponse.json(surveys);
+    return NextResponse.json(surveys, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error, { tags: { route: "GET /api/surveys" } });
     return NextResponse.json({ error: "Failed to fetch surveys" }, { status: 500 });

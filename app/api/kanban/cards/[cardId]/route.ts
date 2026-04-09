@@ -42,7 +42,9 @@ export async function GET(
     .where(eq(schema.kanbanComments.cardId, cardId))
     .orderBy(asc(schema.kanbanComments.createdAt));
 
-  return NextResponse.json({ ...card, comments });
+  return NextResponse.json({ ...card, comments }, {
+    headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+  });
 }
 
 export async function PATCH(

@@ -77,6 +77,8 @@ export async function GET() {
       byEntityType,
       byActorType,
       dailyVolume,
+    }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
     });
   } catch (error) {
     captureError(error);

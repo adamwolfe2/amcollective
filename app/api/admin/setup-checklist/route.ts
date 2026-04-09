@@ -112,7 +112,9 @@ export async function GET() {
       completedCount,
       totalCount,
       allComplete,
-    } satisfies SetupChecklistResponse);
+    } satisfies SetupChecklistResponse, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (err) {
     captureError(err, { tags: { route: "GET /api/admin/setup-checklist" } });
     return NextResponse.json(

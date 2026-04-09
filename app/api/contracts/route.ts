@@ -48,7 +48,9 @@ export async function GET() {
       .orderBy(desc(schema.contracts.createdAt))
       .limit(100);
 
-    return NextResponse.json(rows);
+    return NextResponse.json(rows, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error);
     return NextResponse.json({ error: "Failed to fetch contracts" }, { status: 500 });

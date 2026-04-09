@@ -185,7 +185,9 @@ export async function GET() {
     };
     items.sort((a, b) => urgencyOrder[a.urgency] - urgencyOrder[b.urgency]);
 
-    return NextResponse.json({ items: items.slice(0, 5) });
+    return NextResponse.json({ items: items.slice(0, 5) }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error, { tags: { component: "dashboard-priorities" } });
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -54,7 +54,9 @@ export async function GET(
     .from(schema.documentTags)
     .where(eq(schema.documentTags.documentId, id));
 
-  return NextResponse.json({ ...doc, tags });
+  return NextResponse.json({ ...doc, tags }, {
+    headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+  });
 }
 
 export async function PATCH(

@@ -144,6 +144,8 @@ export async function GET() {
       stats7d,
       campaignTotals,
       dailyActivity,
+    }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
     });
   } catch (error) {
     captureError(error, { tags: { component: "Outreach API Error" } });

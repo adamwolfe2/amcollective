@@ -62,7 +62,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
       return NextResponse.json({ error: "Lead not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ ...lead, activities });
+    return NextResponse.json({ ...lead, activities }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error);
     return NextResponse.json(

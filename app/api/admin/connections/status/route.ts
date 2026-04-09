@@ -193,5 +193,7 @@ export async function GET() {
     missing: missingCount,
     connections,
     timestamp: new Date().toISOString(),
+  }, {
+    headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
   });
 }

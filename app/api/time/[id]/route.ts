@@ -47,7 +47,9 @@ export async function GET(_request: NextRequest, context: RouteContext) {
       .limit(1);
 
     if (!entry) return NextResponse.json({ error: "Not found" }, { status: 404 });
-    return NextResponse.json(entry);
+    return NextResponse.json(entry, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error, { tags: { route: "GET /api/time/:id" } });
     return NextResponse.json({ error: "Failed to fetch time entry" }, { status: 500 });

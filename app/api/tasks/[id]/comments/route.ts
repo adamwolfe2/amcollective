@@ -28,7 +28,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
       .where(eq(schema.taskComments.taskId, id))
       .orderBy(asc(schema.taskComments.createdAt));
 
-    return NextResponse.json(comments);
+    return NextResponse.json(comments, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error);
     return NextResponse.json(

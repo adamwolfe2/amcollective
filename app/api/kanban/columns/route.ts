@@ -35,7 +35,9 @@ export async function GET(req: NextRequest) {
     .where(eq(schema.kanbanColumns.clientId, clientId))
     .orderBy(asc(schema.kanbanColumns.position));
 
-  return NextResponse.json(columns);
+  return NextResponse.json(columns, {
+    headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+  });
 }
 
 export async function POST(req: NextRequest) {

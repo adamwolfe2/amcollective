@@ -46,6 +46,8 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     return NextResponse.json({
       ...doc,
       tags: tags.map((t) => t.tag),
+    }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
     });
   } catch (error) {
     captureError(error);

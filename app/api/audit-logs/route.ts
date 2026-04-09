@@ -80,6 +80,8 @@ export async function GET(request: NextRequest) {
       total: totalResult?.count ?? 0,
       limit,
       offset,
+    }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
     });
   } catch (error) {
     captureError(error);

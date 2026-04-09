@@ -51,7 +51,9 @@ export async function GET() {
       .orderBy(desc(schema.recurringInvoices.createdAt))
       .limit(200);
 
-    return NextResponse.json(templates);
+    return NextResponse.json(templates, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error, {
       tags: { source: "api", route: "recurring" },

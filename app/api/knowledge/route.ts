@@ -76,7 +76,8 @@ export async function GET(request: NextRequest) {
         .limit(100);
 
       return NextResponse.json(
-        rows.map((r) => ({ ...r.document, tags: [r.tag] }))
+        rows.map((r) => ({ ...r.document, tags: [r.tag] })),
+        { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" } }
       );
     }
 
@@ -109,7 +110,8 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      documents.map((d) => ({ ...d, tags: tagMap.get(d.id) ?? [] }))
+      documents.map((d) => ({ ...d, tags: tagMap.get(d.id) ?? [] })),
+      { headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" } }
     );
   } catch (error) {
     captureError(error);

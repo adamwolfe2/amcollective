@@ -61,7 +61,9 @@ export async function GET(_request: NextRequest, ctx: RouteContext) {
     // Strip sensitive signing metadata from admin GET response
     const { token: _token, signerIp: _signerIp, signerUserAgent: _signerUserAgent, ...safeContract } = row.contract;
 
-    return NextResponse.json({ ...row, contract: safeContract });
+    return NextResponse.json({ ...row, contract: safeContract }, {
+      headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
+    });
   } catch (error) {
     captureError(error);
     return NextResponse.json({ error: "Failed to fetch contract" }, { status: 500 });
