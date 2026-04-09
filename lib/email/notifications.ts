@@ -1,5 +1,6 @@
 import { getResend, FROM_EMAIL, APP_URL, buildBaseHtml, type OrderEmailData } from "./shared";
 import { captureError } from "@/lib/errors";
+import { isEmailSuppressed } from "@/lib/email/suppression-check";
 
 // ---------------------------------------------------------------------------
 // sendContractEmail — send contract signing link to client
@@ -108,6 +109,9 @@ export async function sendClientWelcomeEmail(data: {
 }) {
   const r = getResend();
   if (!r) return null;
+
+  const suppressed = await isEmailSuppressed(data.clientEmail);
+  if (suppressed) return null;
 
   const html = buildBaseHtml({
     headline: "Welcome to AM Collective",

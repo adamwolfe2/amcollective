@@ -5,6 +5,7 @@
  */
 
 import { getResend, FROM_EMAIL, buildBaseHtml } from "@/lib/email/shared";
+import { isEmailSuppressed } from "@/lib/email/suppression-check";
 
 export async function sendClientStatusEmail(data: {
   to: string;
@@ -15,6 +16,11 @@ export async function sendClientStatusEmail(data: {
   const resend = getResend();
   if (!resend) {
     // Resend not configured — skip sending
+    return null;
+  }
+
+  const suppressed = await isEmailSuppressed(data.to);
+  if (suppressed) {
     return null;
   }
 
