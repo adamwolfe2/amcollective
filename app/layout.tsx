@@ -106,6 +106,12 @@ export default function RootLayout({
 }) {
   const content = (
     <html lang="en" className={`scroll-smooth ${newsreader.variable} ${geistMono.variable}`}>
+      <head>
+        <link rel="preconnect" href="https://api.clerk.com" />
+        <link rel="preconnect" href="https://app.posthog.com" />
+        <link rel="dns-prefetch" href="https://api.stripe.com" />
+        <link rel="dns-prefetch" href="https://api.openai.com" />
+      </head>
       <body
         className="antialiased font-serif"
         style={{

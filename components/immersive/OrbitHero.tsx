@@ -195,7 +195,7 @@ function ProjectCard({ project, onClick }: { project: Project; onClick: () => vo
             className="relative rounded-xl overflow-hidden bg-gray-50 border border-gray-100 shrink-0"
             style={{ width: 44, height: 44 }}
           >
-            <Image src={logo} alt="" fill className="object-contain p-1.5" unoptimized />
+            <Image src={logo} alt="" fill sizes="44px" className="object-contain p-1.5" unoptimized />
           </div>
           <div className="min-w-0">
             <p className="font-serif text-base font-semibold text-gray-900 leading-tight">
