@@ -1,0 +1,19 @@
+{
+  "name": "AM Collective",
+  "short_name": "AMC",
+  "description": "AM Collective Capital — Internal operations dashboard",
+  "start_url": "/admin",
+  "display": "standalone",
+  "background_color": "#F3F3EF",
+  "theme_color": "#000000",
+  "orientation": "any",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
