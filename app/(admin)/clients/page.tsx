@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { ClientSearch } from "./client-search";
 import { ClientFilter } from "./client-filter";
 import { AddClientDialog } from "./add-client-dialog";
+import { Suspense } from "react";
 import { captureError } from "@/lib/errors";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Users, UserPlus } from "lucide-react";
@@ -108,12 +109,16 @@ export default async function ClientsPage({
 
       {/* Filters */}
       <div className="flex items-center gap-4 mb-4">
-        <ClientFilter currentFilter={filter} />
+        <Suspense fallback={<div className="h-10 w-64 bg-[#0A0A0A]/5 animate-pulse" />}>
+          <ClientFilter currentFilter={filter} />
+        </Suspense>
       </div>
 
       {/* Search */}
       <div className="mb-4">
-        <ClientSearch defaultValue={search} />
+        <Suspense fallback={<div className="h-10 w-full bg-[#0A0A0A]/5 animate-pulse" />}>
+          <ClientSearch defaultValue={search} />
+        </Suspense>
       </div>
 
       {/* Table */}

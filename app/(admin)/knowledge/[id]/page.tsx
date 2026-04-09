@@ -3,7 +3,11 @@ import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
-import { ArticleEditor } from "./article-editor";
+import dynamic from "next/dynamic";
+
+const ArticleEditor = dynamic(() => import("./article-editor").then((m) => m.ArticleEditor), {
+  loading: () => <div className="h-96 bg-[#0A0A0A]/5 animate-pulse" />,
+});
 
 type PageProps = { params: Promise<{ id: string }> };
 

@@ -5,12 +5,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { format } from "date-fns";
-import {
-  SprintEditor,
-  type SprintData,
-  type SprintSection,
-  type SprintTask,
-} from "./sprint-editor";
+import type { SprintData, SprintSection, SprintTask } from "./sprint-editor";
+import dynamic from "next/dynamic";
+
+const SprintEditor = dynamic(
+  () => import("./sprint-editor").then((m) => m.SprintEditor),
+  { loading: () => <div className="h-96 bg-[#0A0A0A]/5 animate-pulse" /> }
+);
 
 async function getSprint(id: string): Promise<SprintData | null> {
   // Step 1: Load sprint

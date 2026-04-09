@@ -6,7 +6,8 @@ import { CompanyProvider } from "@/components/company-context";
 import { PresenceHeartbeat } from "@/components/presence-heartbeat";
 import { Toaster } from "@/components/ui/sonner";
 
-// Admin pages are always auth-gated and serve live data — never statically prerender
+// Auth-gated pages can't be statically generated during build.
+// Data-level caching is handled via unstable_cache on individual pages.
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({

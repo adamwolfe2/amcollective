@@ -19,6 +19,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { FileText, Paperclip } from "lucide-react";
 import { UploadDocumentDialog } from "./upload-dialog";
+import { Suspense } from "react";
 import { EmptyState } from "@/components/ui/empty-state";
 import { DocumentFilters } from "./document-filters";
 import { DocumentActions } from "./document-actions";
@@ -112,7 +113,9 @@ export default async function DocumentsPage({
 
       {/* Filters */}
       <div className="mb-4">
-        <DocumentFilters />
+        <Suspense fallback={<div className="flex gap-3"><div className="h-9 w-32 bg-[#0A0A0A]/5 animate-pulse" /><div className="h-9 w-32 bg-[#0A0A0A]/5 animate-pulse" /></div>}>
+          <DocumentFilters />
+        </Suspense>
       </div>
 
       {/* Table */}

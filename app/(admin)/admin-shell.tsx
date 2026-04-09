@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect, useCallback } from "react";
 import { UserButton } from "@clerk/nextjs";
-import { motion, AnimatePresence } from "framer-motion";
 import { PageTransition } from "@/components/PageTransition";
 import {
   LayoutDashboard,
@@ -255,16 +254,15 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
             </button>
 
             {/* Children with tree-line connector — animated expand/collapse */}
-            <AnimatePresence initial={false}>
-              {open && item.children && (
-                <motion.div
-                  key="submenu"
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: "auto", opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  style={{ overflow: "hidden" }}
-                >
+            <div
+              className="grid transition-[grid-template-rows,opacity] duration-200 ease-out"
+              style={{
+                gridTemplateRows: open && item.children ? "1fr" : "0fr",
+                opacity: open && item.children ? 1 : 0,
+              }}
+            >
+              <div className="overflow-hidden">
+                {item.children && (
                   <div className="ml-[23px] border-l border-white/10">
                     {item.children.map((child, idx) => {
                       const childActive = isActive(pathname, child.href);
@@ -297,9 +295,9 @@ function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
                       );
                     })}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                )}
+              </div>
+            </div>
           </div>
         );
       })}
