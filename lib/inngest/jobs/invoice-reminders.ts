@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { createAuditLog } from "@/lib/db/repositories/audit";
 import { notifySlack } from "@/lib/webhooks/slack";
 import { notifyAdmins } from "@/lib/db/repositories/notifications";
+import { isEmailSuppressed } from "@/lib/email/suppression-check";
 
 export const invoiceReminders = inngest.createFunction(
   {
@@ -89,6 +90,9 @@ export const invoiceReminders = inngest.createFunction(
     // Send due-soon reminders
     for (const row of dueSoon) {
       if (!row.clientEmail) continue;
+
+      const dueSoonSuppressed = await isEmailSuppressed(row.clientEmail);
+      if (dueSoonSuppressed) continue;
 
       await step.run(`remind-due-soon-${row.invoice.id}`, async () => {
         const inv = row.invoice;

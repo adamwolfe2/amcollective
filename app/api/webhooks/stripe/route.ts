@@ -23,6 +23,8 @@ import { notifySlack } from "@/lib/webhooks/slack";
 import { ajWebhook } from "@/lib/middleware/arcjet";
 import type Stripe from "stripe";
 import { captureError } from "@/lib/errors";
+import { inngest } from "@/lib/inngest/client";
+import type { DunningPayload } from "@/lib/inngest/jobs/dunning-sequence";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -397,6 +399,30 @@ async function handleInvoicePaymentFailed(event: Stripe.Event) {
   await notifySlack(
     `Payment FAILED — $${((invoice.amount_due ?? 0) / 100).toFixed(2)} from ${invoice.customer_email ?? "unknown"} (attempt ${invoice.attempt_count ?? 1})`
   );
+
+  // Trigger dunning sequence on first failure only (Stripe retries automatically;
+  // we only start the email sequence once to avoid spamming the client).
+  if ((invoice.attempt_count ?? 1) === 1) {
+    const dunningPayload: DunningPayload = {
+      stripeInvoiceId: invoice.id,
+      clientId: client?.id ?? null,
+      clientName: client?.name ?? null,
+      clientEmail: invoice.customer_email ?? client?.email ?? null,
+      amountDue: invoice.amount_due ?? 0,
+      currency: invoice.currency ?? "usd",
+      attemptCount: invoice.attempt_count ?? 1,
+      stripeHostedUrl: invoice.hosted_invoice_url ?? null,
+    };
+
+    try {
+      await inngest.send({
+        name: "stripe/invoice.payment_failed",
+        data: dunningPayload,
+      });
+    } catch (err) {
+      captureError(err, { tags: { component: "stripe-webhook", action: "dunning-trigger" } });
+    }
+  }
 }
 
 async function handleInvoiceOverdue(event: Stripe.Event) {
