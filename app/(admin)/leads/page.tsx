@@ -51,7 +51,17 @@ const getCachedLeads = unstable_cache(
 );
 
 export default async function LeadsPage() {
-  const leads = await getCachedLeads();
+  const cached = await getCachedLeads();
+  // unstable_cache serializes Date -> string via JSON. Rehydrate date fields
+  // so downstream code (e.g. `.toLocaleDateString`, comparisons) works.
+  const leads = cached.map((l) => ({
+    ...l,
+    nextFollowUpAt: l.nextFollowUpAt ? new Date(l.nextFollowUpAt) : null,
+    lastContactedAt: l.lastContactedAt ? new Date(l.lastContactedAt) : null,
+    convertedAt: l.convertedAt ? new Date(l.convertedAt) : null,
+    createdAt: l.createdAt ? new Date(l.createdAt) : null,
+    updatedAt: l.updatedAt ? new Date(l.updatedAt) : null,
+  }));
 
   // Weighted pipeline (consideration + intent)
   const weightedValue = leads
