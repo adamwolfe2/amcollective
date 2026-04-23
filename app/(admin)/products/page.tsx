@@ -18,6 +18,7 @@ import * as taskspaceConnector from "@/lib/connectors/taskspace";
 import * as wholesailConnector from "@/lib/connectors/wholesail";
 import * as tbgcConnector from "@/lib/connectors/tbgc";
 import * as hookConnector from "@/lib/connectors/hook";
+import * as leasestackConnector from "@/lib/connectors/leasestack";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { statusBadge, statusText } from "@/lib/ui/status-colors";
@@ -68,7 +69,7 @@ interface ProductRow {
 
 export default async function ProductsPage() {
   // Fetch all product data in parallel
-  const [projects, trackrResult, taskspaceResult, wholesailResult, , tbgcResult, hookResult, mrrByCompanyResult] =
+  const [projects, trackrResult, taskspaceResult, wholesailResult, , tbgcResult, hookResult, leasestackResult, mrrByCompanyResult] =
     await Promise.all([
       db.select({
         id: schema.portfolioProjects.id,
@@ -88,6 +89,7 @@ export default async function ProductsPage() {
       Promise.resolve({ success: false as const, data: null }), // cursive: MRR via Stripe
       tbgcConnector.getSnapshot().catch(() => ({ success: false as const, data: null })),
       hookConnector.getSnapshot().catch(() => ({ success: false as const, data: null })),
+      leasestackConnector.getSnapshot().catch(() => ({ success: false as const, data: null })),
       stripeConnector.getMRRByCompany().catch(() => ({ success: false as const, data: null })),
 
       db.select({
@@ -120,6 +122,8 @@ export default async function ProductsPage() {
       mrrCents = hookResult.success && hookResult.data ? hookResult.data.mrrCents : getStripeMrr("hook");
     } else if (p.slug === "myvsl") {
       mrrCents = getStripeMrr("myvsl");
+    } else if (p.slug === "leasestack") {
+      mrrCents = leasestackResult.success && leasestackResult.data ? leasestackResult.data.mrrCents : getStripeMrr("leasestack");
     }
 
     const daysLive = p.launchDate

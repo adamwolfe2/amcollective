@@ -17,5 +17,6 @@ export * as taskspace from "./taskspace";
 export * as wholesail from "./wholesail";
 export * as tbgc from "./tbgc";
 export * as hook from "./hook";
+export * as leasestack from "./leasestack";
 export * as emailbison from "./emailbison";
 export { type ConnectorResult, invalidateCache } from "./base";

@@ -19,6 +19,7 @@ const COMPANY_TAGS = [
   "tbgc",
   "hook",
   "myvsl",
+  "leasestack",
   "am_collective",
   "personal",
   "untagged",

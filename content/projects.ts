@@ -107,6 +107,22 @@ export const PROJECTS: Project[] = [
     ],
   },
   {
+    name: "LeaseStack",
+    tagline: "Full-stack managed marketing platform for real estate operators",
+    description:
+      "Deploys a custom website, AI chatbot, visitor identification pixel, and managed ad campaigns across Meta, Google, and TikTok — all tied to lease-level attribution.",
+    longDescription:
+      "LeaseStack is the full-stack managed marketing platform for real estate operators. It deploys a custom website, AI chatbot, visitor identification pixel, and managed ad campaigns across Meta, Google, and TikTok — all tied to lease-level attribution. One platform replaces five vendors, live in 14 days.",
+    tags: ["Real Estate", "Managed Marketing", "Attribution"],
+    image: "/leasestack social.png",
+    url: "https://leasestack.co",
+    metrics: [
+      { label: "Vendors replaced", value: "5" },
+      { label: "Time to live", value: "14 days" },
+      { label: "Attribution", value: "Lease-level" },
+    ],
+  },
+  {
     name: "Hook",
     tagline: "GTM and viral content engine for brands",
     description:

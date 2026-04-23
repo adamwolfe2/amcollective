@@ -10,6 +10,7 @@ const productLogos: Record<string, string> = {
   cursive: "/logos/cursive.png",
   hook: "/logos/hook.png",
   myvsl: "/logos/myvsl.png",
+  leasestack: "/logos/leasestack.png",
 };
 
 /**

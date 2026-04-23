@@ -64,6 +64,14 @@ const VENTURES = [
     url: "https://www.campusgtm.com",
   },
   {
+    name: "LeaseStack",
+    description:
+      "The full-stack managed marketing platform for real estate operators. Deploys a custom website, AI chatbot, visitor identification pixel, and managed ad campaigns across Meta, Google, and TikTok — all tied to lease-level attribution. One platform replaces five vendors, live in 14 days.",
+    logo: "/logos/leasestack.png",
+    social: "/leasestack social.png",
+    url: "https://leasestack.co",
+  },
+  {
     name: "Hook",
     description:
       "GTM and viral content engine for brands that need Gen Z distribution. Built content systems for YC companies like ElevenLabs.",

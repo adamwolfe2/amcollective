@@ -66,6 +66,14 @@ const PRODUCT_METADATA: Array<{
     targetMarket: "DTC brands and content marketing teams",
     monthlyGoalCents: 500000, // $5k/mo goal
   },
+  {
+    slug: "leasestack",
+    launchDate: null,
+    productStage: "building",
+    description: "Full-stack managed marketing platform for real estate operators — custom website, AI chatbot, visitor ID pixel, and managed Meta/Google/TikTok ads with lease-level attribution",
+    targetMarket: "Real estate operators and property management companies",
+    monthlyGoalCents: 1000000, // $10k/mo goal
+  },
 ];
 
 async function seedProductMetadata() {
