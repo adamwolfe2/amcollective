@@ -250,8 +250,7 @@ export function MarketingPage() {
           <div className="absolute top-6 right-6 md:top-8 md:right-10">
             <a
               href="https://app.amcollectivecapital.com/sign-in"
-              className="font-serif text-sm text-white/80 hover:text-white transition-colors"
-              style={{ textShadow: "0 1px 4px rgba(0,0,0,0.5)" }}
+              className="font-serif text-sm text-[#0A0A0A]/70 hover:text-[#0A0A0A] transition-colors"
             >
               login
             </a>
