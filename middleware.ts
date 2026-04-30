@@ -48,6 +48,7 @@ const isPublicRoute = createRouteMatcher([
   "/api/bot/sms(.*)",   // Bloo.io inbound webhook (verified by HMAC)
   "/api/bot/slack(.*)", // Slack Events API (verified by signing secret)
   "/api/bot/claw(.*)",  // OpenClaw bridge (verified by OPENCLAW_SHARED_SECRET Bearer token)
+  "/api/mcp(.*)",       // Hermes MCP endpoint — auth via MCP_SERVICE_TOKEN bearer
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
