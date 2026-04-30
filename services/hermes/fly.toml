@@ -17,7 +17,9 @@ primary_region = "iad"
 # VM size — shared-cpu-1x with 256MB is enough for a Slack bot
 [[vm]]
   size = "shared-cpu-1x"
-  memory = "256mb"
+  memory = "512mb"
+  # 256mb caused OOM kills during LLM tool-loops. 512mb gives headroom
+  # for Anthropic context + MCP calls. ~$3-4/mo instead of $2/mo.
 
 [env]
   PYTHONUNBUFFERED = "1"
