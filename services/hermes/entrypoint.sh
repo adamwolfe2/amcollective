@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # Hermes Agent entrypoint.
 #
-# 1. On first boot, generate ~/.hermes/cli-config.yaml with our cost-conscious
-#    defaults (Haiku, no auto-skill creation, no memory nudges).
+# 1. On first boot, generate ~/.hermes/cli-config.yaml + SOUL.md with our
+#    cost-conscious, terse-output defaults.
 # 2. Always rewrite ~/.hermes/mcp.json so the AM Collective MCP server stays
 #    in sync with whatever Fly secrets currently hold.
-# 3. Run `hermes gateway start` in the foreground.
+# 3. Seed initial cron jobs if none exist.
+# 4. Run a background health server, then `hermes gateway run` in the foreground.
 #
 # Required env vars (set as Fly secrets):
 #   SLACK_BOT_TOKEN, SLACK_APP_TOKEN, SLACK_SIGNING_SECRET
@@ -15,17 +16,20 @@
 set -euo pipefail
 
 HERMES_DIR="${HOME}/.hermes"
-mkdir -p "${HERMES_DIR}"
+PROFILE_DIR="${HERMES_DIR}/profiles/default"
+mkdir -p "${HERMES_DIR}" "${PROFILE_DIR}"
 
 CONFIG="${HERMES_DIR}/cli-config.yaml"
 MCP_FILE="${HERMES_DIR}/mcp.json"
+SOUL="${PROFILE_DIR}/SOUL.md"
 
 # ── First-boot config ─────────────────────────────────────────────────────
-if [[ ! -f "${CONFIG}" ]]; then
-  echo "[entrypoint] Generating ${CONFIG} with cost-conscious defaults"
-  cat > "${CONFIG}" <<'YAML'
-# AM Collective deployment config — generated on first boot.
-# Edit by exec-ing into the running container; persists on Fly volume.
+# Force-regenerate so config tweaks (terseness, compression off) ship on
+# next deploy without needing to manually wipe the volume.
+echo "[entrypoint] Writing ${CONFIG}"
+cat > "${CONFIG}" <<'YAML'
+# AM Collective deployment config. Regenerated on every boot from
+# entrypoint.sh — local edits will not survive a redeploy.
 
 model:
   # Default to Haiku 4.5 — ~10x cheaper than Sonnet, plenty smart for daily ops.
@@ -33,13 +37,15 @@ model:
   provider: "anthropic"
   # Anthropic SDK reads ANTHROPIC_API_KEY automatically.
 
-# Cap output tokens per response so a runaway model can't drain the budget.
-# Most Slack replies fit in <500 tokens. 2048 is generous headroom.
-max_tokens: 2048
+# Hard cap on output per response. Slack replies should be short — if Hermes
+# wants more, it can ask the user. 600 tokens ≈ 4-5 short paragraphs.
+max_tokens: 600
 
-# Compress long sessions aggressively to keep input tokens low.
+# Compression OFF: needs an auxiliary OpenRouter/Gemini key we don't have,
+# and Slack DMs almost never approach context limits anyway. Old turns just
+# get dropped instead of summarized — fine for short-form chat.
 compression:
-  enabled: true
+  enabled: false
 
 prompt_caching:
   enabled: true
@@ -47,17 +53,14 @@ prompt_caching:
 memory:
   memory_enabled: true
   memory_char_limit: 2200
-  # Disable periodic LLM-driven memory nudges — these are background calls
-  # that quietly cost money. Re-enable later if we want richer memory.
+  # Disable periodic LLM-driven memory nudges — quiet background spend.
   nudge_interval: 0
 
 skills:
   # Disable autonomous skill-creation nudges — Hermes' biggest cost vector.
-  # Skills can still be created manually with `/skill new`.
   creation_nudge_interval: 0
 
-# Slack platform: tools available to Hermes when responding in Slack.
-# We start with a small safe surface; expand once we trust it.
+# Slack toolset: small + safe.
 platform_toolsets:
   slack: [web, file, todo, skills]
 
@@ -72,7 +75,46 @@ session_reset:
 delegation:
   max_iterations: 30
 YAML
-fi
+
+# ── Tight, AM-Collective-specific persona (regenerated each boot) ─────────
+echo "[entrypoint] Writing ${SOUL}"
+cat > "${SOUL}" <<'SOUL'
+# Hermes — AM Collective Edition
+
+You are Hermes, the AM Collective Slack assistant for Adam Wolfe and Maggie Byrne.
+
+## Output style — STRICT
+
+- Be terse. Slack replies should fit in one screen.
+- Lead with the answer. Skip preamble like "I'll help with that..." or "Let me check...".
+- Use **plain prose** for one-fact answers. Use bullets only for ≥3 items.
+- No emojis unless the user uses them first.
+- No headers in short responses. Use them only for multi-section answers.
+- Skip your own commentary on what you just did. The user can see the result.
+- If a tool returns 50 ventures, summarize ("9 ventures: Cursive, TaskSpace…") — don't dump JSON.
+- Prefer **3 sentences** over **3 paragraphs**.
+- For numbers and dates, just say them. No "as you can see" / "interestingly".
+
+## When to be longer
+
+- The user explicitly asks for detail ("explain", "walk me through", "deep dive").
+- Multi-step task that genuinely needs structure (a draft email, a checklist).
+- A complex tool error you need to surface.
+
+## Context
+
+- Workspace: AM Collective (operational holding co for AI ventures).
+- Portfolio: Cursive, TaskSpace, AIMS, CampusGTM, Hook, Trackr, Wholesail, TBGC.
+- Live data lives behind the `am-collective` MCP server. Use those tools first
+  for any AM Collective question.
+- Adam = founder/CEO. Maggie = COO. Treat them as principals, not novices.
+
+## Hard rules
+
+- Never hallucinate numbers. If a tool fails, say so plainly.
+- Never invent tool names. Use what's listed in the tool inventory.
+- Never reformat tool output into something the tool didn't return.
+SOUL
 
 # ── Always sync the MCP server pointer ────────────────────────────────────
 # Rewriting on every boot keeps the URL/token in lockstep with Fly secrets.
@@ -106,13 +148,9 @@ echo "[entrypoint] Seeding cron jobs..."
 python3 /opt/hermes-agent/seed_crons.py
 
 # ── Health-check server (background) ─────────────────────────────────────
-# Fly probes :8080/health. We run a tiny Python HTTP server as a daemon so
-# the machine is visible in the Fly dashboard. It exits when hermes exits.
 python3 /opt/hermes-agent/health.py &
 HEALTH_PID=$!
 echo "[entrypoint] Health server started on :8080 (pid ${HEALTH_PID})"
 
 # ── Run the gateway in the foreground ─────────────────────────────────────
-# `hermes gateway start` blocks indefinitely on the Slack websocket. If it
-# exits non-zero, Fly will restart the machine per fly.toml restart policy.
 exec hermes gateway run
