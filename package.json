@@ -27,6 +27,7 @@
     "@clerk/nextjs": "^6.38.2",
     "@composio/core": "^0.6.3",
     "@linear/sdk": "^76.0.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@neondatabase/serverless": "^0.10.4",
     "@radix-ui/react-accordion": "1.2.12",
     "@radix-ui/react-alert-dialog": "1.1.15",
