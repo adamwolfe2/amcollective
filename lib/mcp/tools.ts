@@ -515,6 +515,83 @@ export function registerTools(
     },
   );
 
+  // ── Read: legal document review via Mike ───────────────────────────────
+  server.registerTool(
+    "legal.review",
+    {
+      title: "Legal document review",
+      description:
+        "Send a document URL to Mike (AM Collective internal legal AI) for review. " +
+        "Returns a structured JSON analysis: summary, key clauses, risks, and a recommendation. " +
+        "Accepts PDF or DOCX URLs reachable from the Mike backend. " +
+        "Powered by Claude Haiku — cost ~$0.01–0.10 per review.",
+      inputSchema: {
+        doc_url: z
+          .string()
+          .url()
+          .describe("Public HTTPS URL of the PDF or DOCX to review."),
+        question: z
+          .string()
+          .optional()
+          .describe(
+            "Specific legal question or focus area " +
+              "(e.g. 'identify liability clauses', 'is this NDA balanced?'). " +
+              "Omit for a general review.",
+          ),
+      },
+    },
+    async ({ doc_url, question }) => {
+      const MIKE_API_URL =
+        process.env.MIKE_API_URL ??
+        "https://mike-backend-amcollective.fly.dev";
+      const MIKE_SERVICE_TOKEN = process.env.MIKE_SERVICE_TOKEN;
+
+      if (!MIKE_SERVICE_TOKEN) {
+        return err(
+          "MIKE_SERVICE_TOKEN is not set. Add it to Vercel env and redeploy.",
+        );
+      }
+
+      try {
+        const response = await fetch(`${MIKE_API_URL}/review`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${MIKE_SERVICE_TOKEN}`,
+          },
+          body: JSON.stringify({ doc_url, question }),
+          signal: AbortSignal.timeout(120_000), // 2-min timeout for LLM
+        });
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => "no body");
+          return err(`Mike returned HTTP ${response.status}: ${text}`);
+        }
+
+        const data = (await response.json()) as {
+          summary?: string;
+          risks?: string[];
+          key_clauses?: string[];
+          recommendation?: string;
+          raw?: string;
+        };
+
+        const parts = [
+          data.summary && `**Summary**: ${data.summary}`,
+          data.key_clauses?.length &&
+            `**Key clauses**: ${data.key_clauses.join("; ")}`,
+          data.risks?.length && `**Risks**: ${data.risks.join("; ")}`,
+          data.recommendation &&
+            `**Recommendation**: ${data.recommendation}`,
+        ].filter(Boolean);
+
+        return ok(data, parts.join("\n\n") || data.raw || "Review complete.");
+      } catch (e) {
+        return err(e instanceof Error ? e.message : String(e));
+      }
+    },
+  );
+
   // ── Write: resolve alert ────────────────────────────────────────────────
   server.registerTool(
     "alerts.resolve",
