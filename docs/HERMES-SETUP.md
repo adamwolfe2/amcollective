@@ -6,7 +6,7 @@ Adam and Maggie can talk to the dashboard from Slack. Once finished:
 - **Slack** is the daily interface — DM the bot, mention it in a channel,
   or let it post the morning briefing automatically.
 - **Hermes** runs serverlessly on Modal (free when idle, ~$0.05/run otherwise).
-- **AM Collective MCP server** at `https://amcollectivecapital.com/api/mcp`
+- **AM Collective MCP server** at `https://app.amcollectivecapital.com/api/mcp`
   exposes 16 tools (read + write) backed by the Drizzle schema and connector
   cache.
 - **Auth**: bearer token in env, audited on every call.
@@ -27,7 +27,7 @@ This is roughly a 2-hour setup once all the accounts are created.
 You can curl the live endpoint as a smoke test:
 
 ```bash
-curl -i https://amcollectivecapital.com/api/mcp
+curl -i https://app.amcollectivecapital.com/api/mcp
 # {"service":"am-collective-mcp","status":"ok",...}
 ```
 
@@ -125,7 +125,7 @@ Hermes config lives in `~/.hermes/`. Two pieces matter:
   "mcpServers": {
     "am-collective": {
       "type": "http",
-      "url": "https://amcollectivecapital.com/api/mcp",
+      "url": "https://app.amcollectivecapital.com/api/mcp",
       "headers": {
         "Authorization": "Bearer ${AM_COLLECTIVE_MCP_TOKEN}",
         "X-MCP-Agent": "hermes"
