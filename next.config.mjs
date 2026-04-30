@@ -73,14 +73,35 @@ const nextConfig = {
   },
 };
 
-export default analyzer(
-  withSentryConfig(nextConfig, {
-    org: process.env.SENTRY_ORG,
-    project: process.env.SENTRY_PROJECT,
-    silent: !process.env.CI,
-    widenClientFileUpload: true,
-    webpack: {
-      treeshake: { removeDebugLogging: true },
-    },
-  })
-);
+// Sentry release/sourcemap upload is gated on having both SENTRY_AUTH_TOKEN
+// and a working SENTRY_ORG/SENTRY_PROJECT. When those are missing or the
+// token lacks access, the post-compile release-creation step exits non-zero
+// and Vercel marks the deploy as Error even though the build succeeds —
+// blocking the production alias from promoting. Skip the wrapper entirely
+// in that case so a missing/stale Sentry config never blocks shipping.
+const sentryConfigured =
+  Boolean(process.env.SENTRY_AUTH_TOKEN) &&
+  Boolean(process.env.SENTRY_ORG) &&
+  Boolean(process.env.SENTRY_PROJECT) &&
+  process.env.SENTRY_DISABLE_BUILD !== "true";
+
+const finalConfig = sentryConfigured
+  ? withSentryConfig(nextConfig, {
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      silent: !process.env.CI,
+      widenClientFileUpload: true,
+      // Tolerate transient Sentry errors so the build doesn't fail when the
+      // release-create step can't find the project. We still get runtime
+      // instrumentation from sentry.{client,server,edge}.config.ts.
+      errorHandler: (err) => {
+        // eslint-disable-next-line no-console
+        console.warn("[sentry] non-fatal build hook error:", err?.message ?? err);
+      },
+      webpack: {
+        treeshake: { removeDebugLogging: true },
+      },
+    })
+  : nextConfig;
+
+export default analyzer(finalConfig);
