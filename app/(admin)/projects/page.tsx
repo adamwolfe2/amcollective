@@ -83,15 +83,31 @@ const getCachedProjectsData = unstable_cache(
           .from(schema.clientProjects)
           .groupBy(schema.clientProjects.projectId),
       ]);
-    return { projects, vercelResult, snapshots, teamCountRows, clientCountRows };
+
+    // Fetch latest deploy for each project in parallel — kept inside the cache
+    // so we make N Vercel API calls at most once every 5 minutes, not on every render.
+    const deployResults = await Promise.all(
+      projects
+        .filter((p) => p.vercelProjectId)
+        .map(async (p) => {
+          const deploys = await vercelConnector.getDeployments(p.vercelProjectId!, 1);
+          return {
+            projectId: p.id,
+            state: deploys.success && deploys.data?.length ? deploys.data[0].state : null,
+            created: deploys.success && deploys.data?.length ? deploys.data[0].created : null,
+          };
+        })
+    );
+
+    return { projects, vercelResult, snapshots, teamCountRows, clientCountRows, deployResults };
   },
   ["projects-page-data"],
   { revalidate: 300, tags: ["projects"] }
 );
 
 export default async function ProjectsPage() {
-  // Fetch everything in parallel — including batch stats (no N+1)
-  const { projects, vercelResult, snapshots, teamCountRows, clientCountRows } =
+  // Fetch everything in parallel — including batch stats and deploy state (no uncached N+1)
+  const { projects, vercelResult, snapshots, teamCountRows, clientCountRows, deployResults } =
     await getCachedProjectsData();
 
   const vercelProjects =
@@ -100,20 +116,6 @@ export default async function ProjectsPage() {
   const snapshotMap = new Map(snapshots.map((s) => [s.projectSlug, s]));
   const teamMap = new Map(teamCountRows.map((r) => [r.projectId, r.cnt]));
   const clientMap = new Map(clientCountRows.map((r) => [r.projectId, r.cnt]));
-
-  // Fetch latest deploy for each project that has a Vercel ID (in parallel)
-  const deployResults = await Promise.all(
-    projects
-      .filter((p) => p.vercelProjectId)
-      .map(async (p) => {
-        const deploys = await vercelConnector.getDeployments(p.vercelProjectId!, 1);
-        return {
-          projectId: p.id,
-          state: deploys.success && deploys.data?.length ? deploys.data[0].state : null,
-          created: deploys.success && deploys.data?.length ? deploys.data[0].created : null,
-        };
-      })
-  );
   const deployMap = new Map(deployResults.map((d) => [d.projectId, d]));
 
   const rows: ProjectRow[] = projects.map((project) => {
