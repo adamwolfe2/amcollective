@@ -46,6 +46,21 @@ State (skills, memory, sqlite session DB) persists on a Fly volume mounted at
 | `AM_COLLECTIVE_MCP_URL` | `https://app.amcollectivecapital.com/api/mcp` |
 | `GATEWAY_ALLOW_ALL_USERS` | `true` for now (small team); tighten later |
 
+### Optional channel routing for proactive crons
+
+Set these so the cron jobs in `seed_crons.py` post to the right Slack
+channels. If unset, jobs fall back to the default Slack delivery (less
+reliable). Find each channel id in Slack → channel name dropdown →
+"View channel details" → bottom of dialog.
+
+| Secret | Purpose |
+|---|---|
+| `SLACK_DM_ADAM` | Adam's user DM id (`D...`) — preferred for private daily briefings |
+| `SLACK_CHANNEL_HEREMES` | `#heremes` channel id (`C...`) — fallback for cron output |
+| `SLACK_CHANNEL_AM_COLLECTIVE` | `#am-collective` channel id |
+| `SLACK_CHANNEL_OPS_ALERTS` | `#ops-alerts` channel id |
+| `SLACK_CHANNEL_SALES` | `#sales` channel id |
+
 Set with `fly secrets set KEY=VALUE --app hermes-am-collective` from this directory.
 
 ## Deploy
@@ -54,6 +69,34 @@ Set with `fly secrets set KEY=VALUE --app hermes-am-collective` from this direct
 cd services/hermes
 fly deploy --app hermes-am-collective --remote-only
 ```
+
+After deploy, the new SOUL.md persona + cron jobs are picked up
+automatically (entrypoint.sh regenerates them on every boot, and
+seed_crons.py upserts each job by name so editing this file +
+redeploying is the source of truth).
+
+## Active cron jobs
+
+After deploy, check the live cron list:
+
+```bash
+fly ssh console --app hermes-am-collective -C "hermes cron list"
+```
+
+Should show 6 jobs:
+
+| Job | Schedule | Purpose |
+|---|---|---|
+| `morning-briefing` | Mon-Fri 8am | MRR + roadmap + reply queue + alerts → Slack |
+| `reply-queue-check` | Every 2h, 9am-6pm Mon-Fri | Posts only if 3+ drafts pending |
+| `eod-checkin` | Mon-Fri 5pm | Blockers + at-risk rocks + draft backlog |
+| `week-wrap` | Fri 4pm | Strategic week summary + next-week priority |
+| `roadmap-drift` | Mon + Thu 7am | Drift alert when roadmap items slip |
+| `client-blocker-sweep` | Mon 9am | Auto-drafts nudges for waiting-on-client engagements |
+
+To edit: change `seed_crons.py`, redeploy. The seeder upserts by name,
+so existing cron history is preserved while prompt/schedule updates
+take effect.
 
 ## Watch logs
 
