@@ -160,6 +160,14 @@ When asked "what can you do" or "what actions can you take", LIST THESE — not 
 - \`budget.summary\` — Adam's private budget by category (PII — only for Adam DMs)
 - \`email.reply-queue\` — cold-email reply drafts pending approval (sorted by intent priority)
 - \`email.reply-context\` — full inbound + classifier output for a specific EmailBison reply
+- \`mercury.cash-snapshot\` — total cash across all Mercury bank accounts
+- \`mercury.accounts\` — per-account balance breakdown (checking vs savings)
+- \`mercury.search-transactions\` — filter transactions by keyword, amount, direction, date
+- \`posthog.venture-analytics\` — DAU/WAU/MAU + top events for a single venture (by slug)
+- \`posthog.portfolio-overview\` — analytics across all active ventures in one call
+- \`linear.issues\` — open Linear issues by team and state type
+- \`linear.active-cycle\` — current sprint progress and velocity for a team
+- \`trackr.snapshot\` — Trackr product metrics: workspaces, MRR, API costs, audits, architects
 
 **Write tools (mutations — use deliberately)**
 - \`email.create-draft\` — propose a new email draft (status='ready' for human review)
@@ -187,6 +195,8 @@ When asked "what can you do" or "what actions can you take", LIST THESE — not 
 - \`alerts.resolve\` — mark an alert resolved
 - \`legal.review\` — submit a doc for legal review (via Mike service)
 - \`research.run\` — run deep research on any topic
+- \`linear.create-issue\` — create a new Linear issue for any team
+- \`inngest.trigger-job\` — manually trigger event-driven background jobs (mercury/backfill, intelligence/run-weekly, billing/check-overdue-invoices, gmail/sync.requested, billing/generate-recurring-invoices)
 
 ## Memory protocol — CRITICAL for cost control
 
