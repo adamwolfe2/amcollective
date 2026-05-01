@@ -46,22 +46,22 @@ State (skills, memory, sqlite session DB) persists on a Fly volume mounted at
 | `AM_COLLECTIVE_MCP_URL` | `https://app.amcollectivecapital.com/api/mcp` |
 | `GATEWAY_ALLOW_ALL_USERS` | `true` for now (small team); tighten later |
 
-### Optional channel routing for proactive crons
+### Routing cron output to a channel
 
-Set these so the cron jobs in `seed_crons.py` post to the right Slack
-channels. If unset, jobs fall back to the default Slack delivery (less
-reliable). Find each channel id in Slack → channel name dropdown →
-"View channel details" → bottom of dialog.
+Hermes' upstream cron API doesn't accept a per-job channel parameter.
+Instead, **cron output goes to the channel set as Hermes' "home"**.
 
-| Secret | Purpose |
-|---|---|
-| `SLACK_DM_ADAM` | Adam's user DM id (`D...`) — preferred for private daily briefings |
-| `SLACK_CHANNEL_HEREMES` | `#heremes` channel id (`C...`) — fallback for cron output |
-| `SLACK_CHANNEL_AM_COLLECTIVE` | `#am-collective` channel id |
-| `SLACK_CHANNEL_OPS_ALERTS` | `#ops-alerts` channel id |
-| `SLACK_CHANNEL_SALES` | `#sales` channel id |
+To set the home channel:
 
-Set with `fly secrets set KEY=VALUE --app hermes-am-collective` from this directory.
+1. Open the Slack channel or DM where you want cron output to land
+   (e.g., your DM with Hermes, or `#heremes`)
+2. Type `/hermes sethome`
+3. Confirm
+
+All scheduled crons (morning briefing, EOD checkin, week wrap, etc.)
+will now deliver there.
+
+To change the home channel later, run `/hermes sethome` in the new channel.
 
 ## Deploy
 

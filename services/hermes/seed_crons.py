@@ -8,17 +8,11 @@ without manual volume edits.
 Each job is a Hermes "scheduled prompt" — a natural-language instruction
 Hermes will execute on its cron, with full MCP access to AM Collective.
 
-Channels are referenced by Slack channel ID via env vars (set as Fly
-secrets) so we don't hardcode channel IDs in the repo:
-
-  SLACK_CHANNEL_AM_COLLECTIVE  — main AM Collective channel
-  SLACK_CHANNEL_HEREMES        — heremes channel (proactive updates)
-  SLACK_CHANNEL_OPS_ALERTS     — ops alerts channel
-  SLACK_CHANNEL_SALES          — sales channel
-  SLACK_DM_ADAM                — Adam's user DM (for private updates)
-
-If a channel env var is unset, the job falls back to the default Slack
-delivery (whatever channel Hermes was DMed in last; less reliable).
+Cron output goes to Hermes' "home channel" — set per-channel by typing
+`/hermes sethome` in the Slack channel/DM where you want cron output.
+This is configured in Slack at runtime, NOT here. To route different
+crons to different channels, you'd need post-creation editing via the
+gateway's `hermes cron edit <id>` command.
 """
 
 import sys
@@ -35,24 +29,12 @@ from cron.jobs import load_jobs, save_jobs, create_job  # type: ignore
 JOBS_FILE = Path(os.environ.get("HOME", "/root")) / ".hermes" / "cron" / "jobs.json"
 
 
-def channel(env_name: str) -> str | None:
-    """Return a Slack channel id from env, or None if unset."""
-    val = os.environ.get(env_name)
-    return val.strip() if val and val.strip() else None
-
-
 def desired_jobs() -> list:
     """Return the canonical list of jobs we want present.
 
     Each job is upserted by name. Jobs not in this list are left alone
     (so manually-created jobs survive redeploys).
     """
-    am_collective_channel = channel("SLACK_CHANNEL_AM_COLLECTIVE")
-    heremes_channel = channel("SLACK_CHANNEL_HEREMES")
-    ops_alerts_channel = channel("SLACK_CHANNEL_OPS_ALERTS")
-    sales_channel = channel("SLACK_CHANNEL_SALES")
-    adam_dm = channel("SLACK_DM_ADAM")
-
     jobs = []
 
     # ── 1. Morning briefing — weekdays at 8am ──────────────────────────────
@@ -77,7 +59,6 @@ def desired_jobs() -> list:
                 "Format: Slack markdown (*bold*, _italic_), no emojis, under 300 words."
             ),
             deliver="slack",
-            slack_channel=adam_dm or heremes_channel,
             enabled_toolsets=["web"],
         )
     )
@@ -98,7 +79,6 @@ def desired_jobs() -> list:
                 "Only post if there's something actionable. Stay quiet otherwise."
             ),
             deliver="slack",
-            slack_channel=adam_dm or heremes_channel,
             enabled_toolsets=["web"],
         )
     )
@@ -122,7 +102,6 @@ def desired_jobs() -> list:
                 "Under 150 words. Slack markdown, no emojis."
             ),
             deliver="slack",
-            slack_channel=adam_dm or heremes_channel,
             enabled_toolsets=["web"],
         )
     )
@@ -147,7 +126,6 @@ def desired_jobs() -> list:
                 "End with: 'Bias to action.'"
             ),
             deliver="slack",
-            slack_channel=adam_dm or heremes_channel,
             enabled_toolsets=["web"],
         )
     )
@@ -171,7 +149,6 @@ def desired_jobs() -> list:
                 "noise — only signal."
             ),
             deliver="slack",
-            slack_channel=adam_dm or heremes_channel,
             enabled_toolsets=["web"],
         )
     )
@@ -198,7 +175,6 @@ def desired_jobs() -> list:
                 "Skip clients where contact happened in the last 5 days."
             ),
             deliver="slack",
-            slack_channel=adam_dm or heremes_channel,
             enabled_toolsets=["web"],
         )
     )
@@ -221,9 +197,9 @@ def main():
     for name, job in desired_by_name.items():
         if name in existing_by_name:
             # Preserve fields the cron engine adds (last_run_at, next_run_at, etc.)
-            # but overwrite our authoritative fields (prompt, schedule, channel).
+            # but overwrite our authoritative fields (prompt, schedule, toolsets).
             merged = dict(existing_by_name[name])
-            for key in ("prompt", "schedule", "deliver", "slack_channel", "enabled_toolsets"):
+            for key in ("prompt", "schedule", "deliver", "enabled_toolsets"):
                 if key in job:
                     merged[key] = job[key]
             final.append(merged)
@@ -248,8 +224,8 @@ def main():
     for j in final:
         name = j.get("name", "?")
         sched = j.get("schedule_display", j.get("schedule", "?"))
-        chan = j.get("slack_channel") or "(default)"
-        print(f"  - {name} | schedule: {sched} | channel: {chan}")
+        deliver = j.get("deliver", "?")
+        print(f"  - {name} | schedule: {sched} | deliver: {deliver}")
 
 
 if __name__ == "__main__":
