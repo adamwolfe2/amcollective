@@ -109,6 +109,7 @@ export const { GET, POST, PUT } = serve({
     syncEmailbisonInbox,
     processEmailbisonReply,
     notifyDraftReady,
+    processGmailMessage,
     dailyCalendarBriefing,
     syncBudgetSheets,
     jobFailureWatchdog,
