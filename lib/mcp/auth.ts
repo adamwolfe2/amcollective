@@ -26,16 +26,9 @@ export interface McpAuthContext {
  */
 export function authenticateMcpRequest(req: Request): McpAuthContext | null {
   const expected = process.env.MCP_SERVICE_TOKEN;
-  if (!expected) {
-    // Fail closed in prod; allow only when explicitly bypassed for dev.
-    if (
-      process.env.BYPASS_AUTH_FOR_DEV === "true" &&
-      process.env.NODE_ENV === "development"
-    ) {
-      return { agent: "dev-local" };
-    }
-    return null;
-  }
+  // Fail closed unconditionally if token is not set.
+  // For local dev, set MCP_SERVICE_TOKEN in .env.local to any random string.
+  if (!expected) return null;
 
   const header = req.headers.get("authorization") ?? "";
   const match = /^Bearer\s+(.+)$/i.exec(header);

@@ -55,6 +55,28 @@ export const ajWebhook = key
     })
   : null;
 
+/**
+ * MCP agent rate limiter: 30 req/min per IP.
+ * Hermes sends ≤2 requests per cron run and ≤20 during a complex Slack
+ * session, so 30/min is comfortable for legitimate use while blocking
+ * brute-force token-probing and runaway agent loops.
+ */
+export const ajMcp = key
+  ? arcjet({
+      key,
+      characteristics: ["ip.src"],
+      rules: [
+        shield({ mode: "LIVE" }),
+        tokenBucket({
+          mode: "LIVE",
+          refillRate: 30,
+          interval: 60,
+          capacity: 30,
+        }),
+      ],
+    })
+  : null;
+
 /** AI chat rate limiter: 20 req/min per IP (prevent runaway AI costs) */
 export const ajAiChat = key
   ? arcjet({

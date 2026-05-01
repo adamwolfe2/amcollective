@@ -475,9 +475,9 @@ export function registerTools(
           .string()
           .regex(/^\d{4}-\d{2}-\d{2}$/)
           .describe("YYYY-MM-DD"),
-        tasks_completed: z.array(z.string()).default([]),
-        blockers: z.string().optional(),
-        tomorrow_plan: z.array(z.string()).default([]),
+        tasks_completed: z.array(z.string().min(1).max(500)).max(50).default([]),
+        blockers: z.string().max(2000).optional(),
+        tomorrow_plan: z.array(z.string().min(1).max(500)).max(50).default([]),
         needs_escalation: z.boolean().default(false),
         escalation_note: z.string().optional(),
       },
@@ -1086,7 +1086,7 @@ export function registerTools(
         category: z.string().min(1).max(64),
         summary: z.string().min(1).max(500),
         content: z.string().min(1).max(20000),
-        tags: z.array(z.string()).optional(),
+        tags: z.array(z.string().min(1).max(128)).max(50).optional(),
         importance: z.number().int().min(1).max(10).optional(),
         pinned: z.boolean().optional(),
         conversation_id: z.string().max(200).optional(),
@@ -1285,7 +1285,7 @@ export function registerTools(
         content: z.string().min(1).max(10000),
         source_conversation_id: z.string().max(200).optional(),
         source_job_name: z.string().max(100).optional(),
-        tags: z.array(z.string()).optional(),
+        tags: z.array(z.string().min(1).max(128)).max(50).optional(),
       },
     },
     async ({
@@ -1456,7 +1456,7 @@ export function registerTools(
         probability: z.number().int().min(0).max(100).optional(),
         industry: z.string().max(100).optional(),
         notes: z.string().max(5000).optional(),
-        tags: z.array(z.string()).optional(),
+        tags: z.array(z.string().min(1).max(128)).max(50).optional(),
       },
     },
     async (args) => {
@@ -1505,7 +1505,7 @@ export function registerTools(
           .describe("ISO timestamp"),
         last_contacted_at: z.string().datetime().optional(),
         notes: z.string().max(5000).optional(),
-        tags: z.array(z.string()).optional(),
+        tags: z.array(z.string().min(1).max(128)).max(50).optional(),
         archive: z.boolean().optional(),
       },
     },
@@ -1643,7 +1643,7 @@ export function registerTools(
         company_name: z.string().max(255).optional(),
         email: z.string().email().optional(),
         phone: z.string().max(50).optional(),
-        notes: z.string().optional(),
+        notes: z.string().max(20_000).optional(),
         payment_status: z
           .enum(["healthy", "warning", "overdue", "churned"])
           .optional(),
@@ -1693,7 +1693,13 @@ export function registerTools(
         .limit(1);
       if (!existing) return err("Client not found.");
       const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
-      const newNotes = `${existing.notes ?? ""}\n[${stamp}] ${note}`.trim();
+      const newLine = `[${stamp}] ${note}`;
+      const existingNotes = existing.notes ?? "";
+      // Cap total notes at 100KB to prevent unbounded write-amplification.
+      if (existingNotes.length + newLine.length + 1 > 100_000) {
+        return err("Client notes field is full (100KB cap). Please truncate old notes first via clients.update.");
+      }
+      const newNotes = `${existingNotes}\n${newLine}`.trim();
       await db
         .update(clients)
         .set({ notes: newNotes })
@@ -1715,7 +1721,7 @@ export function registerTools(
         description: z.string().max(20000).optional(),
         priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
         due_date: z.string().datetime().optional(),
-        labels: z.array(z.string()).optional(),
+        labels: z.array(z.string().min(1).max(128)).max(50).optional(),
         client_id: z.string().uuid().optional(),
         project_id: z.string().uuid().optional(),
       },
@@ -1757,7 +1763,7 @@ export function registerTools(
           .enum(["backlog", "todo", "in_progress", "in_review", "done", "cancelled"])
           .optional(),
         due_date: z.string().datetime().optional(),
-        labels: z.array(z.string()).optional(),
+        labels: z.array(z.string().min(1).max(128)).max(50).optional(),
         archive: z.boolean().optional(),
       },
     },
@@ -1854,11 +1860,12 @@ export function registerTools(
         line_items: z
           .array(
             z.object({
-              description: z.string(),
-              quantity: z.number().int().min(1),
-              unit_price_cents: z.number().int().min(0),
+              description: z.string().min(1).max(500),
+              quantity: z.number().int().min(1).max(100_000),
+              unit_price_cents: z.number().int().min(0).max(100_000_00),
             })
           )
+          .max(100)
           .optional(),
         notes: z.string().max(2000).optional(),
       },
@@ -1901,22 +1908,28 @@ export function registerTools(
       },
     },
     async ({ invoice_id, payment_method, notes }) => {
+      // Atomic conditional update: SELECT + UPDATE in one round-trip.
+      // Only succeeds if status is currently NOT 'paid', eliminating the
+      // TOCTOU race between two concurrent mark-paid calls.
       const [invoice] = await db
-        .select()
-        .from(invoices)
-        .where(eq(invoices.id, invoice_id))
-        .limit(1);
-      if (!invoice) return err("Invoice not found.");
-      if (invoice.status === "paid") return err("Invoice already paid.");
-
-      await db
         .update(invoices)
         .set({ status: "paid", paidAt: new Date() })
-        .where(eq(invoices.id, invoice_id));
+        .where(
+          and(
+            eq(invoices.id, invoice_id),
+            not(eq(invoices.status, "paid"))
+          )
+        )
+        .returning();
 
-      // Best-effort payment log — schema may not have all fields exactly,
-      // and the audit value is in the invoice status update + audit_logs.
-      // Silent failure here is acceptable.
+      if (!invoice) {
+        // Generic message — does not reveal whether the invoice exists vs
+        // was already paid (avoids information disclosure via error text).
+        return err("Invoice not found or not in a payable state.");
+      }
+
+      // Best-effort payment log — schema may not have all fields exactly.
+      // Silent failure is acceptable; invoice status update is source of truth.
       try {
         await db.insert(payments).values({
           invoiceId: invoice_id,
@@ -1928,7 +1941,7 @@ export function registerTools(
           notes: notes ?? null,
         } as never);
       } catch {
-        // ignore — invoice update is the source of truth
+        // ignore
       }
 
       return ok(

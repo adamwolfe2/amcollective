@@ -20,6 +20,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { authenticateMcpRequest, type McpAuthContext } from "@/lib/mcp/auth";
 import { logMcpCall } from "@/lib/mcp/audit";
 import { registerTools } from "@/lib/mcp/tools";
+import { ajMcp } from "@/lib/middleware/arcjet";
 
 // Force Node runtime — Drizzle uses Node APIs and we use crypto.timingSafeEqual.
 export const runtime = "nodejs";
@@ -62,6 +63,18 @@ function extractToolCall(
 }
 
 export async function POST(req: Request) {
+  // Rate-limit before auth so brute-force token probing costs as much as
+  // legitimate requests (30/min per IP; Hermes sends ≤2 per cron run).
+  if (ajMcp) {
+    const decision = await ajMcp.protect(req as Parameters<typeof ajMcp.protect>[0], { requested: 1 });
+    if (decision.isDenied()) {
+      return NextResponse.json(
+        { error: "Too many requests." },
+        { status: 429 },
+      );
+    }
+  }
+
   const ctx = authenticateMcpRequest(req);
   if (!ctx) {
     return NextResponse.json(
@@ -92,9 +105,12 @@ export async function POST(req: Request) {
   try {
     response = await transport.handleRequest(req, { parsedBody });
   } catch (e) {
-    console.error("[mcp] request handler error:", e);
+    // Never echo internal error messages (may contain SQL schema, table names,
+    // constraint details). Log server-side only.
+    const reqId = crypto.randomUUID().slice(0, 8);
+    console.error(`[mcp] request handler error (reqId=${reqId}):`, e);
     response = NextResponse.json(
-      { error: e instanceof Error ? e.message : String(e) },
+      { error: "Internal server error.", reqId },
       { status: 500 },
     );
   } finally {
