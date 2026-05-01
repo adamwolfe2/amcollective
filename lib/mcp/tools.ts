@@ -49,6 +49,27 @@ import { getRecentDeployments } from "@/lib/connectors/vercel";
 import { calculateClientHealth } from "@/lib/ai/agents/client-health";
 import { runResearch } from "@/lib/ai/agents/research";
 import { sendReply as emailbisonSendReply, isConfigured as isEmailbisonConfigured } from "@/lib/connectors/emailbison";
+import {
+  isMercuryConfigured,
+  getAccounts as getMercuryAccounts,
+  getTotalCash,
+  searchTransactions,
+} from "@/lib/connectors/mercury";
+import {
+  getActiveUsersForProject,
+  getTopEventsForProject,
+} from "@/lib/connectors/posthog";
+import {
+  isLinearConfigured,
+  getIssues as getLinearIssues,
+  getActiveCycle,
+  createIssue as linearCreateIssue,
+} from "@/lib/connectors/linear";
+import {
+  isConfigured as isTrackrConfigured,
+  getSnapshot as getTrackrSnapshot,
+} from "@/lib/connectors/trackr";
+import { inngest } from "@/lib/inngest/client";
 
 import type { McpAuthContext } from "./auth";
 
@@ -2125,6 +2146,347 @@ export function registerTools(
           .join("\n")
       );
     },
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // MERCURY BANKING
+  // ─────────────────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "mercury.cash-snapshot",
+    {
+      title: "Total cash across all Mercury accounts",
+      description:
+        "Returns current total cash balance across all Mercury checking and savings accounts. Fast single-number answer for 'how much cash do we have?'.",
+      inputSchema: {},
+    },
+    async () => {
+      if (!isMercuryConfigured()) return err("Mercury API key not configured.");
+      const result = await getTotalCash();
+      if (!result.success || result.data === undefined)
+        return err(result.error ?? "Failed to fetch Mercury cash");
+      return ok(
+        { totalCash: result.data },
+        `Total cash: $${result.data.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      );
+    }
+  );
+
+  server.registerTool(
+    "mercury.accounts",
+    {
+      title: "List Mercury bank accounts",
+      description:
+        "Returns all Mercury accounts with balances. Use to see per-account breakdown (checking vs savings).",
+      inputSchema: {},
+    },
+    async () => {
+      if (!isMercuryConfigured()) return err("Mercury API key not configured.");
+      const result = await getMercuryAccounts();
+      if (!result.success || !result.data)
+        return err(result.error ?? "Failed to fetch accounts");
+      const summary = result.data
+        .map(
+          (a) =>
+            `${a.name} (${a.type}): $${a.currentBalance.toLocaleString("en-US", { minimumFractionDigits: 2 })} · …${a.accountNumber}`
+        )
+        .join("\n");
+      return ok(result.data, summary);
+    }
+  );
+
+  server.registerTool(
+    "mercury.search-transactions",
+    {
+      title: "Search Mercury transactions",
+      description:
+        "Search recent Mercury transactions by keyword, amount range, direction (credit/debit), or date window.",
+      inputSchema: {
+        keyword: z.string().max(200).optional(),
+        min_amount: z.number().optional(),
+        max_amount: z.number().optional(),
+        start: z.string().date().optional().describe("YYYY-MM-DD"),
+        end: z.string().date().optional().describe("YYYY-MM-DD"),
+        direction: z.enum(["credit", "debit"]).optional(),
+      },
+    },
+    async ({ keyword, min_amount, max_amount, start, end, direction }) => {
+      if (!isMercuryConfigured()) return err("Mercury API key not configured.");
+      const result = await searchTransactions({
+        keyword,
+        minAmount: min_amount,
+        maxAmount: max_amount,
+        start,
+        end,
+        direction,
+      });
+      if (!result.success || !result.data)
+        return err(result.error ?? "Failed to search transactions");
+      const summary = result.data
+        .map(
+          (t) =>
+            `${t.createdAt.slice(0, 10)} ${t.direction === "credit" ? "+" : "-"}$${Math.abs(t.amount).toFixed(2)} · ${t.counterpartyName ?? t.description}`
+        )
+        .join("\n");
+      return ok(
+        { transactions: result.data, count: result.data.length },
+        summary || "(no matching transactions)"
+      );
+    }
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // POSTHOG ANALYTICS (per-venture)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "posthog.venture-analytics",
+    {
+      title: "PostHog analytics for a specific venture",
+      description:
+        "Returns DAU / WAU / MAU and top events for a single portfolio venture. Looks up the venture by name slug (e.g. 'cursive', 'taskspace') and reads its posthogProjectId from the portfolio table.",
+      inputSchema: {
+        slug: z
+          .string()
+          .min(1)
+          .describe("Venture slug (e.g. 'cursive', 'taskspace', 'trackr')."),
+      },
+    },
+    async ({ slug }) => {
+      const posthogKey = process.env.POSTHOG_API_KEY;
+      if (!posthogKey) return err("POSTHOG_API_KEY not configured.");
+
+      const [venture] = await db
+        .select({
+          name: portfolioProjects.name,
+          posthogProjectId: portfolioProjects.posthogProjectId,
+        })
+        .from(portfolioProjects)
+        .where(eq(portfolioProjects.slug, slug))
+        .limit(1);
+
+      if (!venture) return err(`Venture '${slug}' not found in portfolio.`);
+      if (!venture.posthogProjectId)
+        return err(`Venture '${venture.name}' has no PostHog project ID configured.`);
+
+      const [users, events] = await Promise.all([
+        getActiveUsersForProject(posthogKey, venture.posthogProjectId),
+        getTopEventsForProject(posthogKey, venture.posthogProjectId, 5),
+      ]);
+
+      if (!users.success || !users.data)
+        return err(users.error ?? "Failed to fetch active users");
+
+      const usersText = `DAU ${users.data.dau} · WAU ${users.data.wau} · MAU ${users.data.mau}`;
+      const eventsText =
+        events.success && events.data
+          ? events.data
+              .slice(0, 5)
+              .map((e) => `${e.event}: ${e.count}`)
+              .join(", ")
+          : "events unavailable";
+
+      return ok(
+        { venture: venture.name, users: users.data, topEvents: events.data ?? [] },
+        `${venture.name}: ${usersText}\nTop events: ${eventsText}`
+      );
+    }
+  );
+
+  server.registerTool(
+    "posthog.portfolio-overview",
+    {
+      title: "PostHog analytics across all ventures",
+      description:
+        "Returns DAU/WAU/MAU for every portfolio venture that has a PostHog project ID configured. Good for a single-shot 'who's growing this week' scan.",
+      inputSchema: {},
+    },
+    async () => {
+      const posthogKey = process.env.POSTHOG_API_KEY;
+      if (!posthogKey) return err("POSTHOG_API_KEY not configured.");
+
+      const ventures = await db
+        .select({
+          name: portfolioProjects.name,
+          slug: portfolioProjects.slug,
+          posthogProjectId: portfolioProjects.posthogProjectId,
+        })
+        .from(portfolioProjects)
+        .where(
+          and(
+            eq(portfolioProjects.status, "active"),
+            isNotNull(portfolioProjects.posthogProjectId)
+          )
+        );
+
+      if (ventures.length === 0)
+        return ok([], "No active ventures have PostHog project IDs configured.");
+
+      const results = await Promise.allSettled(
+        ventures.map(async (v) => {
+          const r = await getActiveUsersForProject(posthogKey, v.posthogProjectId!);
+          return { name: v.name, slug: v.slug, ...(r.data ?? { dau: null, wau: null, mau: null }) };
+        })
+      );
+
+      type VentureAnalytics = { name: string; slug: string; dau: number | null; wau: number | null; mau: number | null };
+      const data = (
+        results
+          .filter((r) => r.status === "fulfilled") as PromiseFulfilledResult<VentureAnalytics>[]
+      ).map((r) => r.value);
+
+      const summary = data
+        .map((d) => `${d.name}: DAU ${d.dau ?? "?"} · WAU ${d.wau ?? "?"} · MAU ${d.mau ?? "?"}`)
+        .join("\n");
+
+      return ok(data, summary || "(no data)");
+    }
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // LINEAR (issue tracker)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "linear.issues",
+    {
+      title: "List Linear issues",
+      description:
+        "Returns open issues from Linear, optionally filtered by team and state type. Use to surface what's in-progress or blocked across the engineering workflow.",
+      inputSchema: {
+        team_id: z.string().optional().describe("Linear team ID to filter."),
+        state_types: z
+          .array(z.enum(["triage", "backlog", "unstarted", "started", "completed", "cancelled"]))
+          .optional()
+          .describe("Filter by Linear state category. Default: started + unstarted."),
+        limit: z.number().int().min(1).max(100).optional(),
+      },
+    },
+    async ({ team_id, state_types, limit = 25 }) => {
+      if (!isLinearConfigured()) return err("LINEAR_API_KEY not configured.");
+      const issues = await getLinearIssues({
+        teamId: team_id,
+        stateTypes: state_types ?? ["started", "unstarted"],
+        limit,
+      });
+      const summary = issues
+        .map((i) => `[${i.priorityLabel}] ${i.identifier}: ${i.title} (${i.stateName ?? i.stateType ?? "?"})`)
+        .join("\n");
+      return ok({ issues, count: issues.length }, summary || "(no issues)");
+    }
+  );
+
+  server.registerTool(
+    "linear.active-cycle",
+    {
+      title: "Linear active sprint / cycle",
+      description:
+        "Returns the active sprint cycle for a Linear team, including progress, issue counts, and dates. Use to answer 'where are we in the sprint'.",
+      inputSchema: {
+        team_id: z.string().describe("Linear team ID."),
+      },
+    },
+    async ({ team_id }) => {
+      if (!isLinearConfigured()) return err("LINEAR_API_KEY not configured.");
+      const cycle = await getActiveCycle(team_id);
+      if (!cycle) return ok(null, "No active cycle for this team.");
+      const summary =
+        `${cycle.name ?? `Cycle ${cycle.number}`}: ` +
+        `${cycle.completedIssues}/${cycle.totalIssues} done · ${Math.round(cycle.progress * 100)}% progress · ` +
+        `ends ${new Date(cycle.endsAt).toISOString().slice(0, 10)}`;
+      return ok(cycle, summary);
+    }
+  );
+
+  server.registerTool(
+    "linear.create-issue",
+    {
+      title: "Create a Linear issue",
+      description:
+        "Create a new issue in Linear. Priority: 0=none, 1=urgent, 2=high, 3=medium, 4=low.",
+      inputSchema: {
+        team_id: z.string().describe("Linear team ID."),
+        title: z.string().min(1).max(500),
+        description: z.string().max(10000).optional(),
+        priority: z.number().int().min(0).max(4).optional().describe("0=none 1=urgent 2=high 3=medium 4=low"),
+      },
+    },
+    async ({ team_id, title, description, priority }) => {
+      if (!isLinearConfigured()) return err("LINEAR_API_KEY not configured.");
+      const result = await linearCreateIssue({
+        teamId: team_id,
+        title,
+        description,
+        priority,
+      });
+      if (!result.success) return err("Failed to create Linear issue.");
+      return ok(
+        { issueId: result.issueId, identifier: result.identifier, url: result.url },
+        `Created ${result.identifier}: ${title} — ${result.url ?? ""}`
+      );
+    }
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // TRACKR SNAPSHOT
+  // ─────────────────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "trackr.snapshot",
+    {
+      title: "Trackr product metrics snapshot",
+      description:
+        "Returns the latest Trackr snapshot: workspaces, MRR, API costs, subscriptions, audit pipeline, and architect stats.",
+      inputSchema: {},
+    },
+    async () => {
+      if (!isTrackrConfigured()) return err("Trackr is not configured (missing DB env).");
+      const result = await getTrackrSnapshot();
+      if (!result.success || !result.data)
+        return err(result.error ?? "Failed to fetch Trackr snapshot");
+      const d = result.data;
+      const summary =
+        `Trackr: ${d.totalWorkspaces} workspaces · MRR $${(d.mrrCents / 100).toFixed(0)} · ` +
+        `${d.activeSubscriptions} active subs · API costs MTD $${(d.apiCostsMtdCents / 100).toFixed(2)} · ` +
+        `${d.auditSubmissionsTotal} audits total (${d.auditPipelinePending} pending)`;
+      return ok(d, summary);
+    }
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // INNGEST — manually trigger background jobs
+  // ─────────────────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "inngest.trigger-job",
+    {
+      title: "Manually trigger an Inngest background job",
+      description:
+        "Fire an Inngest event to trigger (or re-run) a background job on demand. " +
+        "Common event names: 'mercury/backfill', 'billing/check-overdue-invoices', " +
+        "'intelligence/run-weekly', 'linear/issue.triage', 'gmail/sync.requested', " +
+        "'billing/generate-recurring-invoices', 'sprint/metrics.sync'. " +
+        "Cron-only jobs (no event trigger) cannot be manually fired here — use the /admin/jobs dashboard.",
+      inputSchema: {
+        event_name: z.string().min(1).max(200).describe("Inngest event name (e.g. 'mercury/backfill')."),
+        data: z
+          .record(z.unknown())
+          .optional()
+          .describe("Optional event payload to pass to the job handler."),
+      },
+    },
+    async ({ event_name, data }) => {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (inngest as any).send({ name: event_name, data: data ?? {} });
+        return ok(
+          { event: event_name, triggered: true },
+          `Event '${event_name}' sent to Inngest — job will run shortly.`
+        );
+      } catch (e) {
+        return err(e instanceof Error ? e.message : String(e));
+      }
+    }
   );
 
   // ── Read: emailbison reply context (full inbound thread) ────────────────
