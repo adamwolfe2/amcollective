@@ -19,11 +19,18 @@ import { inngest } from "../client";
 import { captureError } from "@/lib/errors";
 import { db } from "@/lib/db";
 import {
+  aiUsage,
   emailbisonReplies,
   outreachCampaigns,
   emailDrafts,
 } from "@/lib/db/schema";
-import { eq } from "drizzle-orm";
+import { count, eq, gte, and } from "drizzle-orm";
+
+/** Hard ceiling on Sonnet drafts per 24h. A normal day is ~10-30 replies;
+ *  this only triggers on spam waves or a stuck loop. Override via env. */
+const DAILY_DRAFT_CEILING = Number(
+  process.env.REPLY_RESPONDER_DAILY_CEILING ?? "100"
+);
 import {
   classifyReply,
   draftReplyResponse,
@@ -34,7 +41,10 @@ export const processEmailbisonReply = inngest.createFunction(
   {
     id: "process-emailbison-reply",
     name: "Process EmailBison Reply",
-    retries: 2,
+    // retries=0: classifier + drafter both have built-in fallbacks (see
+    // lib/ai/agents/reply-responder.ts) so retrying just multiplies Sonnet
+    // spend without recovery benefit. Failed runs surface as Sentry warnings.
+    retries: 0,
     // De-dupe within a 24h window — same reply external ID = same job
     idempotency: "event.data.externalId",
     concurrency: { limit: 5 }, // small fan-out budget — keeps Anthropic load tame
@@ -82,6 +92,32 @@ export const processEmailbisonReply = inngest.createFunction(
     });
     if (alreadyDrafted) {
       return { skipped: true, reason: "draft already exists", externalId };
+    }
+
+    // Step 2a: Daily ceiling check — if we've drafted more than
+    // DAILY_DRAFT_CEILING (default 100) reply responses in the last 24h,
+    // skip drafting entirely. Protects against spam waves and stuck loops.
+    const ceilingHit = await step.run("check-daily-ceiling", async () => {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const rows = await db
+        .select({ value: count() })
+        .from(aiUsage)
+        .where(
+          and(
+            eq(aiUsage.agentName, "reply-responder"),
+            gte(aiUsage.timestamp, since)
+          )
+        );
+      const used = rows[0]?.value ?? 0;
+      return used >= DAILY_DRAFT_CEILING;
+    });
+    if (ceilingHit) {
+      return {
+        skipped: true,
+        reason: "daily-draft-ceiling-hit",
+        externalId,
+        ceiling: DAILY_DRAFT_CEILING,
+      };
     }
 
     // Step 2: Load campaign knowledge base (if linked)

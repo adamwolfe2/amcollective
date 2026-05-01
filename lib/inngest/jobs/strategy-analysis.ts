@@ -40,7 +40,13 @@ export const strategyAnalysis = inngest.createFunction(
     { event: "strategy/run-analysis" },
   ],
   async ({ step, event }) => {
-    const useOpus = (event as { data?: { useOpus?: boolean } })?.data?.useOpus ?? false;
+    // Hard-block Opus path. Opus is ~6x Sonnet and the only opt-in path is
+    // here. Cost audit flagged this as the single Opus exposure. To re-enable,
+    // explicitly set ALLOW_OPUS_STRATEGY=1 in env.
+    const useOpus =
+      process.env.ALLOW_OPUS_STRATEGY === "1"
+        ? (event as { data?: { useOpus?: boolean } })?.data?.useOpus ?? false
+        : false;
     const weekOf = getMondayOfWeek(new Date());
 
     // ── Step 1: Gather data ────────────────────────────────────────────────

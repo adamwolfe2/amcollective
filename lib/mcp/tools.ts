@@ -819,15 +819,36 @@ export function registerTools(
       if (!isEmailbisonConfigured()) {
         return err("EmailBison not configured.");
       }
-      const [draft] = await db
-        .select()
-        .from(emailDrafts)
-        .where(eq(emailDrafts.id, draft_id))
-        .limit(1);
-      if (!draft) return err("Draft not found.");
-      if (draft.status === "sent") return err("Draft already sent.");
-      if (!draft.replyExternalId)
+
+      // Race-safe claim WITHOUT new enum value: atomically set sentAt=now()
+      // where status='ready' AND sentAt IS NULL. If two concurrent approves
+      // race, only one wins the UPDATE; the loser sees zero returned rows
+      // and bails before making the network call.
+      const claimed = await db
+        .update(emailDrafts)
+        .set({ sentAt: new Date() })
+        .where(
+          and(
+            eq(emailDrafts.id, draft_id),
+            eq(emailDrafts.status, "ready"),
+            sql`${emailDrafts.sentAt} IS NULL`
+          )
+        )
+        .returning();
+      if (claimed.length === 0) {
+        return err(
+          "Draft not found, already sent, or claimed by another sender. (Race-safe.)"
+        );
+      }
+      const draft = claimed[0];
+      if (!draft.replyExternalId) {
+        // Release the claim so it can be retried via a different send path
+        await db
+          .update(emailDrafts)
+          .set({ sentAt: null })
+          .where(eq(emailDrafts.id, draft_id));
         return err("Draft has no replyExternalId — use a different send path.");
+      }
 
       const result = await emailbisonSendReply({
         replyId: draft.replyExternalId,
@@ -835,9 +856,10 @@ export function registerTools(
         subject: draft.subject,
       });
       if (!result.success) {
+        // Release the claim so retry is possible
         await db
           .update(emailDrafts)
-          .set({ status: "failed" })
+          .set({ status: "failed", sentAt: null })
           .where(eq(emailDrafts.id, draft_id));
         return err(result.error ?? "EmailBison send failed");
       }
@@ -846,7 +868,7 @@ export function registerTools(
         .update(emailDrafts)
         .set({
           status: "sent",
-          sentAt: new Date(),
+          // sentAt is already set from the claim — keep it
           sentMessageId: result.messageId ?? null,
         })
         .where(eq(emailDrafts.id, draft_id));
@@ -911,15 +933,23 @@ export function registerTools(
     {
       title: "Private budget summary by category",
       description:
-        "Returns the latest category-level totals from Adam's synced budget sheets. PRIVATE — only callable with admin-level MCP token. Useful for the personal-finance side of the operating system.",
+        "Returns the latest category-level totals from Adam's synced budget sheets. PRIVATE — scoped to BUDGET_OWNER_CLERK_ID env. Useful for the personal-finance side of the operating system.",
       inputSchema: {
         limit: z.number().int().min(1).max(50).optional(),
       },
     },
     async ({ limit = 20 }) => {
-      // Latest snapshot per (source, tab, category) — we just take the most
-      // recent snapshotAt regardless. For a true "latest only" view, future
-      // work could window per-category.
+      // Defense-in-depth: even though MCP token is admin-equivalent,
+      // scope rows by ownerClerkId so future multi-tenant additions don't
+      // accidentally leak Adam's personal finance data. If the env is unset,
+      // refuse rather than fall through.
+      const ownerId = process.env.BUDGET_OWNER_CLERK_ID;
+      if (!ownerId) {
+        return err(
+          "BUDGET_OWNER_CLERK_ID env not set — refusing to expose budget data."
+        );
+      }
+
       const rows = await db
         .select({
           sourceId: budgetCategorySnapshots.sourceId,
@@ -931,10 +961,11 @@ export function registerTools(
           sourceLabel: budgetSheetSources.label,
         })
         .from(budgetCategorySnapshots)
-        .leftJoin(
+        .innerJoin(
           budgetSheetSources,
           eq(budgetCategorySnapshots.sourceId, budgetSheetSources.id)
         )
+        .where(eq(budgetSheetSources.ownerClerkId, ownerId))
         .orderBy(desc(budgetCategorySnapshots.snapshotAt))
         .limit(limit);
 
@@ -973,6 +1004,30 @@ export function registerTools(
       },
     },
     async ({ to, subject, body, plain_text, context, generated_by }) => {
+      // Dedupe: external agents (Notion Inbox Organizer, Polsia, retried
+      // crons) can repeat-send identical drafts. If we've already created an
+      // identical (to + subject + body) draft in the last 5 minutes, return
+      // its id instead of creating a duplicate. Caller still sees success.
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const existing = await db
+        .select({ id: emailDrafts.id })
+        .from(emailDrafts)
+        .where(
+          and(
+            eq(emailDrafts.to, to),
+            eq(emailDrafts.subject, subject),
+            eq(emailDrafts.body, body),
+            gte(emailDrafts.createdAt, fiveMinAgo)
+          )
+        )
+        .limit(1);
+      if (existing.length > 0) {
+        return ok(
+          { draftId: existing[0].id, deduped: true },
+          `Draft ${existing[0].id} (deduped — identical draft created in the last 5 minutes)`
+        );
+      }
+
       const inserted = await db
         .insert(emailDrafts)
         .values({

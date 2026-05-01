@@ -12,7 +12,9 @@
 
 import { safeCall, cached, type ConnectorResult } from "./base";
 
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+// cached() expects SECONDS. Was 5*60*1000 = 300_000 seconds = 3.5 days of stale cache.
+// Real intent: 5 minutes = 300 seconds.
+const CACHE_TTL = 5 * 60;
 
 function getAuth() {
   const apiKey = process.env.EMAILBISON_API_KEY;
