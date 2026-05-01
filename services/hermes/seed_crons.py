@@ -32,6 +32,14 @@ from cron.jobs import (  # noqa: E402
 
 # ─── Job definitions ──────────────────────────────────────────────────────
 
+# All cron jobs MUST pin a model. Without this, hermes' upstream cron
+# scheduler passes model="" to the Anthropic API which errors with
+# "model: String should have at least 1 character". Default to Haiku
+# (10× cheaper than Sonnet/Opus) — these are recurring jobs, cost matters.
+JOB_MODEL = "claude-haiku-4-5"
+JOB_PROVIDER = "anthropic"
+
+
 JOBS = [
     {
         "name": "morning-briefing",
@@ -41,23 +49,17 @@ JOBS = [
         "enabled_toolsets": ["web"],
         "prompt": (
             "Daily briefing for AM Collective. Pull live data via the MCP server.\n\n"
-            "1. Call memory.list-reflections (limit=3) — what you've learned recently.\n"
-            "2. In parallel: finance.mrr, alerts.open(severity=critical), "
-            "eos.rocks(status=at_risk), email.reply-queue(limit=10), "
-            "roadmap.list(wave=top10, limit=3), pipeline.next-actions(days=3, limit=5), "
-            "invoices.list(status=overdue, limit=5).\n"
-            "3. If any reflection in step 1 is relevant to today's work, factor it in.\n\n"
-            "Post:\n"
+            "1. Call finance.mrr — current total MRR.\n"
+            "2. Call alerts.open with severity=critical — list any critical alerts.\n"
+            "3. Call eos.rocks with status=at_risk — at-risk quarterly goals.\n"
+            "4. Call briefing.get-latest — yesterday's briefing for delta context.\n\n"
+            "Format the Slack post as:\n"
             "  *AM Collective — <today's date>*\n"
-            "  MRR: $X\n"
-            "  Reply queue: N drafts (intent breakdown if N>0)\n"
-            "  Top 3 strategic items: <from roadmap.list>\n"
-            "  Critical alerts: <count + 1-liner, or 'none'>\n"
+            "  MRR: $X (delta vs yesterday if known)\n"
+            "  Critical alerts: <count + 1-line each, or 'none'>\n"
             "  At-risk rocks: <count + names, or 'none'>\n"
-            "  Counterparty actions due: <top 3 with names>\n"
-            "  Outstanding invoices: <total $ + count over $1K>\n"
-            "  *One hard question:* <push on the highest-leverage thing Adam might be avoiding>\n\n"
-            "Hard cap: 250 words. No fluff. No tool-call commentary."
+            "  Today's priority: <one-liner you derive from above>\n\n"
+            "Hard cap: 200 words. No fluff. No restating what tools you called."
         ),
     },
     {
@@ -67,16 +69,14 @@ JOBS = [
         "deliver": "slack",
         "enabled_toolsets": ["web"],
         "prompt": (
-            "Check the cold-email reply queue.\n\n"
-            "1. Call email.reply-queue(limit=20).\n"
-            "2. If 0-2 drafts: post nothing — exit silently.\n"
-            "3. If 3+ drafts, post:\n"
+            "Check the reply queue (drafts waiting for Adam or Maggie to send).\n\n"
+            "1. Call alerts.open and filter to type='draft_pending' or 'reply_queue' if those types exist.\n"
+            "2. If fewer than 3 drafts pending, post nothing — exit silently.\n"
+            "3. If 3 or more, post a single Slack message:\n"
             "   *Reply queue: N drafts waiting*\n"
-            "   <intent breakdown: 'X interested, Y question, Z objection'>\n"
-            "   - <leadEmail>: <subject> (intent, conf%)\n"
-            "   - ...\n"
-            "   Approve at /email\n\n"
-            "Hard cap: 120 words. Skip if queue is short."
+            "   - <client>: <subject> (Xd old)\n"
+            "   - ...\n\n"
+            "Hard cap: 100 words. Skip the post entirely if the queue is short."
         ),
     },
     {
@@ -87,20 +87,16 @@ JOBS = [
         "enabled_toolsets": ["web"],
         "prompt": (
             "End-of-day check-in for AM Collective.\n\n"
-            "1. Parallel calls: eos.open-blockers, eos.rocks(status=at_risk), "
-            "alerts.open, email.reply-queue(limit=5), tasks.next(priority=urgent, limit=3).\n\n"
-            "2. Post:\n"
-            "   *EOD <today's date>*\n"
-            "   Blockers: <list, or 'none'>\n"
-            "   At-risk rocks: <list, or 'none'>\n"
-            "   New alerts: <count, or 'none'>\n"
-            "   Reply queue going into tomorrow: <count>\n"
-            "   Urgent tasks still open: <count + 1-liner each>\n"
-            "   If everything is clean: 'EOD: all clear.'\n\n"
-            "3. AFTER posting: call memory.reflect with kind='what_worked' OR "
-            "'what_didnt' summarizing the day, IF something notable happened. "
-            "Skip the reflect call on uneventful days.\n\n"
-            "Hard cap: 180 words."
+            "1. Call eos.open-blockers — unresolved blockers from today's EODs.\n"
+            "2. Call eos.rocks with status=at_risk — anything moved to at-risk today.\n"
+            "3. Call alerts.open — any new alerts from the day.\n\n"
+            "Format:\n"
+            "  *EOD <today's date>*\n"
+            "  Blockers: <list, or 'none'>\n"
+            "  At-risk rocks: <list, or 'none'>\n"
+            "  New alerts: <count, or 'none'>\n\n"
+            "If everything is clean, post one line: 'EOD: all clear.'\n"
+            "Hard cap: 150 words."
         ),
     },
     {
@@ -111,20 +107,16 @@ JOBS = [
         "enabled_toolsets": ["web"],
         "prompt": (
             "Weekly wrap for AM Collective.\n\n"
-            "1. Parallel: finance.revenue-trend(days=7), intelligence.weekly-insights(limit=5), "
-            "eos.rocks, roadmap.list(wave=top10), invoices.list(status=overdue), "
-            "memory.list-reflections(limit=10).\n\n"
-            "2. Post:\n"
-            "   *Week wrap — week of <Monday's date>*\n"
-            "   Revenue: <delta + one-line interpretation>\n"
-            "   Roadmap: <which Top 10 shipped vs slipped>\n"
-            "   Receivables: <collected vs outstanding>\n"
-            "   Rocks: <X on track, Y at risk, Z done>\n"
-            "   Top 3 insights from this week's reflections: <pulled from memory>\n"
-            "   *Next week's #1 priority:* <one-liner derived from above>\n\n"
-            "3. AFTER posting: call memory.reflect with kind='pattern_observed' "
-            "summarizing any pattern you noticed across the week's interactions.\n\n"
-            "Hard cap: 300 words. Bias to action."
+            "1. Call finance.revenue-trend with days=7 — week's revenue movement.\n"
+            "2. Call intelligence.weekly-insights with limit=5 — top weekly insights.\n"
+            "3. Call eos.rocks — full quarterly status snapshot.\n\n"
+            "Format:\n"
+            "  *Week wrap — week of <Monday's date>*\n"
+            "  Revenue: <delta + one-line interpretation>\n"
+            "  Top 3 insights: <bulleted, derived from weekly-insights>\n"
+            "  Rocks status: <X on track, Y at risk, Z done>\n"
+            "  *Next week's #1 priority:* <one-liner you derive>\n\n"
+            "Hard cap: 250 words. This is the only longer-form weekly post."
         ),
     },
     {
@@ -135,16 +127,16 @@ JOBS = [
         "enabled_toolsets": ["web"],
         "prompt": (
             "Roadmap drift check.\n\n"
-            "1. Call roadmap.list(wave=top10, status=open) AND tasks.next(priority=urgent).\n"
-            "2. Identify drift: tasks past due date and still open, OR same dependency "
-            "blocker repeating 2+ weeks.\n"
-            "3. If no drift: post nothing — exit silently.\n"
-            "4. If drift exists, post:\n"
+            "1. Call eos.rocks — get all rocks for the current quarter.\n"
+            "2. For each rock with progress < expected (where expected = "
+            "weeks_elapsed_in_quarter / 13 * 100):\n"
+            "   note the rock name, current progress, expected progress, owner.\n"
+            "3. If no rocks are drifting, post nothing — exit silently.\n"
+            "4. If any are drifting, post:\n"
             "   *Roadmap drift alert*\n"
-            "   - <task title>: <N days overdue> · blocker: <dependency or counterparty> · "
-            "suggested action: <delegate / kill / nudge person>\n"
+            "   - <rock name> (<owner>): <progress>% actual vs <expected>% expected\n"
             "   - ...\n\n"
-            "Hard cap: 150 words. Pure signal — no noise."
+            "Hard cap: 120 words. Skip post entirely if no drift."
         ),
     },
     {
@@ -154,103 +146,19 @@ JOBS = [
         "deliver": "slack",
         "enabled_toolsets": ["web"],
         "prompt": (
-            "Weekly client blocker sweep — auto-draft nudges for waiting clients.\n\n"
-            "1. Call pipeline.next-actions(days=14) AND clients.list.\n"
-            "2. For each client/lead with status='waiting on client' OR follow-up "
-            "due in next 14 days AND last contact >5 days ago:\n"
-            "   a. Call memory.recall(category='client_context', tags_any=[<client_name>]) "
-            "to load any prior context.\n"
-            "   b. Draft 2-3 sentence nudge in Adam's voice: short, lowercase greeting ok, "
-            "no 'circling back', single direct ask, end with cal.com/adamwolfe link if "
-            "appropriate.\n"
-            "   c. Call email.create-draft with status='ready', "
-            "generated_by='hermes-blocker-sweep'.\n"
-            "3. Post summary to Slack:\n"
-            "   *Client blocker sweep — <Monday's date>*\n"
-            "   Drafted N nudges for review at /email:\n"
-            "   - <client>: <one-line gist of the nudge>\n"
-            "   - ...\n"
-            "   If nothing was blocked: 'All clients responsive.'\n\n"
-            "Do NOT auto-send — Adam approves at /email. Hard cap: 200 words."
-        ),
-    },
-    # ── NEW: proactive self-improvement loop ────────────────────────────────
-    {
-        "name": "self-reflection",
-        # 6:30pm PDT Mon-Fri = 01:30 UTC Tue-Sat
-        "schedule": "30 1 * * 2-6",
-        "deliver": "slack",
-        "enabled_toolsets": ["web"],
-        "prompt": (
-            "Daily self-reflection. You're at end of day. Look back on what "
-            "happened in the last 24h.\n\n"
-            "1. Call memory.list-reflections(limit=20) — your existing reflections.\n"
-            "2. Skim today's interactions: was there a moment where you got "
-            "something wrong, or where a pattern repeated?\n"
-            "3. If yes, call memory.reflect with kind='what_worked', "
-            "'what_didnt', 'pattern_observed', or 'rule_proposed'. Be specific.\n"
-            "4. Post a brief 1-3 line note to Slack ONLY if you logged a "
-            "rule_proposed — Adam wants to see those for weekly review:\n"
-            "   *Rule proposed:* <the rule>\n"
-            "   *Why:* <evidence from today>\n"
-            "   *Promote to SOUL.md?* (Adam reviews weekly)\n\n"
-            "If you have no notable reflections, do not post. Hard cap: 100 words."
-        ),
-    },
-    # ── NEW: weekly group-chat post to #am-collective ───────────────────────
-    {
-        "name": "group-chat-update",
-        # 9am PDT Tuesday + Thursday = 16:00 UTC Tue/Thu
-        "schedule": "0 16 * * 2,4",
-        "deliver": "slack",
-        "enabled_toolsets": ["web"],
-        "prompt": (
-            "Twice-weekly proactive update for the team channel. This is "
-            "team-wide visibility — Adam, Maggie, anyone in the channel.\n\n"
-            "1. Parallel: finance.mrr, eos.rocks, roadmap.list(wave=top10, "
-            "limit=3), email.reply-queue, pipeline.next-actions(days=7).\n\n"
-            "2. Post a team update:\n"
-            "   *AM Collective pulse — <day> <date>*\n"
-            "   *MRR:* $X (last delta if known)\n"
-            "   *Top 3 strategic moves this week:*\n"
-            "   - <#01 from roadmap>: <status>\n"
-            "   - <#02>: <status>\n"
-            "   - <#03>: <status>\n"
-            "   *Rocks:* <X on track / Y at risk>\n"
-            "   *Reply queue:* <N awaiting + breakdown>\n"
-            "   *Counterparty waits this week:* <top 3>\n"
-            "   *Maggie focus:* <pull from memory.recall(tags=['maggie']) — what's on her plate>\n\n"
-            "Format with Slack markdown. Hard cap: 350 words. No filler.\n\n"
-            "NOTE: This deliberately goes to the home channel — make sure "
-            "/hermes sethome was set to a TEAM channel for this job. If it's "
-            "set to a DM, the team won't see it."
-        ),
-    },
-    # ── NEW: weekly memory rollup → propose new SOUL.md rules ───────────────
-    {
-        "name": "memory-rollup",
-        # 11am PDT Sunday = 18:00 UTC Sunday
-        "schedule": "0 18 * * 0",
-        "deliver": "slack",
-        "enabled_toolsets": ["web"],
-        "prompt": (
-            "Weekly memory rollup. Adam reviews this Sunday morning to decide "
-            "what gets baked into SOUL.md for next deploy.\n\n"
-            "1. Call memory.list-reflections(unpromoted_only=true, limit=30).\n"
-            "2. Call memory.recall(category='principal_preference', limit=20) "
-            "AND memory.recall(category='decision_log', limit=20).\n\n"
-            "3. Group reflections by theme. For each theme with 2+ supporting "
-            "reflections, propose ONE candidate rule for SOUL.md.\n\n"
+            "Weekly client blocker sweep.\n\n"
+            "1. Call clients.list with active_only=true.\n"
+            "2. For each client, call clients.health and look for "
+            "summaries containing 'waiting on client' / 'no response' / "
+            "'blocked' / 'awaiting feedback'.\n"
+            "3. For each match, draft a one-line nudge: which client, "
+            "what they're blocking, suggested next action.\n"
             "4. Post:\n"
-            "   *Memory rollup — week of <Monday's date>*\n"
-            "   *Rule candidates for promotion:*\n"
-            "   1. <rule text> — based on N reflections\n"
-            "   2. <rule text> — based on N reflections\n"
-            "   ...\n"
-            "   *Top new principal preferences logged this week:* <list>\n"
-            "   *Strategic decisions logged:* <list>\n\n"
-            "Adam, reply with 'promote 1, 3' to bake those into next deploy. "
-            "Hard cap: 400 words."
+            "   *Client blocker sweep — <Monday's date>*\n"
+            "   - <client>: <one-line nudge> → <action>\n"
+            "   - ...\n"
+            "If nothing is blocked, post one line: 'All clients responsive.'\n\n"
+            "Hard cap: 180 words."
         ),
     },
 ]
@@ -274,6 +182,8 @@ def main():
                 prompt=spec["prompt"],
                 deliver=spec["deliver"],
                 enabled_toolsets=spec.get("enabled_toolsets"),
+                model=JOB_MODEL,
+                provider=JOB_PROVIDER,
             )
             created += 1
             print(f"[seed_crons] +created {name}  ({spec['schedule']})")
@@ -284,6 +194,8 @@ def main():
                 "schedule": spec["schedule"],
                 "prompt": spec["prompt"],
                 "deliver": spec["deliver"],
+                "model": JOB_MODEL,
+                "provider": JOB_PROVIDER,
             }
             if spec.get("enabled_toolsets") is not None:
                 updates["enabled_toolsets"] = spec["enabled_toolsets"]
