@@ -14,6 +14,7 @@ import { captureError } from "@/lib/errors";
 import { isConfigured, listReplies } from "@/lib/connectors/emailbison";
 import { db } from "@/lib/db";
 import { emailbisonReplies } from "@/lib/db/schema";
+import { inArray } from "drizzle-orm";
 
 export const syncEmailbisonInbox = inngest.createFunction(
   {
@@ -38,12 +39,30 @@ export const syncEmailbisonInbox = inngest.createFunction(
       return listReplies({ page: 1, perPage: 100 });
     });
 
-    // Step 2: Upsert replies into DB — update flags, insert new
-    const synced = await step.run("upsert-replies", async () => {
-      if (replies.length === 0) return 0;
+    if (replies.length === 0) {
+      return { success: true, synced: 0, newReplies: 0 };
+    }
 
+    // Step 2: Determine which reply external IDs we already have so we can
+    // distinguish "new" from "update" — only NEW replies should fan out to
+    // the auto-responder pipeline. step.run results are JSON-serialized, so
+    // return an array and rebuild the Set outside the step.
+    const externalIds = replies.map((r) => r.id);
+    const existingIds = await step.run("fetch-existing-ids", async () => {
+      const rows = await db
+        .select({ externalId: emailbisonReplies.externalId })
+        .from(emailbisonReplies)
+        .where(inArray(emailbisonReplies.externalId, externalIds));
+      return rows.map((r) => r.externalId);
+    });
+    const existing = new Set<number>(existingIds);
+
+    // Step 3: Upsert replies into DB — update flags, insert new
+    const { synced, newExternalIds } = await step.run("upsert-replies", async () => {
       let count = 0;
+      const newIds: number[] = [];
       for (const reply of replies) {
+        const isNew = !existing.has(reply.id);
         await db
           .insert(emailbisonReplies)
           .values({
@@ -69,10 +88,23 @@ export const syncEmailbisonInbox = inngest.createFunction(
             },
           });
         count++;
+        if (isNew) newIds.push(reply.id);
       }
-      return count;
+      return { synced: count, newExternalIds: newIds };
     });
 
-    return { success: true, synced };
+    // Step 4: Fan out — fire one event per NEW reply so the auto-responder
+    // pipeline picks it up. Existing replies (just flag updates) are skipped.
+    if (newExternalIds.length > 0) {
+      await step.sendEvent(
+        "fanout-new-replies",
+        newExternalIds.map((externalId) => ({
+          name: "emailbison/reply.received",
+          data: { externalId },
+        }))
+      );
+    }
+
+    return { success: true, synced, newReplies: newExternalIds.length };
   }
 );

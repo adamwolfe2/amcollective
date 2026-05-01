@@ -6,6 +6,8 @@ import {
   timestamp,
   index,
   jsonb,
+  integer,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { pgEnum } from "drizzle-orm/pg-core";
 import { clients } from "./crm";
@@ -44,6 +46,12 @@ export const emailDrafts = pgTable(
     sentAt: timestamp("sent_at", { mode: "date" }),
     sentMessageId: varchar("sent_message_id", { length: 255 }), // Resend message ID
     createdBy: varchar("created_by", { length: 255 }), // Clerk user ID
+    // Reply auto-responder linkage — null for normal drafts, populated when this
+    // draft was generated in response to an EmailBison reply
+    replyExternalId: integer("reply_external_id"),
+    replyIntent: varchar("reply_intent", { length: 40 }), // e.g. "interested", "objection", "question"
+    replyConfidence: integer("reply_confidence"), // 0-100
+    replySafeToAutoSend: boolean("reply_safe_to_auto_send").default(false).notNull(),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -54,6 +62,8 @@ export const emailDrafts = pgTable(
     index("email_drafts_client_id_idx").on(table.clientId),
     index("email_drafts_status_idx").on(table.status),
     index("email_drafts_created_at_idx").on(table.createdAt),
+    index("email_drafts_reply_external_id_idx").on(table.replyExternalId),
+    index("email_drafts_reply_intent_idx").on(table.replyIntent),
   ]
 );
 

@@ -32,3 +32,4 @@ export * from "./ai-usage";
 export * from "./email";
 export * from "./search-history";
 export * from "./daily-briefings";
+export * from "./budget";

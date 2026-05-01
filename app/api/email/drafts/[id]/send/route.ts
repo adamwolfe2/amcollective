@@ -7,11 +7,24 @@ import * as schema from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getResend, FROM_EMAIL } from "@/lib/email/shared";
 import { aj } from "@/lib/middleware/arcjet";
+import {
+  sendReply as emailbisonSendReply,
+  isConfigured as isEmailbisonConfigured,
+  markReplyRead,
+  markReplyInterested,
+} from "@/lib/connectors/emailbison";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 /**
- * POST /api/email/drafts/:id/send — Send an email draft via Resend
+ * POST /api/email/drafts/:id/send — Send an email draft.
+ *
+ * Branches:
+ *  - If draft has replyExternalId → send via EmailBison's reply API to keep
+ *    the thread on a warmed sender. This is critical for cold-email
+ *    deliverability — replying via Resend would break thread continuity and
+ *    spam-score the sender.
+ *  - Otherwise → send via Resend (normal AM Collective outbound).
  */
 export async function POST(_request: NextRequest, context: RouteContext) {
   if (aj) {
@@ -43,6 +56,90 @@ export async function POST(_request: NextRequest, context: RouteContext) {
       );
     }
 
+    // ─── Cold-email reply path (EmailBison) ──────────────────────────────────
+    if (draft.replyExternalId) {
+      if (!isEmailbisonConfigured()) {
+        return NextResponse.json(
+          { error: "EmailBison not configured — cannot send reply" },
+          { status: 500 }
+        );
+      }
+
+      const result = await emailbisonSendReply({
+        replyId: draft.replyExternalId,
+        body: draft.plainText || draft.body,
+        subject: draft.subject,
+      });
+
+      if (!result.success) {
+        await db
+          .update(schema.emailDrafts)
+          .set({ status: "failed" })
+          .where(eq(schema.emailDrafts.id, id));
+        return NextResponse.json(
+          { error: result.error ?? "EmailBison send failed" },
+          { status: 502 }
+        );
+      }
+
+      // Mark sent + log
+      await db
+        .update(schema.emailDrafts)
+        .set({
+          status: "sent",
+          sentAt: new Date(),
+          sentMessageId: result.messageId ?? null,
+        })
+        .where(eq(schema.emailDrafts.id, id));
+
+      await db.insert(schema.sentEmails).values({
+        clientId: draft.clientId,
+        to: draft.to,
+        cc: draft.cc,
+        subject: draft.subject,
+        body: draft.body,
+        resendMessageId: result.messageId ?? null,
+        sentBy: userId,
+      });
+
+      // Mark the inbound reply as read + flag interested when intent indicates so
+      // — best-effort, swallow errors so a failed mark doesn't fail the send
+      try {
+        await markReplyRead(draft.replyExternalId);
+        if (draft.replyIntent === "interested") {
+          await markReplyInterested(draft.replyExternalId);
+        }
+      } catch (markErr) {
+        captureError(markErr, {
+          tags: { route: "POST /api/email/drafts/:id/send", step: "mark-reply" },
+          level: "info",
+        });
+      }
+
+      await createAuditLog({
+        actorId: userId,
+        actorType: "user",
+        action: "email.reply_sent",
+        entityType: "email_draft",
+        entityId: id,
+        metadata: {
+          to: draft.to,
+          subject: draft.subject,
+          replyExternalId: draft.replyExternalId,
+          intent: draft.replyIntent,
+          messageId: result.messageId,
+          channel: "emailbison",
+        },
+      });
+
+      return NextResponse.json({
+        success: true,
+        messageId: result.messageId,
+        channel: "emailbison",
+      });
+    }
+
+    // ─── Normal AM Collective outbound (Resend) ──────────────────────────────
     const resend = getResend();
     if (!resend) {
       return NextResponse.json(
@@ -95,10 +192,10 @@ export async function POST(_request: NextRequest, context: RouteContext) {
       action: "email.sent",
       entityType: "email_draft",
       entityId: id,
-      metadata: { to: draft.to, subject: draft.subject, resendId: data?.id },
+      metadata: { to: draft.to, subject: draft.subject, resendId: data?.id, channel: "resend" },
     });
 
-    return NextResponse.json({ success: true, messageId: data?.id });
+    return NextResponse.json({ success: true, messageId: data?.id, channel: "resend" });
   } catch (error) {
     captureError(error, { tags: { route: "POST /api/email/drafts/:id/send" } });
     return NextResponse.json(

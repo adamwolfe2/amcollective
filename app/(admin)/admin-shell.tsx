@@ -21,6 +21,7 @@ import {
   Package,
   Minus,
   Plus,
+  Compass,
   type LucideIcon,
 } from "lucide-react";
 import { NotificationBell } from "@/components/notification-bell";
@@ -42,6 +43,7 @@ interface NavItem {
 
 // All nav items — items with children are collapsible, items with href are links
 const NAV_ITEMS: NavItem[] = [
+  { label: "Command", href: "/command", icon: Compass },
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Strategy", href: "/strategy", icon: TrendingUp },
   { label: "AI", href: "/ai", icon: Sparkles },

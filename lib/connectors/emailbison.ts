@@ -287,6 +287,52 @@ export async function markReplyInterested(replyId: number): Promise<void> {
   await bisonPost(`/unibox/${replyId}/interested`, {});
 }
 
+// ─── Send a Reply Through EmailBison ──────────────────────────────────────────
+// Posts back into the unibox thread so the response goes from the same warmed
+// inbox the original was sent from. This is the only safe way to keep deliverability —
+// sending via Resend or Gmail breaks the thread.
+//
+// EmailBison's API surface for replies isn't fully documented; we try the
+// canonical `/unibox/{id}/reply` endpoint and surface any error so the
+// approver sees it in the draft UI.
+
+export interface SendReplyParams {
+  replyId: number;
+  body: string;
+  subject?: string;
+}
+
+export interface SendReplyResult {
+  success: boolean;
+  messageId?: string;
+  error?: string;
+}
+
+export async function sendReply(params: SendReplyParams): Promise<SendReplyResult> {
+  const { replyId, body, subject } = params;
+  try {
+    const payload: Record<string, unknown> = { body };
+    if (subject) payload.subject = subject;
+
+    const res = await bisonPost<{
+      data?: { id?: string | number; message_id?: string };
+      id?: string | number;
+      message_id?: string;
+    }>(`/unibox/${replyId}/reply`, payload);
+
+    const messageId =
+      (res.data?.message_id ?? res.message_id ?? res.data?.id ?? res.id ?? null)?.toString() ??
+      undefined;
+
+    return { success: true, messageId };
+  } catch (err) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 // ─── Lead Upload ─────────────────────────────────────────────────────────────
 
 export interface EmailBisonLead {

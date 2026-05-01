@@ -13,18 +13,24 @@
  */
 
 import { z } from "zod";
-import { and, desc, eq, gte, isNotNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNotNull, lte, not, or, sql } from "drizzle-orm";
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
 import { db } from "@/lib/db";
 import {
   alerts,
+  budgetCategorySnapshots,
+  budgetSheetSources,
   clients,
   dailyBriefings,
+  emailbisonReplies,
+  emailDrafts,
   eodReports,
   invoices,
+  leads,
   portfolioProjects,
   rocks,
+  tasks,
   weeklyInsights,
 } from "@/lib/db/schema";
 
@@ -36,6 +42,7 @@ import {
 import { getRecentDeployments } from "@/lib/connectors/vercel";
 import { calculateClientHealth } from "@/lib/ai/agents/client-health";
 import { runResearch } from "@/lib/ai/agents/research";
+import { sendReply as emailbisonSendReply, isConfigured as isEmailbisonConfigured } from "@/lib/connectors/emailbison";
 
 import type { McpAuthContext } from "./auth";
 
@@ -610,6 +617,417 @@ export function registerTools(
         .returning();
       if (!row) return err("Alert not found.");
       return ok(row, `Alert ${alert_id} resolved`);
+    },
+  );
+
+  // ── Read: strategic roadmap (40-task Q2 plan) ───────────────────────────
+  server.registerTool(
+    "roadmap.list",
+    {
+      title: "List strategic roadmap tasks",
+      description:
+        "Returns the 40-task Q2 strategic roadmap (Top 10 + Waves 1-5) in priority order. Each task has rank, wave, tier, tag, est hours, ventures it serves, and dependency links. External agents (Notion Inbox Organizer, Polsia) should call this first to understand what's high-leverage TODAY.",
+      inputSchema: {
+        wave: z
+          .enum(["top10", "1", "2", "3", "4", "5", "all"])
+          .optional()
+          .describe("Filter by wave. Default: top10."),
+        status: z
+          .enum(["open", "in_progress", "done", "all"])
+          .optional()
+          .describe("Filter by status. Default: open (excludes done/cancelled)."),
+        limit: z.number().int().min(1).max(40).optional(),
+      },
+    },
+    async ({ wave = "top10", status = "open", limit = 10 }) => {
+      const conditions = [
+        eq(tasks.isArchived, false),
+        sql`${tasks.labels}::jsonb @> ${JSON.stringify(["roadmap:2026-q2"])}::jsonb`,
+      ];
+      if (status === "open") {
+        conditions.push(not(inArray(tasks.status, ["done", "cancelled"])));
+      } else if (status === "in_progress") {
+        conditions.push(eq(tasks.status, "in_progress"));
+      } else if (status === "done") {
+        conditions.push(eq(tasks.status, "done"));
+      }
+      if (wave !== "all") {
+        conditions.push(
+          sql`${tasks.labels}::jsonb @> ${JSON.stringify([`wave:${wave}`])}::jsonb`
+        );
+      }
+
+      const rows = await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          description: tasks.description,
+          status: tasks.status,
+          priority: tasks.priority,
+          dueDate: tasks.dueDate,
+          labels: tasks.labels,
+          position: tasks.position,
+        })
+        .from(tasks)
+        .where(and(...conditions))
+        .orderBy(asc(tasks.position))
+        .limit(limit);
+
+      const enriched = rows.map((t) => {
+        const labels = t.labels ?? [];
+        return {
+          ...t,
+          rank: labels.find((l) => l.startsWith("rank:"))?.slice(5) ?? null,
+          wave: labels.find((l) => l.startsWith("wave:"))?.slice(5) ?? null,
+          tier: labels.find((l) => l.startsWith("tier:"))?.slice(5) ?? null,
+          tag: labels.find((l) => l.startsWith("tag:"))?.slice(4) ?? null,
+          est: labels.find((l) => l.startsWith("est:"))?.slice(4) ?? null,
+          ventures: labels
+            .filter((l) => l.startsWith("venture:"))
+            .map((l) => l.slice(8)),
+          clients: labels
+            .filter((l) => l.startsWith("client:"))
+            .map((l) => l.slice(7)),
+          depends: labels
+            .filter((l) => l.startsWith("depends:"))
+            .map((l) => l.slice(8)),
+        };
+      });
+
+      const summary = enriched
+        .map(
+          (t) =>
+            `${t.rank ? "#" + t.rank : ""} [${t.wave ?? "?"}${t.tier ? "·T" + t.tier : ""}] ${t.title.replace(/^#\d+\s·\s/, "")} (${t.tag ?? "?"}, ${t.est ?? "?"})`
+        )
+        .join("\n");
+
+      return ok({ tasks: enriched, count: enriched.length }, summary);
+    },
+  );
+
+  // ── Read: top open tasks (any source, any roadmap) ──────────────────────
+  server.registerTool(
+    "tasks.next",
+    {
+      title: "Next tasks blocked on me",
+      description:
+        "Returns the top open tasks across the whole AM Collective workspace, ordered by due date then priority. Use to answer 'what's blocked on me today' for any external agent.",
+      inputSchema: {
+        limit: z.number().int().min(1).max(50).optional(),
+        priority: z
+          .enum(["urgent", "high", "medium", "low", "any"])
+          .optional()
+          .describe("Filter by priority. Default: any."),
+      },
+    },
+    async ({ limit = 10, priority = "any" }) => {
+      const conditions = [
+        eq(tasks.isArchived, false),
+        not(inArray(tasks.status, ["done", "cancelled"])),
+      ];
+      if (priority !== "any") {
+        conditions.push(eq(tasks.priority, priority));
+      }
+      const rows = await db
+        .select({
+          id: tasks.id,
+          title: tasks.title,
+          status: tasks.status,
+          priority: tasks.priority,
+          dueDate: tasks.dueDate,
+        })
+        .from(tasks)
+        .where(and(...conditions))
+        .orderBy(asc(tasks.dueDate), desc(tasks.priority))
+        .limit(limit);
+      return ok(rows, rows.map((r) => `[${r.priority}] ${r.title}`).join("\n"));
+    },
+  );
+
+  // ── Read: cold-email reply queue ────────────────────────────────────────
+  server.registerTool(
+    "email.reply-queue",
+    {
+      title: "Cold-email reply drafts pending approval",
+      description:
+        "Returns auto-generated reply drafts for inbound EmailBison replies, sorted by intent priority (interested + question first). Use to surface what needs human review NOW. Each entry includes intent, confidence, lead, subject, full draft body, and the reply context.",
+      inputSchema: {
+        limit: z.number().int().min(1).max(50).optional(),
+      },
+    },
+    async ({ limit = 10 }) => {
+      const rows = await db
+        .select({
+          id: emailDrafts.id,
+          to: emailDrafts.to,
+          subject: emailDrafts.subject,
+          body: emailDrafts.body,
+          replyExternalId: emailDrafts.replyExternalId,
+          replyIntent: emailDrafts.replyIntent,
+          replyConfidence: emailDrafts.replyConfidence,
+          replySafeToAutoSend: emailDrafts.replySafeToAutoSend,
+          context: emailDrafts.context,
+          createdAt: emailDrafts.createdAt,
+        })
+        .from(emailDrafts)
+        .where(
+          and(
+            isNotNull(emailDrafts.replyExternalId),
+            eq(emailDrafts.status, "ready")
+          )
+        )
+        .orderBy(desc(emailDrafts.createdAt))
+        .limit(limit);
+
+      const intentRank: Record<string, number> = {
+        interested: 0,
+        question: 1,
+        referral: 2,
+        objection: 3,
+      };
+      const sorted = [...rows].sort((a, b) => {
+        const ar = intentRank[a.replyIntent ?? ""] ?? 9;
+        const br = intentRank[b.replyIntent ?? ""] ?? 9;
+        if (ar !== br) return ar - br;
+        return b.createdAt.getTime() - a.createdAt.getTime();
+      });
+
+      const summary = sorted
+        .map(
+          (r) =>
+            `[${r.replyIntent ?? "?"} ${r.replyConfidence ?? "?"}%] ${r.to} · ${r.subject}`
+        )
+        .join("\n");
+      return ok({ drafts: sorted, count: sorted.length }, summary);
+    },
+  );
+
+  // ── Write: approve a reply draft and send via EmailBison ────────────────
+  server.registerTool(
+    "email.approve-reply",
+    {
+      title: "Approve and send a cold-email reply draft",
+      description:
+        "Approves a pending reply draft and sends it via EmailBison's reply API (preserves thread + warmed sender). Returns the message id on success. Use for high-confidence drafts after review. The draft must have replyExternalId set (i.e. came from process-emailbison-reply).",
+      inputSchema: {
+        draft_id: z.string().uuid(),
+      },
+    },
+    async ({ draft_id }) => {
+      if (!isEmailbisonConfigured()) {
+        return err("EmailBison not configured.");
+      }
+      const [draft] = await db
+        .select()
+        .from(emailDrafts)
+        .where(eq(emailDrafts.id, draft_id))
+        .limit(1);
+      if (!draft) return err("Draft not found.");
+      if (draft.status === "sent") return err("Draft already sent.");
+      if (!draft.replyExternalId)
+        return err("Draft has no replyExternalId — use a different send path.");
+
+      const result = await emailbisonSendReply({
+        replyId: draft.replyExternalId,
+        body: draft.plainText || draft.body,
+        subject: draft.subject,
+      });
+      if (!result.success) {
+        await db
+          .update(emailDrafts)
+          .set({ status: "failed" })
+          .where(eq(emailDrafts.id, draft_id));
+        return err(result.error ?? "EmailBison send failed");
+      }
+
+      await db
+        .update(emailDrafts)
+        .set({
+          status: "sent",
+          sentAt: new Date(),
+          sentMessageId: result.messageId ?? null,
+        })
+        .where(eq(emailDrafts.id, draft_id));
+
+      return ok(
+        { draftId: draft_id, messageId: result.messageId, channel: "emailbison" },
+        `Sent reply ${draft_id} via EmailBison`
+      );
+    },
+  );
+
+  // ── Read: pipeline next actions ─────────────────────────────────────────
+  server.registerTool(
+    "pipeline.next-actions",
+    {
+      title: "Pipeline next actions due in 7 days",
+      description:
+        "Returns leads/clients with a follow-up due within 7 days, ordered by date. Use to drive 'what's blocked on counterparty action' surfaces and to draft nudges.",
+      inputSchema: {
+        days: z.number().int().min(1).max(30).optional(),
+        limit: z.number().int().min(1).max(50).optional(),
+      },
+    },
+    async ({ days = 7, limit = 10 }) => {
+      const horizon = new Date();
+      horizon.setDate(horizon.getDate() + days);
+      const rows = await db
+        .select({
+          id: leads.id,
+          contactName: leads.contactName,
+          companyName: leads.companyName,
+          stage: leads.stage,
+          nextFollowUpAt: leads.nextFollowUpAt,
+          estimatedValue: leads.estimatedValue,
+        })
+        .from(leads)
+        .where(
+          and(
+            eq(leads.isArchived, false),
+            isNotNull(leads.nextFollowUpAt),
+            lte(leads.nextFollowUpAt, horizon),
+            not(inArray(leads.stage, ["closed_won", "closed_lost"]))
+          )
+        )
+        .orderBy(asc(leads.nextFollowUpAt))
+        .limit(limit);
+      return ok(
+        rows,
+        rows
+          .map(
+            (r) =>
+              `${r.contactName ?? r.companyName ?? "?"} (${r.stage}) · due ${r.nextFollowUpAt?.toISOString().slice(0, 10) ?? "?"}`
+          )
+          .join("\n")
+      );
+    },
+  );
+
+  // ── Read: budget summary by category ────────────────────────────────────
+  server.registerTool(
+    "budget.summary",
+    {
+      title: "Private budget summary by category",
+      description:
+        "Returns the latest category-level totals from Adam's synced budget sheets. PRIVATE — only callable with admin-level MCP token. Useful for the personal-finance side of the operating system.",
+      inputSchema: {
+        limit: z.number().int().min(1).max(50).optional(),
+      },
+    },
+    async ({ limit = 20 }) => {
+      // Latest snapshot per (source, tab, category) — we just take the most
+      // recent snapshotAt regardless. For a true "latest only" view, future
+      // work could window per-category.
+      const rows = await db
+        .select({
+          sourceId: budgetCategorySnapshots.sourceId,
+          tab: budgetCategorySnapshots.tab,
+          category: budgetCategorySnapshots.category,
+          rowCount: budgetCategorySnapshots.rowCount,
+          totalCents: budgetCategorySnapshots.totalCents,
+          snapshotAt: budgetCategorySnapshots.snapshotAt,
+          sourceLabel: budgetSheetSources.label,
+        })
+        .from(budgetCategorySnapshots)
+        .leftJoin(
+          budgetSheetSources,
+          eq(budgetCategorySnapshots.sourceId, budgetSheetSources.id)
+        )
+        .orderBy(desc(budgetCategorySnapshots.snapshotAt))
+        .limit(limit);
+
+      const summary = rows
+        .map(
+          (r) =>
+            `${r.sourceLabel ?? "?"} · ${r.tab} · ${r.category}: $${(r.totalCents / 100).toFixed(2)} (${r.rowCount} rows)`
+        )
+        .join("\n");
+      return ok(rows, summary);
+    },
+  );
+
+  // ── Write: create a new email draft (inbound from external agents) ──────
+  server.registerTool(
+    "email.create-draft",
+    {
+      title: "Create a new email draft",
+      description:
+        "Creates a new email draft in the AM Collective email_drafts table for human review. Use this when an external agent (Notion Inbox Organizer, Polsia) wants Adam to send something — never auto-sends. Status='ready' surfaces it on /email and /command.",
+      inputSchema: {
+        to: z.string().email().max(320),
+        subject: z.string().min(1).max(500),
+        body: z.string().min(1).max(50000),
+        plain_text: z.string().max(50000).optional(),
+        context: z
+          .string()
+          .max(2000)
+          .optional()
+          .describe("Why this draft was created — shown to Adam during review"),
+        generated_by: z
+          .string()
+          .max(100)
+          .optional()
+          .describe("Origin tag, e.g. 'notion-inbox-organizer'"),
+      },
+    },
+    async ({ to, subject, body, plain_text, context, generated_by }) => {
+      const inserted = await db
+        .insert(emailDrafts)
+        .values({
+          to,
+          subject,
+          body,
+          plainText: plain_text ?? body,
+          status: "ready",
+          generatedBy: generated_by ?? "external-mcp",
+          context: context ?? null,
+        })
+        .returning({ id: emailDrafts.id });
+      const id = inserted[0]?.id;
+      if (!id) return err("Failed to create draft.");
+      return ok({ draftId: id }, `Draft ${id} created — awaiting approval at /email`);
+    },
+  );
+
+  // ── Read: emailbison reply context (full inbound thread) ────────────────
+  server.registerTool(
+    "email.reply-context",
+    {
+      title: "Inspect a specific inbound EmailBison reply",
+      description:
+        "Returns the full inbound reply (subject, body, lead info, campaign, classifier output via the linked draft). Use when an external agent needs to compose a manual response or escalate a thread.",
+      inputSchema: {
+        external_id: z
+          .number()
+          .int()
+          .describe("EmailBison reply external_id (from sync-emailbison-inbox)"),
+      },
+    },
+    async ({ external_id }) => {
+      const [reply] = await db
+        .select()
+        .from(emailbisonReplies)
+        .where(eq(emailbisonReplies.externalId, external_id))
+        .limit(1);
+      if (!reply) return err(`No reply found with external_id=${external_id}`);
+
+      const [draft] = await db
+        .select({
+          id: emailDrafts.id,
+          status: emailDrafts.status,
+          replyIntent: emailDrafts.replyIntent,
+          replyConfidence: emailDrafts.replyConfidence,
+          subject: emailDrafts.subject,
+          body: emailDrafts.body,
+        })
+        .from(emailDrafts)
+        .where(eq(emailDrafts.replyExternalId, external_id))
+        .limit(1);
+
+      return ok(
+        { reply, draft: draft ?? null },
+        `Reply from ${reply.leadEmail} · ${reply.subject ?? "(no subject)"}\n\n${(reply.body ?? "").slice(0, 600)}`
+      );
     },
   );
 }
