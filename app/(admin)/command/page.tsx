@@ -4,6 +4,9 @@
 //   2. What's blocked on me today?
 //   3. What's blocked on someone else?
 
+// Always fetch live — this page is the morning briefing, staleness defeats the purpose.
+export const dynamic = "force-dynamic";
+
 import type { Metadata } from "next";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";

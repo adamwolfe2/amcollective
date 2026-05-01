@@ -6,6 +6,9 @@ import { desc, eq, and, gte, lte, sql, count } from "drizzle-orm";
 export const metadata: Metadata = {
   title: "Finance | AM Collective",
 };
+
+// Financial data must be fresh — re-fetch every 60 s so Vercel ISR doesn't cache stale balances.
+export const revalidate = 60;
 import { format } from "date-fns";
 import * as stripeConnector from "@/lib/connectors/stripe";
 import * as mercuryConnector from "@/lib/connectors/mercury";

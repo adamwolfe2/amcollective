@@ -2,6 +2,9 @@
 // Layout: Compact metrics strip → Portfolio Grid (platforms) + Actions sidebar
 // Floating chat bar replaces the full-page AI panel — click to open /ai
 
+// Live data — re-fetch on each request so Vercel doesn't serve a 24-hour-old snapshot.
+export const revalidate = 60;
+
 import { Suspense } from "react";
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";

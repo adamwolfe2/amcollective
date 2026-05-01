@@ -7,6 +7,9 @@ import { eq, desc, count, isNotNull, and } from "drizzle-orm";
 export const metadata: Metadata = {
   title: "Email | AM Collective",
 };
+
+// Always fetch live — email send status changes in real time.
+export const dynamic = "force-dynamic";
 import {
   Table,
   TableBody,

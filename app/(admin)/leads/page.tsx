@@ -9,6 +9,10 @@ import { db } from "@/lib/db";
 export const metadata: Metadata = {
   title: "Leads | AM Collective",
 };
+
+// 5-minute revalidation — pipeline view can tolerate slight staleness.
+export const revalidate = 300;
+
 import * as schema from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import Link from "next/link";

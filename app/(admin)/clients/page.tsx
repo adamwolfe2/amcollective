@@ -1,3 +1,6 @@
+// 5-minute revalidation — client list can tolerate slight staleness.
+export const revalidate = 300;
+
 import Link from "next/link";
 import { format, formatDistanceToNow } from "date-fns";
 import { unstable_cache } from "next/cache";
