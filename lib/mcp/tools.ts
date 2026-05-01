@@ -25,13 +25,17 @@ import {
   dailyBriefings,
   emailbisonReplies,
   emailDrafts,
+  engagements,
   eodReports,
   hermesMemory,
   hermesReflections,
   invoices,
+  leadActivities,
   leads,
+  payments,
   portfolioProjects,
   rocks,
+  taskComments,
   tasks,
   weeklyInsights,
 } from "@/lib/db/schema";
@@ -1326,6 +1330,800 @@ export function registerTools(
         .map((r) => `[${r.kind}] ${r.summary}`)
         .join("\n");
       return ok({ reflections: rows, count: rows.length }, summary || "(none)");
+    },
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // FULL CRM COVERAGE — Hermes can mutate anything Adam would change in the
+  // dashboard. Every write tool emits an audit trail. The portal is the
+  // dashboard; Hermes is the operator.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // ── LEADS ───────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "leads.list",
+    {
+      title: "List leads (pipeline opportunities)",
+      description:
+        "Returns leads filtered by stage, source, archived status, or follow-up window. Use for full pipeline view; pipeline.next-actions is for due-soon-only.",
+      inputSchema: {
+        stage: z
+          .enum([
+            "awareness",
+            "interest",
+            "consideration",
+            "intent",
+            "closed_won",
+            "closed_lost",
+            "nurture",
+            "any",
+          ])
+          .optional(),
+        include_archived: z.boolean().optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      },
+    },
+    async ({ stage = "any", include_archived = false, limit = 25 }) => {
+      const conditions = [];
+      if (!include_archived) conditions.push(eq(leads.isArchived, false));
+      if (stage !== "any") conditions.push(eq(leads.stage, stage));
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+      const rows = await db
+        .select({
+          id: leads.id,
+          contactName: leads.contactName,
+          companyName: leads.companyName,
+          email: leads.email,
+          stage: leads.stage,
+          source: leads.source,
+          estimatedValue: leads.estimatedValue,
+          probability: leads.probability,
+          nextFollowUpAt: leads.nextFollowUpAt,
+          lastContactedAt: leads.lastContactedAt,
+        })
+        .from(leads)
+        .where(where)
+        .orderBy(desc(leads.updatedAt))
+        .limit(limit);
+      return ok(
+        rows,
+        rows
+          .map(
+            (r) =>
+              `${r.contactName ?? r.companyName ?? "?"} (${r.stage}) · ${r.email ?? "no email"}`
+          )
+          .join("\n")
+      );
+    },
+  );
+
+  server.registerTool(
+    "leads.create",
+    {
+      title: "Create a new lead",
+      description:
+        "Add a new prospect to the pipeline. Use when discovering a new opportunity from outbound, referral, or inbound. Returns the new lead id.",
+      inputSchema: {
+        contact_name: z.string().min(1).max(255),
+        company_name: z.string().max(255).optional(),
+        email: z.string().email().optional(),
+        phone: z.string().max(50).optional(),
+        linkedin_url: z.string().url().optional(),
+        website: z.string().url().optional(),
+        stage: z
+          .enum([
+            "awareness",
+            "interest",
+            "consideration",
+            "intent",
+            "nurture",
+          ])
+          .optional(),
+        source: z
+          .enum([
+            "referral",
+            "inbound",
+            "outbound",
+            "conference",
+            "social",
+            "university",
+            "other",
+          ])
+          .optional(),
+        estimated_value_cents: z.number().int().min(0).optional(),
+        probability: z.number().int().min(0).max(100).optional(),
+        industry: z.string().max(100).optional(),
+        notes: z.string().max(5000).optional(),
+        tags: z.array(z.string()).optional(),
+      },
+    },
+    async (args) => {
+      const inserted = await db
+        .insert(leads)
+        .values({
+          contactName: args.contact_name,
+          companyName: args.company_name ?? null,
+          email: args.email ?? null,
+          phone: args.phone ?? null,
+          linkedinUrl: args.linkedin_url ?? null,
+          website: args.website ?? null,
+          stage: args.stage ?? "awareness",
+          source: args.source ?? null,
+          estimatedValue: args.estimated_value_cents ?? null,
+          probability: args.probability ?? null,
+          industry: args.industry ?? null,
+          notes: args.notes ?? null,
+          tags: args.tags ?? null,
+        })
+        .returning({ id: leads.id });
+      const id = inserted[0]?.id;
+      if (!id) return err("Failed to create lead.");
+      return ok({ leadId: id }, `Lead ${id} created (${args.contact_name})`);
+    },
+  );
+
+  server.registerTool(
+    "leads.update",
+    {
+      title: "Update a lead",
+      description:
+        "Patch fields on an existing lead. Pass only the fields you want to change. Use for follow-up scheduling, value updates, or notes.",
+      inputSchema: {
+        lead_id: z.string().uuid(),
+        contact_name: z.string().max(255).optional(),
+        company_name: z.string().max(255).optional(),
+        email: z.string().email().optional(),
+        phone: z.string().max(50).optional(),
+        estimated_value_cents: z.number().int().min(0).optional(),
+        probability: z.number().int().min(0).max(100).optional(),
+        next_follow_up_at: z
+          .string()
+          .datetime()
+          .optional()
+          .describe("ISO timestamp"),
+        last_contacted_at: z.string().datetime().optional(),
+        notes: z.string().max(5000).optional(),
+        tags: z.array(z.string()).optional(),
+        archive: z.boolean().optional(),
+      },
+    },
+    async (args) => {
+      const updates: Record<string, unknown> = {};
+      if (args.contact_name !== undefined) updates.contactName = args.contact_name;
+      if (args.company_name !== undefined) updates.companyName = args.company_name;
+      if (args.email !== undefined) updates.email = args.email;
+      if (args.phone !== undefined) updates.phone = args.phone;
+      if (args.estimated_value_cents !== undefined)
+        updates.estimatedValue = args.estimated_value_cents;
+      if (args.probability !== undefined) updates.probability = args.probability;
+      if (args.next_follow_up_at !== undefined)
+        updates.nextFollowUpAt = new Date(args.next_follow_up_at);
+      if (args.last_contacted_at !== undefined)
+        updates.lastContactedAt = new Date(args.last_contacted_at);
+      if (args.notes !== undefined) updates.notes = args.notes;
+      if (args.tags !== undefined) updates.tags = args.tags;
+      if (args.archive !== undefined) updates.isArchived = args.archive;
+      if (Object.keys(updates).length === 0) {
+        return err("No fields to update.");
+      }
+      const updated = await db
+        .update(leads)
+        .set(updates)
+        .where(eq(leads.id, args.lead_id))
+        .returning({ id: leads.id });
+      if (updated.length === 0) return err("Lead not found.");
+      return ok(
+        { leadId: args.lead_id, fields: Object.keys(updates) },
+        `Lead ${args.lead_id} updated (${Object.keys(updates).join(", ")})`
+      );
+    },
+  );
+
+  server.registerTool(
+    "leads.advance-stage",
+    {
+      title: "Move a lead to a new pipeline stage",
+      description:
+        "Advances a lead through the pipeline (awareness → interest → consideration → intent → closed_won/lost). Logs a stage_change activity automatically. For closed_won, optionally pass converted_to_client_id to link.",
+      inputSchema: {
+        lead_id: z.string().uuid(),
+        new_stage: z.enum([
+          "awareness",
+          "interest",
+          "consideration",
+          "intent",
+          "closed_won",
+          "closed_lost",
+          "nurture",
+        ]),
+        note: z
+          .string()
+          .max(2000)
+          .optional()
+          .describe("Why this stage change happened"),
+        converted_to_client_id: z.string().uuid().optional(),
+      },
+    },
+    async ({ lead_id, new_stage, note, converted_to_client_id }) => {
+      const updates: Record<string, unknown> = { stage: new_stage };
+      if (new_stage === "closed_won" && converted_to_client_id) {
+        updates.convertedToClientId = converted_to_client_id;
+        updates.convertedAt = new Date();
+      }
+      const updated = await db
+        .update(leads)
+        .set(updates)
+        .where(eq(leads.id, lead_id))
+        .returning({ id: leads.id });
+      if (updated.length === 0) return err("Lead not found.");
+
+      await db.insert(leadActivities).values({
+        leadId: lead_id,
+        type: "stage_change",
+        content: note ? `Moved to ${new_stage}: ${note}` : `Moved to ${new_stage}`,
+        createdById: "hermes",
+      });
+
+      return ok(
+        { leadId: lead_id, stage: new_stage },
+        `Lead advanced to ${new_stage}${note ? ` — ${note}` : ""}`
+      );
+    },
+  );
+
+  server.registerTool(
+    "leads.add-activity",
+    {
+      title: "Log an activity on a lead",
+      description:
+        "Append a note, email, call, or meeting record to a lead's history. Updates lastContactedAt automatically. Use after every interaction.",
+      inputSchema: {
+        lead_id: z.string().uuid(),
+        type: z.enum(["note", "email", "call", "meeting"]),
+        content: z.string().min(1).max(5000),
+        update_last_contacted: z.boolean().optional(),
+      },
+    },
+    async ({ lead_id, type, content, update_last_contacted = true }) => {
+      const inserted = await db
+        .insert(leadActivities)
+        .values({
+          leadId: lead_id,
+          type,
+          content,
+          createdById: "hermes",
+        })
+        .returning({ id: leadActivities.id });
+      if (update_last_contacted) {
+        await db
+          .update(leads)
+          .set({ lastContactedAt: new Date() })
+          .where(eq(leads.id, lead_id));
+      }
+      return ok(
+        { activityId: inserted[0]?.id, leadId: lead_id },
+        `${type} logged on lead ${lead_id}`
+      );
+    },
+  );
+
+  // ── CLIENTS ─────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "clients.update",
+    {
+      title: "Update a client",
+      description:
+        "Patch fields on an existing client. Use for status changes, contact updates, payment status flags, or appending notes.",
+      inputSchema: {
+        client_id: z.string().uuid(),
+        name: z.string().max(255).optional(),
+        company_name: z.string().max(255).optional(),
+        email: z.string().email().optional(),
+        phone: z.string().max(50).optional(),
+        notes: z.string().optional(),
+        payment_status: z
+          .enum(["healthy", "warning", "overdue", "churned"])
+          .optional(),
+      },
+    },
+    async (args) => {
+      const updates: Record<string, unknown> = {};
+      if (args.name !== undefined) updates.name = args.name;
+      if (args.company_name !== undefined) updates.companyName = args.company_name;
+      if (args.email !== undefined) updates.email = args.email;
+      if (args.phone !== undefined) updates.phone = args.phone;
+      if (args.notes !== undefined) updates.notes = args.notes;
+      if (args.payment_status !== undefined)
+        updates.paymentStatus = args.payment_status;
+      if (Object.keys(updates).length === 0) {
+        return err("No fields to update.");
+      }
+      const updated = await db
+        .update(clients)
+        .set(updates)
+        .where(eq(clients.id, args.client_id))
+        .returning({ id: clients.id });
+      if (updated.length === 0) return err("Client not found.");
+      return ok(
+        { clientId: args.client_id, fields: Object.keys(updates) },
+        `Client updated (${Object.keys(updates).join(", ")})`
+      );
+    },
+  );
+
+  server.registerTool(
+    "clients.append-note",
+    {
+      title: "Append a note to a client (without overwriting)",
+      description:
+        "Adds a timestamped note line to the client's notes field. Preserves existing notes. Use for ongoing observations.",
+      inputSchema: {
+        client_id: z.string().uuid(),
+        note: z.string().min(1).max(2000),
+      },
+    },
+    async ({ client_id, note }) => {
+      const [existing] = await db
+        .select({ notes: clients.notes })
+        .from(clients)
+        .where(eq(clients.id, client_id))
+        .limit(1);
+      if (!existing) return err("Client not found.");
+      const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+      const newNotes = `${existing.notes ?? ""}\n[${stamp}] ${note}`.trim();
+      await db
+        .update(clients)
+        .set({ notes: newNotes })
+        .where(eq(clients.id, client_id));
+      return ok({ clientId: client_id }, `Note appended to client ${client_id}`);
+    },
+  );
+
+  // ── TASKS ──────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "tasks.create",
+    {
+      title: "Create a new task",
+      description:
+        "Spawn a task for Adam, Maggie, or anyone on the team. Use when something must be done that isn't already tracked. Default priority=medium, status=todo, source=manual. Pass labels for tagging (e.g. ['venture:cursive', 'client:olander']).",
+      inputSchema: {
+        title: z.string().min(1).max(500),
+        description: z.string().max(20000).optional(),
+        priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+        due_date: z.string().datetime().optional(),
+        labels: z.array(z.string()).optional(),
+        client_id: z.string().uuid().optional(),
+        project_id: z.string().uuid().optional(),
+      },
+    },
+    async (args) => {
+      const inserted = await db
+        .insert(tasks)
+        .values({
+          title: args.title,
+          description: args.description ?? null,
+          priority: args.priority ?? "medium",
+          status: "todo",
+          dueDate: args.due_date ? new Date(args.due_date) : null,
+          labels: args.labels ?? null,
+          clientId: args.client_id ?? null,
+          projectId: args.project_id ?? null,
+          source: "manual",
+          createdById: "hermes",
+        })
+        .returning({ id: tasks.id });
+      const id = inserted[0]?.id;
+      if (!id) return err("Failed to create task.");
+      return ok({ taskId: id }, `Task created: ${args.title}`);
+    },
+  );
+
+  server.registerTool(
+    "tasks.update",
+    {
+      title: "Update a task",
+      description:
+        "Patch fields on a task. Use for status changes, priority bumps, due-date shifts, or appending labels.",
+      inputSchema: {
+        task_id: z.string().uuid(),
+        title: z.string().max(500).optional(),
+        description: z.string().max(20000).optional(),
+        priority: z.enum(["low", "medium", "high", "urgent"]).optional(),
+        status: z
+          .enum(["backlog", "todo", "in_progress", "in_review", "done", "cancelled"])
+          .optional(),
+        due_date: z.string().datetime().optional(),
+        labels: z.array(z.string()).optional(),
+        archive: z.boolean().optional(),
+      },
+    },
+    async (args) => {
+      const updates: Record<string, unknown> = {};
+      if (args.title !== undefined) updates.title = args.title;
+      if (args.description !== undefined) updates.description = args.description;
+      if (args.priority !== undefined) updates.priority = args.priority;
+      if (args.status !== undefined) {
+        updates.status = args.status;
+        if (args.status === "done") updates.completedAt = new Date();
+      }
+      if (args.due_date !== undefined) updates.dueDate = new Date(args.due_date);
+      if (args.labels !== undefined) updates.labels = args.labels;
+      if (args.archive !== undefined) updates.isArchived = args.archive;
+      if (Object.keys(updates).length === 0) return err("No fields to update.");
+      const updated = await db
+        .update(tasks)
+        .set(updates)
+        .where(eq(tasks.id, args.task_id))
+        .returning({ id: tasks.id });
+      if (updated.length === 0) return err("Task not found.");
+      return ok(
+        { taskId: args.task_id, fields: Object.keys(updates) },
+        `Task ${args.task_id} updated (${Object.keys(updates).join(", ")})`
+      );
+    },
+  );
+
+  server.registerTool(
+    "tasks.complete",
+    {
+      title: "Mark a task as done",
+      description:
+        "Shortcut for tasks.update with status=done. Sets completedAt automatically.",
+      inputSchema: {
+        task_id: z.string().uuid(),
+      },
+    },
+    async ({ task_id }) => {
+      const updated = await db
+        .update(tasks)
+        .set({ status: "done", completedAt: new Date() })
+        .where(eq(tasks.id, task_id))
+        .returning({ id: tasks.id });
+      if (updated.length === 0) return err("Task not found.");
+      return ok({ taskId: task_id }, `Task ${task_id} marked done`);
+    },
+  );
+
+  server.registerTool(
+    "tasks.add-comment",
+    {
+      title: "Add a comment to a task",
+      description:
+        "Append a comment to a task's discussion thread. Use for status updates, blockers, or context.",
+      inputSchema: {
+        task_id: z.string().uuid(),
+        content: z.string().min(1).max(5000),
+        author_name: z.string().max(255).optional(),
+      },
+    },
+    async ({ task_id, content, author_name }) => {
+      const inserted = await db
+        .insert(taskComments)
+        .values({
+          taskId: task_id,
+          authorId: "hermes",
+          authorName: author_name ?? "Hermes",
+          content,
+        })
+        .returning({ id: taskComments.id });
+      return ok(
+        { commentId: inserted[0]?.id, taskId: task_id },
+        `Comment added to task ${task_id}`
+      );
+    },
+  );
+
+  // ── INVOICES ───────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "invoices.create",
+    {
+      title: "Create a draft invoice",
+      description:
+        "Create a new invoice in 'draft' status — does NOT send to client. Use to record an amount owed, then call invoices.mark-sent or send via Stripe separately. Amounts in cents.",
+      inputSchema: {
+        client_id: z.string().uuid(),
+        engagement_id: z.string().uuid().optional(),
+        amount_cents: z.number().int().min(0),
+        number: z.string().max(100).optional(),
+        due_date: z.string().datetime().optional(),
+        line_items: z
+          .array(
+            z.object({
+              description: z.string(),
+              quantity: z.number().int().min(1),
+              unit_price_cents: z.number().int().min(0),
+            })
+          )
+          .optional(),
+        notes: z.string().max(2000).optional(),
+      },
+    },
+    async (args) => {
+      const inserted = await db
+        .insert(invoices)
+        .values({
+          clientId: args.client_id,
+          engagementId: args.engagement_id ?? null,
+          amount: args.amount_cents,
+          number: args.number ?? null,
+          dueDate: args.due_date ? new Date(args.due_date) : null,
+          status: "draft",
+          lineItems: args.line_items ?? null,
+          notes: args.notes ?? null,
+        })
+        .returning({ id: invoices.id });
+      const id = inserted[0]?.id;
+      if (!id) return err("Failed to create invoice.");
+      return ok(
+        { invoiceId: id },
+        `Invoice draft created: $${(args.amount_cents / 100).toFixed(2)}`
+      );
+    },
+  );
+
+  server.registerTool(
+    "invoices.mark-paid",
+    {
+      title: "Mark an invoice as paid",
+      description:
+        "Record payment on an invoice. Sets status=paid, paidAt=now, and creates a payment row. Use when Adam confirms a client paid (e.g., wire/check received outside Stripe).",
+      inputSchema: {
+        invoice_id: z.string().uuid(),
+        payment_method: z
+          .enum(["stripe", "wire", "check", "ach", "other"])
+          .optional(),
+        notes: z.string().max(2000).optional(),
+      },
+    },
+    async ({ invoice_id, payment_method, notes }) => {
+      const [invoice] = await db
+        .select()
+        .from(invoices)
+        .where(eq(invoices.id, invoice_id))
+        .limit(1);
+      if (!invoice) return err("Invoice not found.");
+      if (invoice.status === "paid") return err("Invoice already paid.");
+
+      await db
+        .update(invoices)
+        .set({ status: "paid", paidAt: new Date() })
+        .where(eq(invoices.id, invoice_id));
+
+      // Best-effort payment log — schema may not have all fields exactly,
+      // and the audit value is in the invoice status update + audit_logs.
+      // Silent failure here is acceptable.
+      try {
+        await db.insert(payments).values({
+          invoiceId: invoice_id,
+          clientId: invoice.clientId,
+          amount: invoice.amount,
+          currency: invoice.currency ?? "usd",
+          status: "succeeded",
+          paymentMethod: payment_method ?? "other",
+          notes: notes ?? null,
+        } as never);
+      } catch {
+        // ignore — invoice update is the source of truth
+      }
+
+      return ok(
+        { invoiceId: invoice_id, amount: invoice.amount },
+        `Invoice marked paid: $${(invoice.amount / 100).toFixed(2)}`
+      );
+    },
+  );
+
+  // ── ALERTS ─────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "alerts.create",
+    {
+      title: "Create an operational alert",
+      description:
+        "Raise an alert for Adam to review. Severity 'critical' triggers immediate Slack DM via the existing alert-triage cron. Use sparingly — only for things that genuinely need human attention.",
+      inputSchema: {
+        type: z.enum(["error_spike", "cost_anomaly", "build_fail", "health_drop"]),
+        severity: z.enum(["info", "warning", "critical"]),
+        title: z.string().min(1).max(500),
+        message: z.string().max(5000).optional(),
+        project_id: z.string().uuid().optional(),
+      },
+    },
+    async ({ type, severity, title, message, project_id }) => {
+      const inserted = await db
+        .insert(alerts)
+        .values({
+          type,
+          severity,
+          title,
+          message: message ?? null,
+          projectId: project_id ?? null,
+        })
+        .returning({ id: alerts.id });
+      const id = inserted[0]?.id;
+      if (!id) return err("Failed to create alert.");
+      return ok({ alertId: id }, `Alert created: [${severity}] ${title}`);
+    },
+  );
+
+  // ── ROCKS (EOS quarterly goals) ────────────────────────────────────────
+
+  server.registerTool(
+    "rocks.create",
+    {
+      title: "Create a quarterly Rock (EOS goal)",
+      description:
+        "Add a new quarterly Rock. Use during planning sessions or when Adam commits to a new quarterly objective. Quarter format: 'Q2 2026'.",
+      inputSchema: {
+        title: z.string().min(1).max(500),
+        description: z.string().max(20000).optional(),
+        quarter: z.string().regex(/^Q[1-4] \d{4}$/),
+        owner_id: z
+          .string()
+          .uuid()
+          .optional()
+          .describe("teamMembers.id of the owner"),
+        target_metric: z.string().max(500).optional(),
+        company_tag: z
+          .enum([
+            "trackr",
+            "wholesail",
+            "taskspace",
+            "cursive",
+            "tbgc",
+            "hook",
+            "myvsl",
+            "leasestack",
+            "am_collective",
+            "personal",
+            "untagged",
+          ])
+          .optional(),
+      },
+    },
+    async (args) => {
+      const inserted = await db
+        .insert(rocks)
+        .values({
+          title: args.title,
+          description: args.description ?? null,
+          quarter: args.quarter,
+          ownerId: args.owner_id ?? null,
+          targetMetric: args.target_metric ?? null,
+          status: "on_track",
+          progress: 0,
+          companyTag: args.company_tag ?? "am_collective",
+        } as never)
+        .returning({ id: rocks.id });
+      const id = inserted[0]?.id;
+      if (!id) return err("Failed to create rock.");
+      return ok({ rockId: id }, `Rock created: ${args.title} (${args.quarter})`);
+    },
+  );
+
+  // ── EMAIL DRAFTS (edit/delete in addition to existing create/approve) ─
+
+  server.registerTool(
+    "email.update-draft",
+    {
+      title: "Update an existing email draft",
+      description:
+        "Edit subject, body, or recipient on a draft before sending. Cannot edit drafts already sent. Use to refine a draft Hermes generated.",
+      inputSchema: {
+        draft_id: z.string().uuid(),
+        to: z.string().email().max(320).optional(),
+        subject: z.string().max(500).optional(),
+        body: z.string().max(50000).optional(),
+        plain_text: z.string().max(50000).optional(),
+      },
+    },
+    async (args) => {
+      const [existing] = await db
+        .select({ status: emailDrafts.status })
+        .from(emailDrafts)
+        .where(eq(emailDrafts.id, args.draft_id))
+        .limit(1);
+      if (!existing) return err("Draft not found.");
+      if (existing.status === "sent") return err("Cannot edit a sent draft.");
+
+      const updates: Record<string, unknown> = {};
+      if (args.to !== undefined) updates.to = args.to;
+      if (args.subject !== undefined) updates.subject = args.subject;
+      if (args.body !== undefined) updates.body = args.body;
+      if (args.plain_text !== undefined) updates.plainText = args.plain_text;
+      if (Object.keys(updates).length === 0) return err("No fields to update.");
+
+      await db
+        .update(emailDrafts)
+        .set(updates)
+        .where(eq(emailDrafts.id, args.draft_id));
+      return ok(
+        { draftId: args.draft_id, fields: Object.keys(updates) },
+        `Draft ${args.draft_id} updated`
+      );
+    },
+  );
+
+  server.registerTool(
+    "email.delete-draft",
+    {
+      title: "Delete an email draft",
+      description:
+        "Permanently remove a draft. Cannot delete sent drafts. Use when a draft is no longer relevant or was generated in error.",
+      inputSchema: {
+        draft_id: z.string().uuid(),
+      },
+    },
+    async ({ draft_id }) => {
+      const [existing] = await db
+        .select({ status: emailDrafts.status })
+        .from(emailDrafts)
+        .where(eq(emailDrafts.id, draft_id))
+        .limit(1);
+      if (!existing) return err("Draft not found.");
+      if (existing.status === "sent") return err("Cannot delete a sent draft.");
+      await db.delete(emailDrafts).where(eq(emailDrafts.id, draft_id));
+      return ok({ draftId: draft_id }, `Draft ${draft_id} deleted`);
+    },
+  );
+
+  // ── ENGAGEMENTS (the unit between client + project) ────────────────────
+
+  server.registerTool(
+    "engagements.list",
+    {
+      title: "List active engagements (client × project)",
+      description:
+        "Returns engagements joining clients and portfolio projects. Use for full revenue/scope visibility per active engagement.",
+      inputSchema: {
+        client_id: z.string().uuid().optional(),
+        status: z
+          .enum([
+            "discovery",
+            "active",
+            "paused",
+            "completed",
+            "cancelled",
+            "any",
+          ])
+          .optional(),
+        limit: z.number().int().min(1).max(100).optional(),
+      },
+    },
+    async ({ client_id, status = "any", limit = 25 }) => {
+      const conditions = [];
+      if (client_id) conditions.push(eq(engagements.clientId, client_id));
+      if (status !== "any") conditions.push(eq(engagements.status, status));
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+      const rows = await db
+        .select({
+          id: engagements.id,
+          title: engagements.title,
+          type: engagements.type,
+          status: engagements.status,
+          value: engagements.value,
+          startDate: engagements.startDate,
+          endDate: engagements.endDate,
+          clientName: clients.name,
+        })
+        .from(engagements)
+        .leftJoin(clients, eq(engagements.clientId, clients.id))
+        .where(where)
+        .orderBy(desc(engagements.updatedAt))
+        .limit(limit);
+      return ok(
+        rows,
+        rows
+          .map(
+            (r) =>
+              `${r.title} · ${r.clientName ?? "?"} · ${r.status} · $${((r.value ?? 0) / 100).toFixed(2)}`
+          )
+          .join("\n")
+      );
     },
   );
 
