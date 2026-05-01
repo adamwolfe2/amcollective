@@ -26,6 +26,8 @@ import {
   emailbisonReplies,
   emailDrafts,
   eodReports,
+  hermesMemory,
+  hermesReflections,
   invoices,
   leads,
   portfolioProjects,
@@ -986,6 +988,289 @@ export function registerTools(
       const id = inserted[0]?.id;
       if (!id) return err("Failed to create draft.");
       return ok({ draftId: id }, `Draft ${id} created — awaiting approval at /email`);
+    },
+  );
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PERSISTENT MEMORY (replaces Hermes' fluid memory — cost-controlled)
+  // Hermes calls these EXPLICITLY when context is needed; never auto-injected.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  server.registerTool(
+    "memory.store",
+    {
+      title: "Store a persistent memory",
+      description:
+        "Save an observation, preference, or fact for future recall. Use sparingly — only for items you'd want to remember across sessions. Returns the memory id. Categories: 'principal_preference', 'client_context', 'venture_context', 'interaction_outcome', 'self_improvement', 'decision_log', 'pinned'. Importance 1-10.",
+      inputSchema: {
+        category: z.string().min(1).max(64),
+        summary: z.string().min(1).max(500),
+        content: z.string().min(1).max(20000),
+        tags: z.array(z.string()).optional(),
+        importance: z.number().int().min(1).max(10).optional(),
+        pinned: z.boolean().optional(),
+        conversation_id: z.string().max(200).optional(),
+        actor_slack_id: z.string().max(50).optional(),
+        expires_in_days: z
+          .number()
+          .int()
+          .min(1)
+          .max(3650)
+          .optional()
+          .describe("Optional auto-expire in N days. Omit for never-expire."),
+      },
+    },
+    async ({
+      category,
+      summary,
+      content,
+      tags,
+      importance,
+      pinned,
+      conversation_id,
+      actor_slack_id,
+      expires_in_days,
+    }) => {
+      let expiresAt: Date | null = null;
+      if (expires_in_days) {
+        expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + expires_in_days);
+      }
+      const inserted = await db
+        .insert(hermesMemory)
+        .values({
+          category,
+          summary,
+          content,
+          tags: tags ?? [],
+          importance: importance ?? 5,
+          pinned: pinned ?? false,
+          sourceTool: "hermes-mcp",
+          conversationId: conversation_id ?? null,
+          actorSlackId: actor_slack_id ?? null,
+          expiresAt,
+        })
+        .returning({ id: hermesMemory.id });
+      const id = inserted[0]?.id;
+      if (!id) return err("Failed to store memory.");
+      return ok({ id }, `Stored memory ${id} (${category})`);
+    },
+  );
+
+  server.registerTool(
+    "memory.recall",
+    {
+      title: "Recall persistent memories by category and tags",
+      description:
+        "Pull stored memories filtered by category and/or tags. Pinned items always rank first, then by importance × recency. Updates lastAccessedAt + accessCount. Use this to load context BEFORE answering questions about the principal's preferences, client history, prior decisions, or self-improvement reflections.",
+      inputSchema: {
+        category: z.string().max(64).optional(),
+        tags_any: z
+          .array(z.string())
+          .optional()
+          .describe("Match memories tagged with ANY of these tags"),
+        limit: z.number().int().min(1).max(50).optional(),
+        include_expired: z.boolean().optional(),
+      },
+    },
+    async ({ category, tags_any, limit = 10, include_expired = false }) => {
+      const conditions = [];
+      if (category) conditions.push(eq(hermesMemory.category, category));
+      if (!include_expired) {
+        conditions.push(
+          or(
+            sql`${hermesMemory.expiresAt} IS NULL`,
+            sql`${hermesMemory.expiresAt} > NOW()`
+          )!
+        );
+      }
+      if (tags_any && tags_any.length > 0) {
+        conditions.push(
+          sql`${hermesMemory.tags}::jsonb ?| ${JSON.stringify(tags_any)}::text[]`
+        );
+      }
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const rows = await db
+        .select()
+        .from(hermesMemory)
+        .where(where)
+        .orderBy(
+          desc(hermesMemory.pinned),
+          desc(hermesMemory.importance),
+          desc(hermesMemory.createdAt)
+        )
+        .limit(limit);
+
+      // Update access stats — fire-and-forget; don't block the response on this
+      if (rows.length > 0) {
+        const ids = rows.map((r) => r.id);
+        await db
+          .update(hermesMemory)
+          .set({
+            lastAccessedAt: new Date(),
+            accessCount: sql`${hermesMemory.accessCount} + 1`,
+          })
+          .where(inArray(hermesMemory.id, ids));
+      }
+
+      const summary = rows
+        .map(
+          (r) =>
+            `[${r.pinned ? "PIN " : ""}${r.category} · imp ${r.importance}] ${r.summary}`
+        )
+        .join("\n");
+      return ok({ memories: rows, count: rows.length }, summary || "(no memories matched)");
+    },
+  );
+
+  server.registerTool(
+    "memory.search",
+    {
+      title: "Search persistent memories by free-text",
+      description:
+        "Full-text search across summary + content. Use for ad-hoc lookups when category/tags are unknown ('did Adam say anything about pricing for Olander?'). Less precise than memory.recall but useful for fuzzy queries.",
+      inputSchema: {
+        query: z.string().min(1).max(500),
+        limit: z.number().int().min(1).max(20).optional(),
+      },
+    },
+    async ({ query, limit = 10 }) => {
+      const ilike = `%${query.replace(/%/g, "")}%`;
+      const rows = await db
+        .select()
+        .from(hermesMemory)
+        .where(
+          and(
+            or(
+              sql`${hermesMemory.summary} ILIKE ${ilike}`,
+              sql`${hermesMemory.content} ILIKE ${ilike}`
+            )!,
+            or(
+              sql`${hermesMemory.expiresAt} IS NULL`,
+              sql`${hermesMemory.expiresAt} > NOW()`
+            )!
+          )
+        )
+        .orderBy(desc(hermesMemory.importance), desc(hermesMemory.createdAt))
+        .limit(limit);
+
+      const summary = rows
+        .map((r) => `[${r.category}] ${r.summary}`)
+        .join("\n");
+      return ok({ memories: rows, count: rows.length }, summary || "(no matches)");
+    },
+  );
+
+  server.registerTool(
+    "memory.delete",
+    {
+      title: "Delete a memory",
+      description:
+        "Remove a memory by id. Use when a previously stored fact is now wrong or superseded. Pinned memories require confirm=true.",
+      inputSchema: {
+        memory_id: z.string().uuid(),
+        confirm: z.boolean().optional(),
+      },
+    },
+    async ({ memory_id, confirm }) => {
+      const [existing] = await db
+        .select({ id: hermesMemory.id, pinned: hermesMemory.pinned })
+        .from(hermesMemory)
+        .where(eq(hermesMemory.id, memory_id))
+        .limit(1);
+      if (!existing) return err("Memory not found.");
+      if (existing.pinned && !confirm) {
+        return err("Memory is pinned. Pass confirm=true to delete.");
+      }
+      await db.delete(hermesMemory).where(eq(hermesMemory.id, memory_id));
+      return ok({ id: memory_id }, `Deleted memory ${memory_id}`);
+    },
+  );
+
+  server.registerTool(
+    "memory.reflect",
+    {
+      title: "Record a self-improvement reflection",
+      description:
+        "Hermes-only: log what worked / didn't work / patterns observed. Adam reviews these weekly. Reflections marked promoted_to_rule=true get baked into SOUL.md on next deploy. Kinds: 'what_worked', 'what_didnt', 'pattern_observed', 'rule_proposed'.",
+      inputSchema: {
+        kind: z.enum([
+          "what_worked",
+          "what_didnt",
+          "pattern_observed",
+          "rule_proposed",
+        ]),
+        summary: z.string().min(1).max(500),
+        content: z.string().min(1).max(10000),
+        source_conversation_id: z.string().max(200).optional(),
+        source_job_name: z.string().max(100).optional(),
+        tags: z.array(z.string()).optional(),
+      },
+    },
+    async ({
+      kind,
+      summary,
+      content,
+      source_conversation_id,
+      source_job_name,
+      tags,
+    }) => {
+      const inserted = await db
+        .insert(hermesReflections)
+        .values({
+          kind,
+          summary,
+          content,
+          sourceConversationId: source_conversation_id ?? null,
+          sourceJobName: source_job_name ?? null,
+          tags: tags ?? [],
+        })
+        .returning({ id: hermesReflections.id });
+      const id = inserted[0]?.id;
+      if (!id) return err("Failed to record reflection.");
+      return ok({ id }, `Recorded ${kind} reflection: ${summary}`);
+    },
+  );
+
+  server.registerTool(
+    "memory.list-reflections",
+    {
+      title: "List recent self-improvement reflections",
+      description:
+        "Pull the latest Hermes reflections — what worked, what didn't, patterns observed, rules proposed. Useful at the start of a session to load 'what I've learned'. Filter by kind or unpromoted only.",
+      inputSchema: {
+        kind: z
+          .enum([
+            "what_worked",
+            "what_didnt",
+            "pattern_observed",
+            "rule_proposed",
+            "any",
+          ])
+          .optional(),
+        unpromoted_only: z.boolean().optional(),
+        limit: z.number().int().min(1).max(50).optional(),
+      },
+    },
+    async ({ kind = "any", unpromoted_only = false, limit = 10 }) => {
+      const conditions = [];
+      if (kind !== "any") conditions.push(eq(hermesReflections.kind, kind));
+      if (unpromoted_only)
+        conditions.push(eq(hermesReflections.promotedToRule, false));
+      const where = conditions.length > 0 ? and(...conditions) : undefined;
+
+      const rows = await db
+        .select()
+        .from(hermesReflections)
+        .where(where)
+        .orderBy(desc(hermesReflections.createdAt))
+        .limit(limit);
+
+      const summary = rows
+        .map((r) => `[${r.kind}] ${r.summary}`)
+        .join("\n");
+      return ok({ reflections: rows, count: rows.length }, summary || "(none)");
     },
   );
 

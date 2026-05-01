@@ -12,7 +12,7 @@
 
 import { inngest } from "../client";
 import { captureError } from "@/lib/errors";
-import { notifySlack } from "@/lib/webhooks/slack";
+import { notifySlack, notifySlackAndWakeHermes } from "@/lib/webhooks/slack";
 import { db } from "@/lib/db";
 import { emailDrafts } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
@@ -78,8 +78,19 @@ export const notifyDraftReady = inngest.createFunction(
       .filter(Boolean)
       .join("\n");
 
+    // Post to Slack AND wake Hermes if HERMES_SLACK_USER_ID is configured.
+    // Hermes will call memory.recall(category='client_context', tags=[lead])
+    // and email.reply-context to add prior context to the alert.
     await step.run("send-slack", async () => {
-      await notifySlack(message);
+      await notifySlackAndWakeHermes({
+        alert: message,
+        actionPrompt: `Pull memory.recall(category='client_context', tags_any=['${leadEmail.split("@")[0]}']) and email.reply-context(external_id=${data.replyExternalId}) for prior context. Post a tight 2-3 sentence summary: who's replying, what intent, what we know about them, and your recommendation (approve as-is / edit first / escalate). Then call memory.store(category='interaction_outcome') noting this reply landed.`,
+      });
+      // Also send the plain version for any team member who doesn't see the
+      // mention in their notifications
+      if (!process.env.HERMES_SLACK_USER_ID) {
+        await notifySlack(message);
+      }
     });
 
     return { success: true, draftId, intent };
