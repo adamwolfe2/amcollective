@@ -41,9 +41,16 @@ export async function POST(request: NextRequest) {
     if (sigResult === "unconfigured") {
       captureError(new Error("Composio webhook secret not configured"), {
         tags: { route: "POST /api/webhooks/composio" },
+        level: "error",
       });
-      // Return 200 to prevent Composio retry storms while secret is unconfigured
-      return NextResponse.json({ received: true });
+      // Fail CLOSED. Previously returned 200 to "prevent retry storms" but
+      // that accepted unverified payloads, allowing anyone to inject events.
+      // Better behavior: 503 surfaces the misconfiguration; Composio will
+      // retry with backoff which gives Adam time to set the secret.
+      return NextResponse.json(
+        { error: "Webhook secret not configured" },
+        { status: 503 }
+      );
     }
     if (!sigResult) {
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 });

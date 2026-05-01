@@ -9,19 +9,35 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "node:crypto";
 import { runCeoAgent, resolveUser } from "@/lib/ai/agents/ceo-agent";
 import { sanitizeUserInput } from "@/lib/ai/sanitize";
+import { captureError } from "@/lib/errors";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
 const MAX_MESSAGE_LENGTH = 10000;
 
-export async function POST(req: NextRequest) {
-  // Internal-only: require a shared secret to prevent abuse
-  const authHeader = req.headers.get("authorization");
+/** Constant-time bearer check. Returns true on match, false otherwise.
+ *  Prevents timing-attack enumeration of the secret. */
+function isAuthorized(req: NextRequest): boolean {
+  const authHeader = req.headers.get("authorization") ?? "";
   const internalSecret = process.env.BOT_INTERNAL_SECRET;
-  if (!internalSecret || authHeader !== `Bearer ${internalSecret}`) {
+  if (!internalSecret) return false; // fail closed when env unset
+
+  const match = /^Bearer\s+(.+)$/i.exec(authHeader);
+  if (!match) return false;
+  const presented = match[1].trim();
+
+  const presentedBuf = Buffer.from(presented);
+  const expectedBuf = Buffer.from(internalSecret);
+  if (presentedBuf.length !== expectedBuf.length) return false;
+  return timingSafeEqual(presentedBuf, expectedBuf);
+}
+
+export async function POST(req: NextRequest) {
+  if (!isAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -65,19 +81,34 @@ export async function POST(req: NextRequest) {
 
   const sanitizedMessage = sanitizeUserInput(message);
 
-  const result = await runCeoAgent({
-    userId: user.id,
-    userRole: user.role,
-    userFocus: user.focus,
-    userName: user.name,
-    message: sanitizedMessage,
-    conversationId,
-  });
+  // Wrap CEO agent call in try/catch — runCeoAgent has unbounded tool loops
+  // and any unhandled throw would crash the route + leak stack traces.
+  try {
+    const result = await runCeoAgent({
+      userId: user.id,
+      userRole: user.role,
+      userFocus: user.focus,
+      userName: user.name,
+      message: sanitizedMessage,
+      conversationId,
+    });
 
-  return NextResponse.json({
-    response: result.response,
-    conversationId: result.conversationId,
-    channel,
-    user: { id: user.id, role: user.role },
-  });
+    return NextResponse.json({
+      response: result.response,
+      conversationId: result.conversationId,
+      channel,
+      user: { id: user.id, role: user.role },
+    });
+  } catch (error) {
+    captureError(error, {
+      tags: { route: "POST /api/bot/message", channel, senderId },
+    });
+    return NextResponse.json(
+      {
+        error: "Agent error — check Sentry for details.",
+        message: error instanceof Error ? error.message : "unknown",
+      },
+      { status: 500 }
+    );
+  }
 }

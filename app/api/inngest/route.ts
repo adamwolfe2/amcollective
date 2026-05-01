@@ -51,6 +51,7 @@ import {
   leadFollowupReminder,
   syncEmailbisonInbox,
   processEmailbisonReply,
+  processGmailMessage,
   notifyDraftReady,
   dailyCalendarBriefing,
   syncBudgetSheets,

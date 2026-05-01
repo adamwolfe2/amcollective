@@ -12,7 +12,7 @@ import * as schema from "@/lib/db/schema";
 import { eq, and, sql, lt } from "drizzle-orm";
 import { createAlert } from "@/lib/db/repositories/alerts";
 import { createAuditLog } from "@/lib/db/repositories/audit";
-import { notifySlack } from "@/lib/webhooks/slack";
+import { notifySlack, notifySlackAndWakeHermes } from "@/lib/webhooks/slack";
 import { notifyAdmins } from "@/lib/db/repositories/notifications";
 
 export const checkOverdueInvoices = inngest.createFunction(
@@ -66,11 +66,27 @@ export const checkOverdueInvoices = inngest.createFunction(
           );
       }
 
-      // Notify Slack for each newly overdue invoice
+      // Notify Slack for each newly overdue invoice. Wake Hermes for
+      // amounts >$1000 (worth context-pull + draft). Below that, just a
+      // passive alert — Adam can decide.
       for (const r of results) {
-        await notifySlack(
-          `Invoice overdue — ${r.invoice.number ?? r.invoice.id.slice(0, 8)} ($${(r.invoice.amount / 100).toFixed(2)}) from ${r.clientName ?? "unknown"}`
-        );
+        const amount = r.invoice.amount;
+        const display = `$${(amount / 100).toFixed(2)}`;
+        const number = r.invoice.number ?? r.invoice.id.slice(0, 8);
+        const client = r.clientName ?? "unknown";
+        const alert = `Invoice overdue — ${number} (${display}) from ${client}`;
+
+        if (amount >= 100_000) {
+          // >= $1,000 — wake Hermes to draft a nudge with prior context
+          await notifySlackAndWakeHermes({
+            alert,
+            actionPrompt: `Pull memory.recall(category='client_context', tags_any=['${(client || "")
+              .toLowerCase()
+              .split(" ")[0]}']) for prior context, then draft a 2-3 sentence collections nudge in Adam's voice (short, lowercase greeting ok, no emojis, single direct ask, payment-link or Cal.com if appropriate). Call email.create-draft with status='ready' so Adam can approve at /email. Then call memory.store(category='interaction_outcome') noting the overdue invoice was flagged.`,
+          });
+        } else {
+          await notifySlack(alert);
+        }
       }
 
       return results.map((r) => ({

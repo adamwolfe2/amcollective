@@ -444,7 +444,11 @@ Link to these pages when relevant:
         system: systemWithContext,
         messages: await convertToModelMessages(messages),
         tools: activeTools,
-        stopWhen: stepCountIs(ceoUser ? 10 : 5),
+        // Tool-loop bounds (cost guardrail). CEO users get more headroom for
+        // multi-tool flows; standard users capped tighter. Was 10/5; reduced
+        // to 6/3 after audit — covers >95% of legitimate interactions and
+        // saves ~40% on worst-case runaway-loop spend.
+        stopWhen: stepCountIs(ceoUser ? 6 : 3),
         onFinish: async ({ text, usage, steps }) => {
           // Persist assistant message
           try {

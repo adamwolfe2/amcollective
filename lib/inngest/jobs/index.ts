@@ -43,6 +43,7 @@ export { syncCashSnapshot } from "./sync-cash-snapshot";
 export { leadFollowupReminder } from "./lead-followup-reminder";
 export { syncEmailbisonInbox } from "./sync-emailbison-inbox";
 export { processEmailbisonReply } from "./process-emailbison-reply";
+export { processGmailMessage } from "./process-gmail-message";
 export { notifyDraftReady } from "./notify-draft-ready";
 export { dailyCalendarBriefing } from "./daily-calendar-briefing";
 export { syncBudgetSheets } from "./sync-budget-sheets";

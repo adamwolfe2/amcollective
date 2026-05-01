@@ -64,6 +64,13 @@ export interface VercelBuildLogEntry {
 
 const VERCEL_API = "https://api.vercel.com";
 
+/** Returns true if VERCEL_API_TOKEN is set. Use to gate calls so the
+ *  connector can degrade gracefully (returns ConnectorResult.success=false)
+ *  rather than throw and crash the calling route. */
+export function isConfigured(): boolean {
+  return Boolean(process.env.VERCEL_API_TOKEN);
+}
+
 function getHeaders(): HeadersInit {
   const token = process.env.VERCEL_API_TOKEN;
   if (!token) throw new Error("VERCEL_API_TOKEN is not set");

@@ -66,22 +66,38 @@ export const syncGmail = inngest.createFunction(
     }
 
     let totalSynced = 0;
+    const allNewInboundIds: string[] = [];
 
     // Step 2: Sync each account
     for (const account of accounts) {
       if (!account.composioAccountId) continue;
 
-      const synced = await step.run(
+      const result = await step.run(
         `sync-account-${account.id}`,
         async () => {
           return syncAccountMessages(account as SyncableAccount);
         }
       );
 
-      totalSynced += synced;
+      totalSynced += result.synced;
+      allNewInboundIds.push(...result.newInboundMessageIds);
     }
 
-    // Step 3: Audit log
+    // Step 3: Fan out events for NEW inbound Gmail messages so the
+    // process-gmail-message job can decide whether to auto-draft a reply.
+    // Only inbound (already filtered) — auto-draft handler then filters
+    // to known clients/leads to avoid drafting against newsletter spam.
+    if (allNewInboundIds.length > 0) {
+      await step.sendEvent(
+        "fanout-new-gmail",
+        allNewInboundIds.map((messageId) => ({
+          name: "gmail/message.received",
+          data: { messageId },
+        }))
+      );
+    }
+
+    // Step 4: Audit log
     await step.run("audit-log", async () => {
       await createAuditLog({
         actorId: "system",
@@ -92,11 +108,17 @@ export const syncGmail = inngest.createFunction(
         metadata: {
           accountCount: accounts.length,
           messagesSynced: totalSynced,
+          newInboundCount: allNewInboundIds.length,
         },
       });
     });
 
-    return { success: true, synced: totalSynced, accounts: accounts.length };
+    return {
+      success: true,
+      synced: totalSynced,
+      accounts: accounts.length,
+      newInbound: allNewInboundIds.length,
+    };
   }
 );
 
@@ -137,28 +159,47 @@ export const syncGmailManual = inngest.createFunction(
     }
 
     let totalSynced = 0;
+    const allNewInboundIds: string[] = [];
 
     for (const account of accounts) {
       if (!account.composioAccountId) continue;
 
-      const synced = await step.run(
+      const result = await step.run(
         `sync-account-${account.id}`,
         async () => {
           return syncAccountMessages(account as SyncableAccount);
         }
       );
 
-      totalSynced += synced;
+      totalSynced += result.synced;
+      allNewInboundIds.push(...result.newInboundMessageIds);
     }
 
-    return { success: true, synced: totalSynced };
+    if (allNewInboundIds.length > 0) {
+      await step.sendEvent(
+        "fanout-new-gmail",
+        allNewInboundIds.map((messageId) => ({
+          name: "gmail/message.received",
+          data: { messageId },
+        }))
+      );
+    }
+
+    return {
+      success: true,
+      synced: totalSynced,
+      newInbound: allNewInboundIds.length,
+    };
   }
 );
 
 // ─── Shared Sync Logic ──────────────────────────────────────────────────────
 
-async function syncAccountMessages(account: SyncableAccount): Promise<number> {
-  if (!account.composioAccountId) return 0;
+async function syncAccountMessages(account: SyncableAccount): Promise<{
+  synced: number;
+  newInboundMessageIds: string[];
+}> {
+  if (!account.composioAccountId) return { synced: 0, newInboundMessageIds: [] };
 
   const sinceDate = account.lastSyncAt ? new Date(account.lastSyncAt) : undefined;
 
@@ -169,9 +210,12 @@ async function syncAccountMessages(account: SyncableAccount): Promise<number> {
     maxResults: 50,
   });
 
-  if (result.error || result.messages.length === 0) return 0;
+  if (result.error || result.messages.length === 0) {
+    return { synced: 0, newInboundMessageIds: [] };
+  }
 
   let synced = 0;
+  const newInboundIds: string[] = [];
 
   for (const msg of result.messages) {
     // Deduplication: check if gmailId already exists
@@ -189,24 +233,30 @@ async function syncAccountMessages(account: SyncableAccount): Promise<number> {
       msg.from.toLowerCase().includes(account.email.toLowerCase())
     );
 
-    await db.insert(schema.messages).values({
-      threadId: `gmail_${msg.threadId}`,
-      direction: isOutbound ? "outbound" : "inbound",
-      channel: "gmail",
-      from: msg.from,
-      to: msg.to,
-      subject: msg.subject,
-      body: msg.body,
-      isRead: isOutbound,
-      metadata: {
-        gmailId: msg.id,
-        gmailThreadId: msg.threadId,
-        composioAccountId: account.composioAccountId,
-        labels: msg.labels,
-      },
-    });
+    const inserted = await db
+      .insert(schema.messages)
+      .values({
+        threadId: `gmail_${msg.threadId}`,
+        direction: isOutbound ? "outbound" : "inbound",
+        channel: "gmail",
+        from: msg.from,
+        to: msg.to,
+        subject: msg.subject,
+        body: msg.body,
+        isRead: isOutbound,
+        metadata: {
+          gmailId: msg.id,
+          gmailThreadId: msg.threadId,
+          composioAccountId: account.composioAccountId,
+          labels: msg.labels,
+        },
+      })
+      .returning({ id: schema.messages.id });
 
     synced++;
+    if (!isOutbound && inserted[0]?.id) {
+      newInboundIds.push(inserted[0].id);
+    }
   }
 
   // Update lastSyncAt
@@ -215,5 +265,5 @@ async function syncAccountMessages(account: SyncableAccount): Promise<number> {
     .set({ lastSyncAt: new Date() })
     .where(eq(schema.connectedAccounts.id, account.id));
 
-  return synced;
+  return { synced, newInboundMessageIds: newInboundIds };
 }

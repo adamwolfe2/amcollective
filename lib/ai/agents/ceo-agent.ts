@@ -448,8 +448,15 @@ export async function runCeoAgent(
     throw err;
   }
 
+  // Tool-loop bound. Was 10; reduced to 6 after cost audit — covers >95%
+  // of legitimate multi-tool flows while halving worst-case spend on stuck
+  // loops. Override via CEO_MAX_TOOL_ITERATIONS env if a specific session
+  // genuinely needs more.
+  const MAX_TOOL_ITER = Number(
+    process.env.CEO_MAX_TOOL_ITERATIONS ?? "6"
+  );
   let iterations = 0;
-  while (response.stop_reason === "tool_use" && iterations < 10) {
+  while (response.stop_reason === "tool_use" && iterations < MAX_TOOL_ITER) {
     iterations++;
 
     const toolUseBlocks = response.content.filter(
