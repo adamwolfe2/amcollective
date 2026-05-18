@@ -58,19 +58,19 @@ export function ParallaxHero({
         <FallingPattern
           color="#000000"
           backgroundColor="#ffffff"
-          duration={120}
-          blurIntensity="0.15em"
+          duration={60}
+          blurIntensity="0.05em"
           density={0.6}
-          className="h-full w-full [mask-image:radial-gradient(ellipse_at_center,black_0%,black_70%,transparent_100%)]"
+          className="h-full w-full [mask-image:radial-gradient(ellipse_at_center,black_0%,black_85%,transparent_115%)]"
         />
       </div>
 
       <div
         className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none"
         style={{
-          height: "40%",
+          height: "25%",
           background:
-            "linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.8) 30%, rgba(255,255,255,0.2) 65%, transparent 100%)",
+            "linear-gradient(to top, rgba(255,255,255,1) 0%, rgba(255,255,255,0.65) 45%, transparent 100%)",
         }}
       />
 
