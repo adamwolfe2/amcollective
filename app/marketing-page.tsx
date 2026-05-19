@@ -10,6 +10,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { ParallaxHero } from "@/components/ParallaxHero";
+import { LogoStrip } from "@/components/LogoStrip";
 import { ImmersiveLanding } from "@/components/immersive/ImmersiveLanding";
 
 // ─── Ventures Data ──────────────────────────────────────────────────────────
@@ -281,6 +282,9 @@ export function MarketingPage() {
             every company we partner with.
           </p>
         </div>
+
+        {/* ─── Trusted By Logo Strip ─────────────────────────────────── */}
+        <LogoStrip />
 
         {/* ─── Tab Navigation ────────────────────────────────────────── */}
         <div className="max-w-2xl mx-auto px-5 sm:px-6 pb-2">

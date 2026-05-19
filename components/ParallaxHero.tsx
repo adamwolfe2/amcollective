@@ -14,7 +14,7 @@ const ANIM_DURATION_MS = 650;
 
 export function ParallaxHero({
   animateIn = false,
-  height = "h-[50vh] sm:h-[60vh] md:h-[80vh]",
+  height = "h-[38vh] sm:h-[44vh] md:h-[52vh] max-h-[520px]",
   overlay,
   className = "",
 }: ParallaxHeroProps) {
