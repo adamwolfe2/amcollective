@@ -25,36 +25,12 @@ const VENTURES = [
     url: "https://meetcursive.com",
   },
   {
-    name: "TaskSpace",
+    name: "LeaseStack",
     description:
-      "AI operational infrastructure for multi-company founders & builders. Unified dashboard across all your teams running on EOS. AI handles EOD reports, surfaces blockers, and keeps every entity accountable without you in every meeting.",
-    logo: "/taskspace logo NEW.png",
-    social: "/taskspace social.png",
-    url: "https://trytaskspace.com",
-  },
-  {
-    name: "WholeSail",
-    description:
-      "Fully custom B2B ordering portals for distribution companies. Client portal, admin panel, iMessage ordering, Stripe billing, automated invoicing \u2014 all curated to your brand. Automate your esoteric spreadsheet company & cut your costs. Fully built and shipped in under 2 weeks.",
-    logo: "/wholesail logo.png",
-    social: "/wholesail social.png",
-    url: "https://wholesailhub.com",
-  },
-  {
-    name: "MyVSL",
-    description:
-      "AI funnel builder that books calls. Build quiz-to-calendar booking funnels in minutes — three questions, smart scoring, automatic calendar routing. No code required.",
-    logo: "/vsl logo.png",
-    social: "/vsl social.png",
-    url: "https://getmyvsl.com",
-  },
-  {
-    name: "Trackr",
-    description:
-      "Research any AI tool in under 2 minutes. Track what you pay for. Stay current on top product launches and paint points custom to your company. One shared workspace for your team to go from spreadsheets to AI-Native.",
-    logo: "/Trackr Logo.jpg",
-    social: "/trackr social.png",
-    url: "https://trytrackr.com",
+      "The full-stack managed marketing platform for real estate operators. Deploys a custom website, AI chatbot, visitor identification pixel, and managed ad campaigns across Meta, Google, and TikTok — all tied to lease-level attribution. One platform replaces five vendors, live in 14 days.",
+    logo: "/logos/leasestack.png",
+    social: "/leasestack social.png",
+    url: "https://leasestack.co",
   },
   {
     name: "CampusGTM",
@@ -65,12 +41,36 @@ const VENTURES = [
     url: "https://www.campusgtm.com",
   },
   {
-    name: "LeaseStack",
+    name: "WholeSail",
     description:
-      "The full-stack managed marketing platform for real estate operators. Deploys a custom website, AI chatbot, visitor identification pixel, and managed ad campaigns across Meta, Google, and TikTok — all tied to lease-level attribution. One platform replaces five vendors, live in 14 days.",
-    logo: "/logos/leasestack.png",
-    social: "/leasestack social.png",
-    url: "https://leasestack.co",
+      "Fully custom B2B ordering portals for distribution companies. Client portal, admin panel, iMessage ordering, Stripe billing, automated invoicing — all curated to your brand. Automate your esoteric spreadsheet company & cut your costs. Fully built and shipped in under 2 weeks.",
+    logo: "/wholesail logo.png",
+    social: "/wholesail social.png",
+    url: "https://wholesailhub.com",
+  },
+  {
+    name: "Trackr",
+    description:
+      "Research any AI tool in under 2 minutes. Track what you pay for. Stay current on top product launches and paint points custom to your company. One shared workspace for your team to go from spreadsheets to AI-Native.",
+    logo: "/Trackr Logo.jpg",
+    social: "/trackr social.png",
+    url: "https://trytrackr.com",
+  },
+  {
+    name: "TaskSpace",
+    description:
+      "AI operational infrastructure for multi-company founders & builders. Unified dashboard across all your teams running on EOS. AI handles EOD reports, surfaces blockers, and keeps every entity accountable without you in every meeting.",
+    logo: "/taskspace logo NEW.png",
+    social: "/taskspace social.png",
+    url: "https://trytaskspace.com",
+  },
+  {
+    name: "MyVSL",
+    description:
+      "AI funnel builder that books calls. Build quiz-to-calendar booking funnels in minutes — three questions, smart scoring, automatic calendar routing. No code required.",
+    logo: "/vsl logo.png",
+    social: "/vsl social.png",
+    url: "https://getmyvsl.com",
   },
   {
     name: "Hook",
