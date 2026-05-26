@@ -43,6 +43,16 @@ export const valuePeriodEnum = pgEnum("value_period", [
   "annual",
 ]);
 
+export const paymentCadenceEnum = pgEnum("payment_cadence", [
+  "one_time",
+  "weekly",
+  "biweekly",
+  "monthly",
+  "quarterly",
+  "annual",
+  "custom",
+]);
+
 // ─── Tables ─────────────────────────────────────────────────────────────────
 
 export const clientPaymentStatusEnum = pgEnum("client_payment_status", [
@@ -129,6 +139,13 @@ export const engagements = pgTable(
     endDate: date("end_date", { mode: "date" }),
     value: integer("value"),
     valuePeriod: valuePeriodEnum("value_period"),
+    // Payment scheduling — drives /finance/calendar countdown + per-venture P&L.
+    // `paymentCadence` describes how often this engagement pays; null = treat as one_time.
+    // `nextPayDate` is the manual override for the next expected payment date.
+    // `lastPayDate` advances when an invoice on this engagement is marked paid.
+    paymentCadence: paymentCadenceEnum("payment_cadence"),
+    nextPayDate: date("next_pay_date", { mode: "date" }),
+    lastPayDate: date("last_pay_date", { mode: "date" }),
     createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { mode: "date" })
       .defaultNow()
@@ -142,6 +159,8 @@ export const engagements = pgTable(
     index("engagements_created_at_idx").on(table.createdAt),
     index("engagements_start_date_idx").on(table.startDate),
     index("engagements_end_date_idx").on(table.endDate),
+    index("engagements_next_pay_date_idx").on(table.nextPayDate),
+    index("engagements_payment_cadence_idx").on(table.paymentCadence),
   ]
 );
 
