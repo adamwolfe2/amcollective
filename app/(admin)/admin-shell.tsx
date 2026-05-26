@@ -87,6 +87,7 @@ const NAV_ITEMS: NavItem[] = [
       { label: "Cash Calendar", href: "/finance/calendar" },
       { label: "Venture P&L", href: "/finance/ventures" },
       { label: "Pay Schedules", href: "/finance/engagements" },
+      { label: "Recurring (Mercury)", href: "/finance/recurring" },
       { label: "Invoices", href: "/invoices" },
       { label: "Costs", href: "/costs" },
       { label: "Forecast", href: "/forecast" },

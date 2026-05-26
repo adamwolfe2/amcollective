@@ -257,6 +257,12 @@ export default async function FinancePage({
           >
             Pay Schedules →
           </Link>
+          <Link
+            href="/finance/recurring"
+            className="font-mono text-[10px] uppercase tracking-wider px-3 py-1.5 border border-[#0A0A0A]/10 hover:bg-[#0A0A0A]/[0.04]"
+          >
+            Recurring →
+          </Link>
           <MercurySyncButton />
         </div>
       </div>
