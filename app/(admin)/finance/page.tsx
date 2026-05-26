@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
 import { desc, eq, and, gte, lte, sql, count } from "drizzle-orm";
@@ -228,7 +229,7 @@ export default async function FinancePage({
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-8 flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold font-serif tracking-tight">
             Finance
@@ -237,7 +238,27 @@ export default async function FinancePage({
             Mercury Banking + Stripe Revenue
           </p>
         </div>
-        <MercurySyncButton />
+        <div className="flex items-center gap-2 flex-wrap">
+          <Link
+            href="/finance/calendar"
+            className="font-mono text-[10px] uppercase tracking-wider px-3 py-1.5 border border-[#0A0A0A] hover:bg-[#0A0A0A] hover:text-white"
+          >
+            Cash Calendar →
+          </Link>
+          <Link
+            href="/finance/ventures"
+            className="font-mono text-[10px] uppercase tracking-wider px-3 py-1.5 border border-[#0A0A0A]/10 hover:bg-[#0A0A0A]/[0.04]"
+          >
+            Venture P&amp;L →
+          </Link>
+          <Link
+            href="/finance/engagements"
+            className="font-mono text-[10px] uppercase tracking-wider px-3 py-1.5 border border-[#0A0A0A]/10 hover:bg-[#0A0A0A]/[0.04]"
+          >
+            Pay Schedules →
+          </Link>
+          <MercurySyncButton />
+        </div>
       </div>
 
       {/* Metric Cards */}

@@ -83,8 +83,11 @@ const NAV_ITEMS: NavItem[] = [
     label: "Finance",
     icon: Landmark,
     children: [
-      { label: "Invoices", href: "/invoices" },
       { label: "Overview", href: "/finance" },
+      { label: "Cash Calendar", href: "/finance/calendar" },
+      { label: "Venture P&L", href: "/finance/ventures" },
+      { label: "Pay Schedules", href: "/finance/engagements" },
+      { label: "Invoices", href: "/invoices" },
       { label: "Costs", href: "/costs" },
       { label: "Forecast", href: "/forecast" },
     ],
