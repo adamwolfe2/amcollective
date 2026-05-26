@@ -5,6 +5,10 @@ import { getRocks, getCurrentQuarter } from "@/lib/db/repositories/rocks";
 export const metadata: Metadata = {
   title: "Rocks | AM Collective",
 };
+
+// Rocks change frequently during active quarters — revalidate every 60 s.
+export const revalidate = 60;
+
 import { Badge } from "@/components/ui/badge";
 import {
   Empty,

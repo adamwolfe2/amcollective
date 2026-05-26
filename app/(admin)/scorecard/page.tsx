@@ -5,6 +5,10 @@ import { getScorecardData } from "@/lib/db/repositories/scorecard";
 export const metadata: Metadata = {
   title: "Scorecard | AM Collective",
 };
+
+// Weekly data entry — 5-minute revalidation is fine.
+export const revalidate = 300;
+
 import { getTeam } from "@/lib/db/repositories/team";
 import { AddMetricDialog } from "./add-metric-dialog";
 import { ScorecardCell } from "./scorecard-cell";

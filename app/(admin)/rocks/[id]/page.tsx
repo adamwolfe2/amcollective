@@ -1,3 +1,6 @@
+// Rock detail changes on updates — revalidate every 60 s.
+export const revalidate = 60;
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { format } from "date-fns";
