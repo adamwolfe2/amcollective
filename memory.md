@@ -1,6 +1,50 @@
 # AM Collective Portal - Memory
 
-> Updated 2026-03-26 after full-day production hardening + feature session.
+> Updated 2026-05-26 after cash-calendar + venture-P&L shipped.
+
+## May 26 Session — Cash Visibility (7 commits, pushed to main)
+
+Built the "I have no idea what's hitting my account next month" stack so we
+can finally see COGS per venture and make kill/feed/scale decisions.
+
+**Migration 0013** — added `payment_cadence` enum + `next_pay_date` +
+`last_pay_date` to `engagements`. Applied to Neon prod via
+`pnpm exec tsx --env-file=.env.local scripts/run-migration-0013-engagement-pay-dates.ts`.
+
+**New routes:**
+- `/finance/calendar` — month grid showing every projected income + expense
+  event with day buckets, side panel of next 30 days, month nav, totals strip.
+- `/finance/ventures` — per-companyTag monthly P&L (revenue, burn, margin %)
+  with Scale / Feed / Watch / Kill signal. Portfolio totals at the bottom.
+- `/finance/engagements` — pay-schedule manager. Buckets engagements into
+  Overdue / Next 7d / Next 30d / Later / Unset with inline edit row for
+  cadence + nextPayDate. Countdown badges.
+
+**New service:** `lib/finance/forecast.ts` (pure) + `lib/finance/forecast-data.ts`
+(Drizzle fetcher). Projects recurring sources forward over a date range.
+Also exports `buildVenturePnL` for the rollup.
+
+**Nav:** sidebar Finance group reordered to lead with the new pages. Finance
+overview page got 3 cross-link CTAs in its header.
+
+**Build:** tsc 0 errors, build clean, pushed to main as commits a6e4b5f..a1acc61.
+
+## What's Next (for kill/feed decisions)
+1. Tag historical Mercury transactions by `companyTag` so back-tested margin
+   matches forward-projected margin.
+2. Add engagement seed/import for existing active engagements so the calendar
+   isn't empty on first load (right now relies on user manually setting
+   `nextPayDate` per engagement at `/finance/engagements`).
+3. Stripe subscription → companyTag mapping (currently always "untagged").
+   Plumb via `subscriptions.metadata.company_tag` set during Stripe checkout.
+4. Scenario planner on `/finance/ventures` — "what if I close 2 more retainers
+   at $X / sunset Trackr" and see runway delta.
+5. Pricing-floor calculator: minimum engagement price to be net-positive after
+   allocated COGS + AI burn + overhead.
+
+---
+
+## March 26 Session Summary
 
 ## Current State
 - **Phase**: All build phases complete. Platform in production with active hardening.
