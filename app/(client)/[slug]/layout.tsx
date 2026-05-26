@@ -9,10 +9,11 @@ export default async function ClientLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Clerk's auth.protect() reliably redirects unauthenticated users via
-  // middleware. The prior manual `if (!userId) redirect(...)` pattern was
-  // silently rendering /_not-found in prod (Next.js 16 + Clerk 6.38 quirk).
-  const { userId } = await auth.protect();
+  // Use manual auth() + redirect() — NOT auth.protect(). In Clerk 6.38+,
+  // auth.protect() silently serves /_not-found for unauthenticated requests
+  // (protect-rewrite behavior, visible in x-clerk-auth-reason header).
+  const { userId } = await auth();
+  if (!userId) redirect("/sign-in");
 
   const client = await getClientByClerkId(userId);
   if (!client || !client.portalAccess) redirect("/sign-in");

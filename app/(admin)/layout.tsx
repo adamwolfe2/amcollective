@@ -1,4 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { AdminShell } from "./admin-shell";
 import { CommandPalette } from "@/components/command-palette";
 import { CompanyProvider } from "@/components/company-context";
@@ -14,13 +15,13 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Use Clerk's official protect() pattern. The prior manual
-  // `const { userId } = await auth(); if (!userId) redirect("/sign-in")`
-  // pattern was silently rendering /_not-found in prod on Next.js 16 +
-  // Clerk 6.38 + Vercel — the NEXT_REDIRECT throw was being eaten somewhere
-  // in the runtime, falling through to the global 404. `auth.protect()`
-  // delegates the redirect to Clerk's middleware, which works reliably.
-  await auth.protect();
+  // Use manual auth() + redirect() rather than auth.protect(). In Clerk 6.38+,
+  // auth.protect() does a "protect-rewrite" that silently serves /_not-found
+  // for unauthenticated requests (visible in x-clerk-auth-reason header).
+  // Belt-and-suspenders: middleware already redirects unauthenticated users,
+  // but the layout also guards in case middleware is ever bypassed.
+  const { userId } = await auth();
+  if (!userId) redirect("/sign-in");
 
   return (
     <CompanyProvider>

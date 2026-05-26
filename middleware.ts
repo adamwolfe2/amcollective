@@ -80,7 +80,20 @@ export default clerkMiddleware(async (auth, req) => {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
       }
     } else {
-      await auth.protect();
+      // IMPORTANT: do NOT use `auth.protect()` here. Recent Clerk versions
+      // (6.38.3+) changed protect() to perform a "protect-rewrite" that
+      // silently rewrites unauthenticated requests to /_not-found instead
+      // of redirecting to /sign-in (visible in `x-clerk-auth-reason:
+      // protect-rewrite, session-token-and-uat-missing` response header).
+      // That broke every authenticated route in prod. Manually redirect
+      // unauthenticated users to /sign-in, preserving the original URL so
+      // Clerk sends them back after sign-in.
+      const { userId } = await auth();
+      if (!userId) {
+        const signInUrl = new URL("/sign-in", req.url);
+        signInUrl.searchParams.set("redirect_url", req.url);
+        return NextResponse.redirect(signInUrl);
+      }
     }
   }
 });
