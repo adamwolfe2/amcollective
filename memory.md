@@ -1,8 +1,55 @@
 # AM Collective Portal - Memory
 
-> Updated 2026-05-26 after cash-calendar + venture-P&L shipped.
+> Updated 2026-05-26 (afternoon) after cost-allocation + Mercury-recurring +
+> weekly action items shipped.
 
-## May 26 Session — Cash Visibility (7 commits, pushed to main)
+## May 26 Session B — COGS Visibility Loop Closed (4 commits)
+
+Built the cost-allocation system (shared expenses like CheapInboxes can now
+be split across ventures), the Mercury recurring detector (so anything
+hitting your bank repeatedly auto-surfaces as a forecast candidate), and
+seeded this week's 21 action items into the open 3/30 sprint.
+
+**Migration 0014** — backfill missing `myvsl` + `leasestack` values on
+`company_tag` enum (schema declared them; DB didn't have them).
+
+**Migration 0015** — `subscription_cost_allocations` table (cost_id,
+company_tag, percent_bps). When ≥1 row exists for a cost, the legacy
+single-tag column is ignored and the cost splits per allocations.
+
+**Forecast + venture P&L respect allocations:** a $300/mo CheapInboxes cost
+split 50/30/20 across Cursive/Hook/SPM now emits 3 calendar events and
+contributes to 3 venture rollups proportionally.
+
+**New page** `/finance/recurring` — pure detector groups Mercury debits by
+(counterparty + amount bucket), needs ≥2 hits at a recognized cadence,
+estimates next renewal. One-click "Add as cost" promotes a candidate to a
+tracked subscription_cost tagged to the right venture.
+
+**21 action items seeded** into the open 3/30 sprint via
+`scripts/seed-week-action-items.ts`. Sections per venture (LeaseStack,
+Cursive, Vend Scout, JustSearched, Apropo, SPM, etc.). Calendar-view task
+pre-marked DONE.
+
+**Build:** tsc 0 errors, build clean, 4 commits on `main` (2c421b5..72de850).
+
+## What's Next
+1. ~~Pull recurring from Mercury~~ ✅ (today)
+2. Run the Mercury recurring detector against real history (the page loads
+   live — go to /finance/recurring to see candidates). Promote real
+   recurring charges.
+3. Add allocations to your shared costs (CheapInboxes, Beanstock) so
+   per-venture P&L matches reality.
+4. Tag historical Mercury transactions by `companyTag` so back-tested
+   margin matches forward-projected margin.
+5. Stripe subscription → companyTag mapping (still "untagged" for now).
+6. Scenario planner ("close 2 retainers / sunset Trackr → runway delta").
+
+---
+
+## May 26 Session A — Cash Visibility (7 commits)
+
+## May 26 Session A — Cash Visibility detail (7 commits)
 
 Built the "I have no idea what's hitting my account next month" stack so we
 can finally see COGS per venture and make kill/feed/scale decisions.
