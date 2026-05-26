@@ -135,11 +135,32 @@ async function getUpcomingCharges() {
 
 async function getSubscriptions() {
   try {
-    return await db
-      .select()
-      .from(schema.subscriptionCosts)
-      .where(eq(schema.subscriptionCosts.isActive, true))
-      .orderBy(asc(schema.subscriptionCosts.nextRenewal));
+    const [subs, allocations] = await Promise.all([
+      db
+        .select()
+        .from(schema.subscriptionCosts)
+        .where(eq(schema.subscriptionCosts.isActive, true))
+        .orderBy(asc(schema.subscriptionCosts.nextRenewal)),
+      db
+        .select({
+          costId: schema.subscriptionCostAllocations.costId,
+          companyTag: schema.subscriptionCostAllocations.companyTag,
+          percentBps: schema.subscriptionCostAllocations.percentBps,
+        })
+        .from(schema.subscriptionCostAllocations),
+    ]);
+
+    const allocationsByCost = new Map<string, Array<{ companyTag: string; percentBps: number }>>();
+    for (const a of allocations) {
+      const arr = allocationsByCost.get(a.costId) ?? [];
+      arr.push({ companyTag: a.companyTag, percentBps: a.percentBps });
+      allocationsByCost.set(a.costId, arr);
+    }
+
+    return subs.map((s) => ({
+      ...s,
+      allocations: allocationsByCost.get(s.id) ?? [],
+    }));
   } catch (err) {
     captureError(err, { tags: { component: "Costs" } });
     return [];
@@ -417,6 +438,7 @@ export default async function CostsPage() {
     nextRenewal: sub.nextRenewal ? sub.nextRenewal.toISOString().slice(0, 10) : null,
     createdAt: sub.createdAt.toISOString(),
     updatedAt: sub.updatedAt.toISOString(),
+    allocations: sub.allocations,
   }));
 
   function formatCurrency(n: number) {

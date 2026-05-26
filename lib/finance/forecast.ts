@@ -105,6 +105,10 @@ export interface ForecastInput {
     billingCycle: string; // 'monthly' | 'annual'
     nextRenewal: Date | null;
     companyTag: CompanyTag;
+    /** Optional split across multiple ventures. When present (≥1), the cost's
+     * own companyTag is ignored and the cost is split per the allocations.
+     * percent_bps sums to 10000. */
+    allocations?: ReadonlyArray<{ companyTag: CompanyTag; percentBps: number }>;
   }>;
 }
 
@@ -357,20 +361,35 @@ export function buildForecast(input: ForecastInput): ForecastEvent[] {
       rangeStart,
       rangeEnd,
     });
+
+    // Resolve allocation splits. If allocations exist, emit one event per
+    // (date, allocation) so the per-venture rollup is exact. If not, fall back
+    // to the single-tag column.
+    const splits =
+      c.allocations && c.allocations.length > 0
+        ? c.allocations.map((a) => ({
+            companyTag: a.companyTag,
+            amountCents: Math.round((c.amount * a.percentBps) / 10000),
+            sublabel: `${c.vendor} · ${a.percentBps / 100}% to ${a.companyTag}`,
+          }))
+        : [{ companyTag: c.companyTag, amountCents: c.amount, sublabel: c.vendor }];
+
     for (const d of dates) {
       const isProjected = !isEqual(d, c.nextRenewal);
-      events.push({
-        date: toIsoDate(d),
-        dateObj: d,
-        kind: "expense",
-        source: "subscription_cost",
-        amountCents: c.amount,
-        label: c.name,
-        sublabel: c.vendor,
-        companyTag: c.companyTag,
-        sourceId: c.id,
-        projected: isProjected,
-      });
+      for (const split of splits) {
+        events.push({
+          date: toIsoDate(d),
+          dateObj: d,
+          kind: "expense",
+          source: "subscription_cost",
+          amountCents: split.amountCents,
+          label: c.name,
+          sublabel: split.sublabel,
+          companyTag: split.companyTag,
+          sourceId: c.id,
+          projected: isProjected,
+        });
+      }
     }
   }
 
@@ -554,9 +573,16 @@ export function buildVenturePnL(input: VenturePnLInput): VenturePnL[] {
     addRevenue(normalizeTag(s.companyTag ?? null), monthlyEquivalent(s.amount, cadence));
   }
 
-  // Burn: subscription_costs
+  // Burn: subscription_costs (respect allocation splits when present)
   for (const c of input.subscriptionCosts) {
-    addBurn(c.companyTag, monthlyEquivalent(c.amount, c.billingCycle));
+    const monthly = monthlyEquivalent(c.amount, c.billingCycle);
+    if (c.allocations && c.allocations.length > 0) {
+      for (const a of c.allocations) {
+        addBurn(a.companyTag, (monthly * a.percentBps) / 10000);
+      }
+    } else {
+      addBurn(c.companyTag, monthly);
+    }
   }
 
   // Build union of tags

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Plus, Pencil, Trash2, X, CreditCard } from "lucide-react";
+import { Plus, Pencil, Trash2, X, CreditCard, Split } from "lucide-react";
 import {
   createSubscription,
   updateSubscription,
   deactivateSubscription,
   type SubscriptionInput,
 } from "@/lib/actions/subscriptions";
+import { AllocationDialog, type AllocationRow } from "./allocation-dialog";
 
 // Serialized from server (dates as ISO strings)
 export type SubscriptionRow = {
@@ -21,6 +22,9 @@ export type SubscriptionRow = {
   nextRenewal: string | null; // ISO string
   category: string | null;
   notes: string | null;
+  /** When present (≥1), the cost is split across multiple ventures and the
+   * single companyTag column is ignored. */
+  allocations: AllocationRow[];
 };
 
 export type ProjectOption = {
@@ -36,6 +40,8 @@ const COMPANY_TAGS = [
   "cursive",
   "tbgc",
   "hook",
+  "myvsl",
+  "leasestack",
   "personal",
   "untagged",
 ];
@@ -266,7 +272,12 @@ export function SubscriptionManager({
   const [isPending, startTransition] = useTransition();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [allocatingId, setAllocatingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const allocatingRow = allocatingId
+    ? subscriptions.find((s) => s.id === allocatingId)
+    : null;
 
   const monthlyTotal = subscriptions.reduce((sum, sub) => {
     const monthly =
@@ -437,9 +448,23 @@ export function SubscriptionManager({
                       </div>
                     </td>
                     <td className="px-5 py-3">
-                      <span className="font-mono text-xs px-2 py-0.5 bg-[#0A0A0A]/5 text-[#0A0A0A]/60">
-                        {projectName}
-                      </span>
+                      {sub.allocations.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {sub.allocations.map((a) => (
+                            <span
+                              key={a.companyTag}
+                              className="font-mono text-[10px] px-1.5 py-0.5 bg-[#0A0A0A] text-white"
+                              title={`${a.companyTag} — ${(a.percentBps / 100).toFixed(0)}%`}
+                            >
+                              {a.companyTag.replace(/_/g, " ")} · {(a.percentBps / 100).toFixed(0)}%
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="font-mono text-xs px-2 py-0.5 bg-[#0A0A0A]/5 text-[#0A0A0A]/60">
+                          {projectName}
+                        </span>
+                      )}
                     </td>
                     <td className="px-5 py-3 font-mono text-xs text-[#0A0A0A]/50">
                       {sub.category ?? "--"}
@@ -467,6 +492,21 @@ export function SubscriptionManager({
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity justify-end">
+                        <button
+                          onClick={() => setAllocatingId(sub.id)}
+                          className={`p-1 hover:text-[#0A0A0A] ${
+                            sub.allocations.length > 0
+                              ? "text-[#0A0A0A]"
+                              : "text-[#0A0A0A]/40"
+                          }`}
+                          title={
+                            sub.allocations.length > 0
+                              ? `Split across ${sub.allocations.length} ventures`
+                              : "Split across ventures"
+                          }
+                        >
+                          <Split size={12} />
+                        </button>
                         <button
                           onClick={() => {
                             setEditingId(sub.id);
@@ -513,6 +553,20 @@ export function SubscriptionManager({
           </tfoot>
         </table>
       </div>
+
+      {allocatingRow && (
+        <AllocationDialog
+          costId={allocatingRow.id}
+          costName={allocatingRow.name}
+          vendor={allocatingRow.vendor}
+          amountCents={allocatingRow.amount}
+          billingCycle={allocatingRow.billingCycle}
+          initialAllocations={allocatingRow.allocations}
+          fallbackTag={allocatingRow.companyTag}
+          onClose={() => setAllocatingId(null)}
+          onSaved={() => setAllocatingId(null)}
+        />
+      )}
     </div>
   );
 }

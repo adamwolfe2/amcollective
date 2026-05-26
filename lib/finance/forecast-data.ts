@@ -10,7 +10,11 @@ import { and, eq, gte, inArray, lte, isNotNull, or } from "drizzle-orm";
 
 import { db } from "@/lib/db";
 import * as schema from "@/lib/db/schema";
-import { COMPANY_TAGS, type CompanyTag } from "@/lib/db/schema/costs";
+import {
+  COMPANY_TAGS,
+  subscriptionCostAllocations,
+  type CompanyTag,
+} from "@/lib/db/schema/costs";
 import {
   buildForecast,
   buildVenturePnL,
@@ -68,6 +72,7 @@ export async function fetchForecast(opts: ForecastFetchOptions): Promise<Forecas
     engagementRows,
     subscriptionRows,
     subCostRows,
+    allocationRows,
   ] = await Promise.all([
     // Invoices: only those due in the visible range, with a non-final status.
     db
@@ -166,7 +171,27 @@ export async function fetchForecast(opts: ForecastFetchOptions): Promise<Forecas
       })
       .from(schema.subscriptionCosts)
       .where(eq(schema.subscriptionCosts.isActive, true)),
+
+    // Allocation splits for shared costs (CheapInboxes, Beanstock, etc.).
+    db
+      .select({
+        costId: subscriptionCostAllocations.costId,
+        companyTag: subscriptionCostAllocations.companyTag,
+        percentBps: subscriptionCostAllocations.percentBps,
+      })
+      .from(subscriptionCostAllocations),
   ]);
+
+  // Group allocations by cost id so each cost can look up its splits.
+  const allocationsByCost = new Map<
+    string,
+    Array<{ companyTag: CompanyTag; percentBps: number }>
+  >();
+  for (const a of allocationRows) {
+    const arr = allocationsByCost.get(a.costId) ?? [];
+    arr.push({ companyTag: a.companyTag, percentBps: a.percentBps });
+    allocationsByCost.set(a.costId, arr);
+  }
 
   // ── Normalize into ForecastInput shape ───────────────────────────────────
 
@@ -221,6 +246,7 @@ export async function fetchForecast(opts: ForecastFetchOptions): Promise<Forecas
       billingCycle: r.billingCycle,
       nextRenewal: r.nextRenewal,
       companyTag: r.companyTag,
+      allocations: allocationsByCost.get(r.id),
     })),
   };
 
