@@ -142,6 +142,33 @@ export const subscriptionCosts = pgTable(
   ]
 );
 
+// ─── Subscription Cost Allocations (split shared costs across ventures) ────
+
+export const subscriptionCostAllocations = pgTable(
+  "subscription_cost_allocations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    costId: uuid("cost_id")
+      .notNull()
+      .references(() => subscriptionCosts.id, { onDelete: "cascade" }),
+    companyTag: companyTagEnum("company_tag").notNull(),
+    // Basis points so we can express precise splits without floats.
+    // Sum across all rows for a given cost MUST equal 10000 (enforced in app).
+    percentBps: integer("percent_bps").notNull(),
+    notes: text("notes"),
+    createdAt: timestamp("created_at", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date" })
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    index("sca_cost_id_idx").on(table.costId),
+    index("sca_company_tag_idx").on(table.companyTag),
+    uniqueIndex("sca_cost_tag_unique_idx").on(table.costId, table.companyTag),
+  ]
+);
+
 // ─── Snapshot Tables ────────────────────────────────────────────────────────
 
 export const vercelProjectSnapshots = pgTable(
@@ -260,12 +287,23 @@ export const cashSnapshots = pgTable(
 
 // ─── Relations ──────────────────────────────────────────────────────────────
 
-export const subscriptionCostsRelations = relations(subscriptionCosts, ({ one }) => ({
+export const subscriptionCostsRelations = relations(subscriptionCosts, ({ one, many }) => ({
   project: one(portfolioProjects, {
     fields: [subscriptionCosts.projectId],
     references: [portfolioProjects.id],
   }),
+  allocations: many(subscriptionCostAllocations),
 }));
+
+export const subscriptionCostAllocationsRelations = relations(
+  subscriptionCostAllocations,
+  ({ one }) => ({
+    cost: one(subscriptionCosts, {
+      fields: [subscriptionCostAllocations.costId],
+      references: [subscriptionCosts.id],
+    }),
+  })
+);
 
 export const toolAccountsRelations = relations(toolAccounts, ({ many }) => ({
   toolCosts: many(toolCosts),
