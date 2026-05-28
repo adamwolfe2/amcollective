@@ -1,7 +1,17 @@
-import { config } from "dotenv";
-config({ path: "/Users/adamwolfe/amcollective/.env.local" });
+/**
+ * Dev diagnostic — pings every EMAILBISON_WORKSPACES entry and prints campaign counts.
+ *
+ * Run with:  pnpm exec tsx scripts/verify-workspaces.ts
+ *
+ * This file uses `export {}` to mark itself as a module so its top-level
+ * decls don't collide with other scripts under tsc --noEmit.
+ */
+export {};
 
-import { getWorkspaceKeys } from "/Users/adamwolfe/amcollective/lib/connectors/emailbison";
+import { config } from "dotenv";
+config({ path: ".env.local" });
+
+import { getWorkspaceKeys } from "@/lib/connectors/emailbison";
 
 async function main() {
   const keys = getWorkspaceKeys();
