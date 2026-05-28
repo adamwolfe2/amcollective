@@ -19,6 +19,8 @@ import { getRecentActivity } from "@/lib/db/repositories/activity";
 import { FloatingChatBar } from "@/components/floating-chat-bar";
 import { SprintWidgetClient } from "@/components/sprint-widget-client";
 import { PrioritiesWidget } from "@/components/dashboard/PrioritiesWidget";
+import { TeamSurfacedRow } from "@/components/dashboard/TeamSurfacedRow";
+import { AgentQuestionsWidget } from "@/components/dashboard/AgentQuestionsWidget";
 import dynamic from "next/dynamic";
 import type { RunwaySnapshot } from "@/components/dashboard/CashRunwayChart";
 const CashRunwayChart = dynamic(
@@ -582,6 +584,7 @@ async function ActionsPanel() {
     return (
       <div className="space-y-4">
         <PrioritiesWidget />
+        <AgentQuestionsWidget />
         <SprintWidget />
 
         {actionItems.length > 0 && (
@@ -737,6 +740,12 @@ export default async function DashboardPage() {
       {/* Main: Pipeline + Products + Side Panel */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 min-h-0">
         <div className="lg:col-span-8 lg:overflow-y-auto min-h-0 space-y-3 sm:space-y-4">
+          <SectionError name="Team Surfaced">
+            <Suspense fallback={<div className="h-36 bg-[#0A0A0A]/5 animate-pulse border border-[#0A0A0A]/10" />}>
+              <TeamSurfacedRow />
+            </Suspense>
+          </SectionError>
+
           <SectionError name="Platform Snapshots">
             <Suspense fallback={<PlatformCardSkeleton />}>
               <PlatformSnapshotsSection />
