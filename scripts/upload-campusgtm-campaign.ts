@@ -5,6 +5,8 @@
  *   EMAILBISON_KEY="9|xxx" npx tsx scripts/upload-campusgtm-campaign.ts
  */
 
+export {}; // make this a module so its top-level decls don't collide with other scripts
+
 const BASE_URL = "https://send.meetcursive.com";
 const API_KEY = process.env.EMAILBISON_KEY;
 
