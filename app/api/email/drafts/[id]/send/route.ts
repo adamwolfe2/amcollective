@@ -13,6 +13,7 @@ import {
   markReplyRead,
   markReplyInterested,
 } from "@/lib/connectors/emailbison";
+import { captureTrainingExample } from "@/lib/ai/agents/reply-learning";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -112,6 +113,63 @@ export async function POST(_request: NextRequest, context: RouteContext) {
       } catch (markErr) {
         captureError(markErr, {
           tags: { route: "POST /api/email/drafts/:id/send", step: "mark-reply" },
+          level: "info",
+        });
+      }
+
+      // Capture the (incoming, draft, sent) tuple as a training example for
+      // Bison's continuous-improvement loop. Best-effort — never fails the send.
+      try {
+        const meta = (draft.metadata ?? {}) as {
+          campaignName?: string;
+          campaignId?: number;
+          workspace?: string;
+          originalDraftSubject?: string;
+          originalDraftBody?: string;
+        };
+        // Pull the original incoming reply to lock down the (incoming, sent) pair.
+        const incoming = await db
+          .select({
+            body: schema.emailbisonReplies.body,
+            subject: schema.emailbisonReplies.subject,
+            leadName: schema.emailbisonReplies.leadName,
+          })
+          .from(schema.emailbisonReplies)
+          .where(eq(schema.emailbisonReplies.externalId, draft.replyExternalId))
+          .limit(1);
+        const inc = incoming[0];
+
+        if (inc?.body) {
+          // Use the original Bison-produced draft (snapshotted in metadata)
+          // as the "draft" side. The current draft.body/plainText is what
+          // Adam actually sent (whether unedited or after his edits in the UI).
+          const originalDraftBody =
+            meta.originalDraftBody ?? draft.plainText ?? draft.body;
+          const originalDraftSubject =
+            meta.originalDraftSubject ?? draft.subject;
+          const sentBody = draft.plainText || draft.body;
+
+          await captureTrainingExample({
+            emailDraftId: id,
+            replyExternalId: draft.replyExternalId,
+            campaignExternalId: meta.campaignId ?? null,
+            campaignName: meta.campaignName ?? null,
+            workspace: meta.workspace ?? null,
+            leadEmail: draft.to,
+            leadName: inc.leadName ?? null,
+            incomingSubject: inc.subject ?? null,
+            incomingBody: inc.body,
+            draftSubject: originalDraftSubject,
+            draftBody: originalDraftBody,
+            sentSubject: draft.subject,
+            sentBody,
+            intent: draft.replyIntent,
+            confidence: draft.replyConfidence,
+          });
+        }
+      } catch (learnErr) {
+        captureError(learnErr, {
+          tags: { route: "POST /api/email/drafts/:id/send", step: "capture-training" },
           level: "info",
         });
       }

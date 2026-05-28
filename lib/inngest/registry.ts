@@ -64,4 +64,6 @@ export const JOB_REGISTRY: JobRegistration[] = [
   { id: "job-failure-watchdog",         name: "Job Failure Watchdog",         cron: "*/15 * * * *",    events: [] },
   { id: "connector-freshness-alert",    name: "Connector Freshness Alert",    cron: "*/30 * * * *",    events: [] },
   { id: "dunning-sequence",             name: "Dunning Email Sequence",        cron: null,               events: ["stripe/invoice.payment_failed"] },
+  { id: "cold-email-research-loop",     name: "Cold Email Research Loop (Bison)", cron: "0 13 * * *",     events: ["cold-email/research.run"] },
+  { id: "reply-outcome-classifier",     name: "Reply Outcome Classifier (Bison Learning)", cron: "0 14 * * *", events: ["reply-learning/outcome.classify"] },
 ];

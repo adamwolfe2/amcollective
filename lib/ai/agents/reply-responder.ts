@@ -18,6 +18,12 @@
 
 import { isAIConfigured, MODEL_SONNET, MODEL_HAIKU } from "../client";
 import { getTrackedAnthropicClient } from "../tracked-client";
+import { COLD_EMAIL_PLAYBOOK_PROMPT } from "../knowledge/cold-email-playbook";
+import {
+  retrieveFewShotExamples,
+  isBrandVoiceLocked,
+  type FewShotExample,
+} from "./reply-learning";
 import type { CampaignKnowledgeBase } from "@/lib/db/schema/outreach";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -58,6 +64,8 @@ export interface ReplyContext {
   /** EmailBison reply ID — for linking back when sending */
   externalReplyId: number;
   campaignName?: string | null;
+  /** Brand/workspace this reply belongs to ("olander", "cursive", etc.) */
+  workspace?: string | null;
   /** Campaign knowledge base (ICP, value prop, proof, tone) — optional */
   knowledgeBase?: CampaignKnowledgeBase | null;
   leadEmail: string;
@@ -226,6 +234,32 @@ export async function draftReplyResponse(
 
   const client = getTrackedAnthropicClient({ agent: "reply-responder" })!;
 
+  // Pull up to 3 successful exemplar replies for THIS brand. Few-shot examples
+  // teach the model Adam's actual sent-reply style for this product/offer.
+  // Failures are silent — if retrieval is empty (cold start) we still draft.
+  let fewShot: FewShotExample[] = [];
+  try {
+    fewShot = await retrieveFewShotExamples({
+      incomingBody: ctx.replyBody,
+      workspace: ctx.workspace ?? null,
+      intent: classification.intent,
+      k: 3,
+    });
+  } catch {
+    fewShot = [];
+  }
+
+  // Check if this brand is voice-locked — if so, allow safeToAutoSend to be true
+  // for high-confidence low-stakes drafts.
+  let brandVoiceLocked = false;
+  if (ctx.workspace) {
+    try {
+      brandVoiceLocked = await isBrandVoiceLocked(ctx.workspace);
+    } catch {
+      brandVoiceLocked = false;
+    }
+  }
+
   const kb = ctx.knowledgeBase;
   const kbBlock = kb
     ? `## Campaign context
@@ -255,6 +289,29 @@ ${ctx.originalEmail.body ?? "(unknown)"}
     ? `\n## Thread-specific instruction\n${ctx.threadInstruction}`
     : "";
 
+  // Few-shot exemplars — show the model 3 examples of Adam's actual sent replies
+  // for this brand on similar incoming messages. This is the most powerful
+  // signal Bison has for matching Adam's voice on each specific product.
+  const fewShotBlock = fewShot.length > 0
+    ? `\n## Reference examples (Adam's actual sent replies on similar messages for this brand)
+These are examples Adam sent and the leads responded positively. Match this voice and structure as closely as possible.
+
+${fewShot
+  .map(
+    (ex, i) =>
+      `### Example ${i + 1} (similarity ${(ex.similarity * 100).toFixed(0)}%, outcome: ${ex.outcome})
+Lead wrote:
+"""
+${ex.incomingBody.slice(0, 1200)}
+"""
+Adam sent:
+"""
+${ex.sentBody.slice(0, 1200)}
+"""`
+  )
+  .join("\n\n")}`
+    : "";
+
   const userPrompt = `Draft a reply to this cold-email response.
 
 ## Reply we received
@@ -275,6 +332,7 @@ Signals: ${classification.signals.join("; ") || "(none)"}
 ${kbBlock}
 ${originalBlock}
 ${instructionBlock}
+${fewShotBlock}
 
 Respond in this exact JSON format:
 {
@@ -291,6 +349,13 @@ Set safeToAutoSend=true ONLY for low-stakes acknowledgments (e.g., "thanks, I'll
     model: MODEL_SONNET, // response writing = quality matters
     max_tokens: 700,
     system: [
+      // Cache the cold-email playbook + voice prompt. Both are static across all
+      // reply drafts in a session — prompt cache hits keep marginal cost near zero.
+      {
+        type: "text",
+        text: COLD_EMAIL_PLAYBOOK_PROMPT,
+        cache_control: { type: "ephemeral" },
+      },
       {
         type: "text",
         text: ADAM_VOICE_PROMPT,
@@ -310,10 +375,15 @@ Set safeToAutoSend=true ONLY for low-stakes acknowledgments (e.g., "thanks, I'll
       body: parsed.body ?? "",
       reasoning: parsed.reasoning,
       warnings: parsed.warnings,
-      // Force human review by default — flip to true only if model explicitly says so
-      // AND the classifier was confident.
+      // Force human review by default. Allow auto-send when ALL of:
+      //  1. Model explicitly green-lit the draft
+      //  2. Classifier was confident (≥0.85)
+      //  3. Either (a) this brand is voice-locked (consistent acceptance history)
+      //          OR (b) confidence is very high (≥0.95) for one-off low-stakes acks
       safeToAutoSend:
-        parsed.safeToAutoSend === true && classification.confidence >= 0.85,
+        parsed.safeToAutoSend === true &&
+        classification.confidence >= 0.85 &&
+        (brandVoiceLocked || classification.confidence >= 0.95),
     };
   } catch {
     return {

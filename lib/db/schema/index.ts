@@ -22,6 +22,8 @@ export * from "./leads";
 export * from "./contracts";
 export * from "./companies";
 export * from "./outreach";
+export * from "./cold-email-coach";
+export * from "./reply-learning";
 export * from "./integrations";
 export * from "./sync";
 export * from "./project-snapshots";

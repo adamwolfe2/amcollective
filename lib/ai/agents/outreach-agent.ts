@@ -14,6 +14,7 @@
 
 import { isAIConfigured, MODEL_SONNET, MODEL_HAIKU } from "../client";
 import { getTrackedAnthropicClient } from "../tracked-client";
+import { COLD_EMAIL_PLAYBOOK_PROMPT } from "../knowledge/cold-email-playbook";
 import type { CampaignKnowledgeBase } from "@/lib/db/schema/outreach";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,9 +55,17 @@ export interface DraftResult {
 }
 
 // ─── System Prompt — Cold Email Writing Skill ─────────────────────────────────
-// This is the canonical skill definition. All writing behavior flows from here.
+// Legacy in-file prompt kept for backwards compatibility, but the canonical
+// playbook now lives in lib/ai/knowledge/cold-email-playbook.ts. This file
+// layers a thin "outreach-specific" addendum on top of that shared playbook.
 
-const COLD_EMAIL_SKILL = `You are an expert cold email writer. Your job is to write emails that sound like they came from a sharp, thoughtful human — not a sales machine following a template.
+const COLD_EMAIL_SKILL_ADDENDUM = `# Outreach Agent Addendum (layered on top of the Cold Email Playbook)
+
+You are writing campaign-specific cold emails. Use the playbook above as your operating doctrine. The user message contains the campaign's knowledge base (ICP, value prop, proof points, tone) and the specific prospect — write to that exact persona.
+
+Return ONLY valid JSON in the requested shape — no prose, no markdown fences.`;
+
+const _LEGACY_COLD_EMAIL_SKILL = `You are an expert cold email writer. Your job is to write emails that sound like they came from a sharp, thoughtful human — not a sales machine following a template.
 
 ## Core Writing Principles
 
@@ -219,9 +228,16 @@ export async function draftColdEmail(req: DraftRequest): Promise<DraftResult> {
     // Prompt caching: the cold email skill is a large static constant — cache it
     // so sequence drafts (5 parallel calls) and repeat campaigns hit the cache
     system: [
+      // 1. Shared cold-email playbook (cached across all agents — high cache-hit rate)
       {
         type: "text",
-        text: COLD_EMAIL_SKILL,
+        text: COLD_EMAIL_PLAYBOOK_PROMPT,
+        cache_control: { type: "ephemeral" },
+      },
+      // 2. Outreach-agent-specific instructions
+      {
+        type: "text",
+        text: COLD_EMAIL_SKILL_ADDENDUM,
         cache_control: { type: "ephemeral" },
       },
     ],

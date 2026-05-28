@@ -60,6 +60,8 @@ import {
   aiUsageAlert,
   connectorFreshnessAlert,
   dunningSequence,
+  coldEmailResearchLoop,
+  replyOutcomeClassifier,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -117,5 +119,7 @@ export const { GET, POST, PUT } = serve({
     aiUsageAlert,
     connectorFreshnessAlert,
     dunningSequence,
+    coldEmailResearchLoop,
+    replyOutcomeClassifier,
   ],
 });

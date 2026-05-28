@@ -52,3 +52,5 @@ export { aiUsageRollup } from "./ai-usage-rollup";
 export { aiUsageAlert } from "./ai-usage-alert";
 export { connectorFreshnessAlert } from "./connector-freshness-alert";
 export { dunningSequence } from "./dunning-sequence";
+export { coldEmailResearchLoop } from "./cold-email-research-loop";
+export { replyOutcomeClassifier } from "./reply-outcome-classifier";

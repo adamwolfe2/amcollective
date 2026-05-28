@@ -120,16 +120,27 @@ export const processEmailbisonReply = inngest.createFunction(
       };
     }
 
-    // Step 2: Load campaign knowledge base (if linked)
-    const knowledgeBase = await step.run("load-campaign-kb", async () => {
-      if (!reply.campaignId) return null;
+    // Step 2: Load campaign knowledge base + workspace (if linked)
+    const campaignContext = await step.run("load-campaign-context", async () => {
+      if (!reply.campaignId) return { knowledgeBase: null, workspace: null };
       const rows = await db
-        .select({ knowledgeBase: outreachCampaigns.knowledgeBase })
+        .select({
+          knowledgeBase: outreachCampaigns.knowledgeBase,
+          metadata: outreachCampaigns.metadata,
+        })
         .from(outreachCampaigns)
         .where(eq(outreachCampaigns.externalId, reply.campaignId))
         .limit(1);
-      return rows[0]?.knowledgeBase ?? null;
+      const row = rows[0];
+      if (!row) return { knowledgeBase: null, workspace: null };
+      const meta = row.metadata as { workspace?: string } | null;
+      return {
+        knowledgeBase: row.knowledgeBase ?? null,
+        workspace: meta?.workspace ?? null,
+      };
     });
+    const knowledgeBase = campaignContext.knowledgeBase;
+    const workspace = campaignContext.workspace;
 
     // Step 3: Classify the reply
     const classification = await step.run("classify-reply", async () => {
@@ -176,6 +187,7 @@ export const processEmailbisonReply = inngest.createFunction(
     const replyCtx: ReplyContext = {
       externalReplyId: externalId,
       campaignName: reply.campaignName,
+      workspace,
       knowledgeBase,
       leadEmail: reply.leadEmail,
       leadName: reply.leadName,
@@ -208,9 +220,14 @@ export const processEmailbisonReply = inngest.createFunction(
           metadata: {
             campaignName: reply.campaignName,
             campaignId: reply.campaignId,
+            workspace,
             classification,
             reasoning: draft.reasoning,
             warnings: draft.warnings ?? [],
+            // Snapshot the draft AS BISON PRODUCED IT so we can compute
+            // edit-distance against the version Adam actually sends.
+            originalDraftSubject: draft.subjectLine,
+            originalDraftBody: draft.body,
           },
         })
         .returning({ id: emailDrafts.id });
