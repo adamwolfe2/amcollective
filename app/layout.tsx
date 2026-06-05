@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { ClerkProvider } from "@clerk/nextjs";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import Script from "next/script";
 import { Newsreader, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -111,6 +112,11 @@ export default function RootLayout({
         <link rel="preconnect" href="https://app.posthog.com" />
         <link rel="dns-prefetch" href="https://api.stripe.com" />
         <link rel="dns-prefetch" href="https://api.openai.com" />
+        <link rel="dns-prefetch" href="https://cdn.idpixel.app" />
+        <Script
+          src="https://cdn.idpixel.app/v1/idp-analytics-6a233867fab915af2e99d3da.min.js"
+          strategy="afterInteractive"
+        />
       </head>
       <body
         className="antialiased font-serif"
