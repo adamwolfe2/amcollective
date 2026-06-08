@@ -48,6 +48,14 @@ const VENTURES = [
     social: "/wholesail social.png",
     url: "https://wholesailhub.com",
   },
+  {
+    name: "Trackr",
+    description:
+      "Research any AI tool in under 2 minutes. Track what you pay for. Stay current on top product launches and pain points custom to your company. One shared workspace for your team to go from spreadsheets to AI-Native.",
+    logo: "/Trackr Logo.jpg",
+    social: "/trackr social.png",
+    url: "https://trytrackr.com",
+  },
 ];
 
 // ─── Team Data ──────────────────────────────────────────────────────────────
