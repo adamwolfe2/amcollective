@@ -65,7 +65,16 @@ type OutreachData = {
   stats30d: Stats;
   stats7d: Stats;
   dailyActivity: DailyActivity[];
+  channelBreakdown?: Record<string, number>;
 };
+
+const CHANNEL_LABELS: Array<{ key: string; label: string }> = [
+  { key: "email", label: "Email" },
+  { key: "linkedin", label: "LinkedIn" },
+  { key: "ads", label: "Ads" },
+  { key: "calls", label: "Calls Booked" },
+  { key: "ugc", label: "UGC" },
+];
 
 type InboxReply = {
   id: string;
@@ -97,6 +106,17 @@ const EVENT_LABELS: Record<string, string> = {
   contact_interested: "Interested",
   email_bounced: "Bounced",
   contact_unsubscribed: "Unsubscribed",
+  // LinkedIn (Dream Leads)
+  linkedin_connected: "LI Connected",
+  linkedin_request_sent: "LI Request",
+  linkedin_message_sent: "LI Msg Sent",
+  linkedin_message_received: "LI Reply",
+  linkedin_inmail_sent: "LI InMail",
+  linkedin_disconnected: "LI Disconnected",
+  // Ads + Calls (GHL / Calendly)
+  ads_opportunity: "Ad Opportunity",
+  call_booked: "Call Booked",
+  call_canceled: "Call Canceled",
 };
 
 const EVENT_COLORS: Record<string, string> = {
@@ -375,6 +395,27 @@ export function OutreachDashboard() {
               subValue={`${data.stats7d.unsubscribed} last 7d`}
             />
           </div>
+
+          {/* Channel Breakdown (30d) — email + linkedin + ads + calls + ugc */}
+          {data.channelBreakdown && (
+            <div className="border border-[#0A0A0A] bg-white p-6">
+              <h3 className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 mb-4">
+                Channels (30d)
+              </h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                {CHANNEL_LABELS.map(({ key, label }) => (
+                  <div key={key} className="border border-[#0A0A0A]/20 p-3">
+                    <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50">
+                      {label}
+                    </p>
+                    <p className="font-mono text-xl font-bold">
+                      {(data.channelBreakdown?.[key] ?? 0).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Daily Activity */}
           {data.dailyActivity.length > 0 && (
