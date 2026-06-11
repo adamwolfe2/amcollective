@@ -28,7 +28,6 @@ export async function GET() {
       eventCounts30d,
       eventCounts7d,
       dailyActivity,
-      channelCounts30d,
     ] = await Promise.all([
       // All campaigns (capped)
       db
@@ -77,30 +76,7 @@ export async function GET() {
         .where(gte(schema.outreachEvents.createdAt, thirtyDaysAgo))
         .groupBy(sql`TO_CHAR(${schema.outreachEvents.createdAt}, 'YYYY-MM-DD')`)
         .orderBy(sql`TO_CHAR(${schema.outreachEvents.createdAt}, 'YYYY-MM-DD')`),
-
-      // 30d event counts grouped by channel (email/linkedin/ads/calls/ugc)
-      db
-        .select({
-          channel: schema.outreachEvents.channel,
-          count: count(),
-        })
-        .from(schema.outreachEvents)
-        .where(gte(schema.outreachEvents.createdAt, thirtyDaysAgo))
-        .groupBy(schema.outreachEvents.channel),
     ]);
-
-    // Normalize channel breakdown into a stable shape for the dashboard.
-    const channelBreakdown = {
-      email: 0,
-      linkedin: 0,
-      ads: 0,
-      calls: 0,
-      ugc: 0,
-    } as Record<string, number>;
-    for (const row of channelCounts30d) {
-      channelBreakdown[row.channel] =
-        (channelBreakdown[row.channel] ?? 0) + Number(row.count);
-    }
 
     // Aggregate totals
     function sumByType(
@@ -168,7 +144,6 @@ export async function GET() {
       stats7d,
       campaignTotals,
       dailyActivity,
-      channelBreakdown,
     }, {
       headers: { "Cache-Control": "private, max-age=60, stale-while-revalidate=120" },
     });

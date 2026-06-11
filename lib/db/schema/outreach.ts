@@ -91,16 +91,11 @@ export const outreachEvents = pgTable(
   "outreach_events",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    // Source channel: email (EmailBison), linkedin (Dream Leads), ads (GHL), calls (Calendly/GHL), ugc
-    channel: varchar("channel", { length: 20 }).default("email").notNull(),
     eventType: varchar("event_type", { length: 100 }).notNull(),
     campaignId: integer("campaign_id"),
     campaignName: varchar("campaign_name", { length: 500 }),
     leadEmail: varchar("lead_email", { length: 500 }),
     leadName: varchar("lead_name", { length: 500 }),
-    // Channel-agnostic identity: LinkedIn handle, phone, or external contact id when no email
-    leadIdentifier: varchar("lead_identifier", { length: 500 }),
-    leadProfileUrl: varchar("lead_profile_url", { length: 1000 }),
     senderEmail: varchar("sender_email", { length: 500 }),
     subject: varchar("subject", { length: 1000 }),
     payload: jsonb("payload"),
@@ -108,7 +103,6 @@ export const outreachEvents = pgTable(
   },
   (table) => [
     index("outreach_events_type_idx").on(table.eventType),
-    index("outreach_events_channel_idx").on(table.channel),
     index("outreach_events_campaign_idx").on(table.campaignId),
     index("outreach_events_created_idx").on(table.createdAt),
   ]
