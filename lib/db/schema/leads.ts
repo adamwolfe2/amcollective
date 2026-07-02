@@ -28,6 +28,17 @@ export const leadStageEnum = pgEnum("lead_stage", [
   "closed_won",
   "closed_lost",
   "nurture",
+  // Tracker-grid stages (2026-07 CRM refresh — see .claude/specs/2026-07-02-crm-refresh.md)
+  "prospect",
+  "active",
+  "proposal",
+]);
+
+/** Confidence of a row's data until confirmed against Mercury or a signed doc. */
+export const dataConfidenceEnum = pgEnum("data_confidence", [
+  "verified",
+  "provisional",
+  "stale",
 ]);
 
 export const leadSourceEnum = pgEnum("lead_source", [
@@ -66,6 +77,21 @@ export const leads = pgTable(
     probability: integer("probability"), // 0-100
     expectedCloseDate: date("expected_close_date"),
 
+    // Tracker grid (2026-07 CRM refresh)
+    priority: text("priority"), // "P0" | "P1" | "P2"
+    nextStep: text("next_step"),
+    lastStepDate: date("last_step_date"), // distinct from lastContactedAt
+    ownerSecondary: text("owner_secondary"),
+    correctEmail: text("correct_email"), // verified-correct email when `email` is suspect
+    payStatus: text("pay_status"), // "on_track" | "pending" | "overdue" | "paid"
+    totalValue: integer("total_value"), // cents — engagement total
+    mrr: integer("mrr"), // cents
+    collected: integer("collected"), // cents — remaining = totalValue - collected
+    ipOrLegalFlag: boolean("ip_or_legal_flag").default(false).notNull(),
+    dataConfidence: dataConfidenceEnum("data_confidence")
+      .default("provisional")
+      .notNull(),
+
     // Enrichment
     industry: text("industry"),
     companySize: text("company_size"),
@@ -97,6 +123,9 @@ export const leads = pgTable(
     index("leads_is_archived_idx").on(table.isArchived),
     index("leads_created_at_idx").on(table.createdAt),
     index("leads_updated_at_idx").on(table.updatedAt),
+    index("leads_priority_idx").on(table.priority),
+    index("leads_last_step_date_idx").on(table.lastStepDate),
+    index("leads_pay_status_idx").on(table.payStatus),
   ]
 );
 

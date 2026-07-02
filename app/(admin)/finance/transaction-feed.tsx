@@ -23,6 +23,8 @@ const COMPANY_TAGS = [
   "am_collective",
   "personal",
   "untagged",
+  "campusgtm",
+  "reseller",
 ] as const;
 
 type CompanyTag = (typeof COMPANY_TAGS)[number];

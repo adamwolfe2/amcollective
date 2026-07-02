@@ -30,6 +30,8 @@ export const COMPANY_TAGS = [
   "am_collective",
   "personal",
   "untagged",
+  "campusgtm",
+  "reseller",
 ] as const;
 
 export type CompanyTag = (typeof COMPANY_TAGS)[number];
