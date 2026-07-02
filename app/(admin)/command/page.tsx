@@ -145,6 +145,8 @@ export default async function CommandPage() {
     agentRunsLast24hCount,
     outstandingTotalRow,
     roadmapTasks,
+    trackerRows,
+    latestCashRows,
   ] = await Promise.all([
     db
       .select({
@@ -324,12 +326,74 @@ export default async function CommandPage() {
       .orderBy(asc(schema.tasks.position))
       .limit(10)
       .catch(() => []),
+
+    // Tracker grid — money + priorities across the whole portfolio
+    db
+      .select({
+        id: schema.leads.id,
+        contactName: schema.leads.contactName,
+        companyName: schema.leads.companyName,
+        companyTag: schema.leads.companyTag,
+        stage: schema.leads.stage,
+        priority: schema.leads.priority,
+        payStatus: schema.leads.payStatus,
+        totalValue: schema.leads.totalValue,
+        mrr: schema.leads.mrr,
+        collected: schema.leads.collected,
+        nextStep: schema.leads.nextStep,
+        lastStepDate: schema.leads.lastStepDate,
+        assignedTo: schema.leads.assignedTo,
+        ownerSecondary: schema.leads.ownerSecondary,
+        ipOrLegalFlag: schema.leads.ipOrLegalFlag,
+        tags: schema.leads.tags,
+      })
+      .from(schema.leads)
+      .where(eq(schema.leads.isArchived, false))
+      .catch(() => []),
+
+    // Latest cash snapshot (Mercury balance / burn / runway)
+    db
+      .select()
+      .from(schema.cashSnapshots)
+      .orderBy(desc(schema.cashSnapshots.recordedAt))
+      .limit(1)
+      .catch(() => []),
   ]);
 
   const repliesAwaiting = pendingDrafts.length;
   const outstandingTotalCents = Number(outstandingTotalRow[0]?.total ?? 0);
   const tasksDueToday = Number(tasksDueTodayCount[0]?.value ?? 0);
   const agentRunsLast24h = Number(agentRunsLast24hCount[0]?.value ?? 0);
+
+  // ── Portfolio (tracker grid) derived values ──
+  const remainingOf = (r: (typeof trackerRows)[number]) =>
+    Math.max((r.totalValue ?? 0) - (r.collected ?? 0), 0);
+
+  const cashIn = trackerRows
+    .filter((r) => remainingOf(r) > 0)
+    .sort((a, b) => remainingOf(b) - remainingOf(a))
+    .slice(0, 8);
+  const arTotal = trackerRows.reduce((sum, r) => sum + remainingOf(r), 0);
+  const portfolioMrr = trackerRows
+    .filter((r) => r.stage === "active")
+    .reduce((sum, r) => sum + (r.mrr ?? 0), 0);
+  const buildPartner = trackerRows.filter(
+    (r) =>
+      r.companyTag === "reseller" ||
+      (Array.isArray(r.tags) &&
+        r.tags.some((t) => ["equity", "rev-share", "reseller"].includes(t)))
+  );
+  const topPriorities = trackerRows
+    .filter(
+      (r) =>
+        r.priority === "P0" &&
+        r.nextStep &&
+        !(Array.isArray(r.tags) && r.tags.includes("backlog"))
+    )
+    .sort((a, b) => remainingOf(b) - remainingOf(a) || (b.mrr ?? 0) - (a.mrr ?? 0))
+    .slice(0, 3);
+  const legalBlockers = trackerRows.filter((r) => r.ipOrLegalFlag);
+  const latestCash = latestCashRows[0] ?? null;
 
   return (
     <div>
@@ -374,6 +438,160 @@ export default async function CommandPage() {
           </p>
           <p className="font-mono text-xl font-bold">{agentRunsLast24h}</p>
         </div>
+      </div>
+
+      {/* Portfolio strip — cash, MRR, AR, runway (2026-07 CRM refresh) */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <div className="border border-[#0A0A0A] bg-white p-4">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 mb-1">
+            Cash (Mercury)
+          </p>
+          <p className="font-mono text-xl font-bold">
+            {latestCash ? formatDollars(latestCash.balanceCents) : "—"}
+          </p>
+        </div>
+        <div className="border border-[#0A0A0A] bg-white p-4">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 mb-1">
+            Portfolio MRR
+          </p>
+          <p className="font-mono text-xl font-bold">
+            {formatDollars(portfolioMrr)}
+          </p>
+        </div>
+        <div className="border border-[#0A0A0A] bg-white p-4">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 mb-1">
+            AR Outstanding
+          </p>
+          <p className="font-mono text-xl font-bold">
+            {formatDollars(arTotal)}
+          </p>
+        </div>
+        <div className="border border-[#0A0A0A] bg-white p-4">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-[#0A0A0A]/50 mb-1">
+            Runway
+          </p>
+          <p className="font-mono text-xl font-bold">
+            {latestCash?.runwayMonths
+              ? `${Number(latestCash.runwayMonths).toFixed(1)} mo`
+              : "—"}
+          </p>
+        </div>
+      </div>
+
+      {/* Top 3 priorities today */}
+      {topPriorities.length > 0 && (
+        <div className="mb-4">
+          <Section
+            title="Top 3 Today"
+            subtitle="P0 rows ranked by money at stake — do these first"
+          >
+            <div className="divide-y divide-[#0A0A0A]/10">
+              {topPriorities.map((r) => (
+                <div key={r.id} className="px-4 py-3 flex items-start gap-4">
+                  <Link
+                    href={`/leads/${r.id}`}
+                    className="font-mono text-sm font-bold text-[#0A0A0A] hover:underline shrink-0 w-44"
+                  >
+                    {r.companyName ?? r.contactName}
+                  </Link>
+                  <p className="font-mono text-xs text-[#0A0A0A]/70 flex-1">
+                    {r.nextStep}
+                  </p>
+                  {remainingOf(r) > 0 && (
+                    <span className="font-mono text-xs font-bold shrink-0">
+                      {formatDollars(remainingOf(r))} owed
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </Section>
+        </div>
+      )}
+
+      {/* Legal / IP blocker line — never bury this */}
+      {legalBlockers.length > 0 && (
+        <div className="border border-[#0A0A0A] bg-white p-3 mb-4">
+          <p className="font-mono text-xs">
+            <span className="font-bold uppercase tracking-wider">
+              Internal blocker:
+            </span>{" "}
+            LeaseStack IP unresolved — affects{" "}
+            {legalBlockers
+              .filter((r) => !r.companyName?.includes("internal blocker"))
+              .map((r) => r.companyName ?? r.contactName)
+              .join(", ")}
+            .
+          </p>
+        </div>
+      )}
+
+      {/* Two boards: CASH IN + BUILD/PARTNER */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <Section
+          title="Cash In"
+          subtitle={`AR + collections · ${formatDollars(arTotal)} outstanding`}
+        >
+          <div className="divide-y divide-[#0A0A0A]/10">
+            {cashIn.map((r) => (
+              <div
+                key={r.id}
+                className="px-4 py-2.5 flex items-center justify-between gap-3"
+              >
+                <div className="min-w-0">
+                  <Link
+                    href={`/leads/${r.id}`}
+                    className="font-mono text-sm text-[#0A0A0A] hover:underline"
+                  >
+                    {r.companyName ?? r.contactName}
+                  </Link>
+                  <p className="font-mono text-[10px] text-[#0A0A0A]/40 uppercase">
+                    {r.payStatus ?? "pending"} · {r.assignedTo ?? "—"}
+                  </p>
+                </div>
+                <span className="font-mono text-sm font-bold shrink-0">
+                  {formatDollars(remainingOf(r))}
+                </span>
+              </div>
+            ))}
+            {cashIn.length === 0 && (
+              <p className="px-4 py-3 font-mono text-xs text-[#0A0A0A]/40">
+                Nothing outstanding.
+              </p>
+            )}
+          </div>
+        </Section>
+
+        <Section
+          title="Build / Partner"
+          subtitle="Equity, rev-share + reseller nodes — scaling, not collecting"
+        >
+          <div className="divide-y divide-[#0A0A0A]/10">
+            {buildPartner.map((r) => (
+              <div key={r.id} className="px-4 py-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <Link
+                    href={`/leads/${r.id}`}
+                    className="font-mono text-sm text-[#0A0A0A] hover:underline"
+                  >
+                    {r.companyName ?? r.contactName}
+                  </Link>
+                  <span className="font-mono text-[10px] uppercase text-[#0A0A0A]/40 shrink-0">
+                    {r.priority ?? ""}
+                  </span>
+                </div>
+                <p className="font-mono text-[10px] text-[#0A0A0A]/50 mt-0.5 line-clamp-1">
+                  {r.nextStep ?? ""}
+                </p>
+              </div>
+            ))}
+            {buildPartner.length === 0 && (
+              <p className="px-4 py-3 font-mono text-xs text-[#0A0A0A]/40">
+                No equity/reseller plays tracked.
+              </p>
+            )}
+          </div>
+        </Section>
       </div>
 
       {/* Strategic Roadmap — 40-task Q2 plan ordered by rank */}

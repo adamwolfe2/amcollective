@@ -52,6 +52,10 @@ export const leadStageCategory: Record<string, StatusCategory> = {
   closed_won: "positive",
   closed_lost: "negative",
   nurture: "warning",
+  // Tracker-grid stages (2026-07 CRM refresh)
+  prospect: "info",
+  active: "positive",
+  proposal: "warning",
 };
 
 /** Invoice status → status category */

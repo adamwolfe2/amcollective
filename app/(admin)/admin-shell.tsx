@@ -6,8 +6,6 @@ import { useState, useEffect, useCallback } from "react";
 import { UserButton } from "@clerk/nextjs";
 import { PageTransition } from "@/components/PageTransition";
 import {
-  LayoutDashboard,
-  TrendingUp,
   MessageSquare,
   Sparkles,
   Settings,
@@ -16,7 +14,6 @@ import {
   Landmark,
   Search,
   Crosshair,
-  BookOpen,
   Zap,
   Package,
   Minus,
@@ -41,49 +38,34 @@ interface NavItem {
   children?: NavChild[];
 }
 
-// All nav items — items with children are collapsible, items with href are links
+// 2026-07-02 CRM refresh: 7 flat items — the CRM must be scannable in one
+// glance. Everything else lives under "More" (nothing deleted, just demoted).
+// Spec: .claude/specs/2026-07-02-crm-refresh.md
 const NAV_ITEMS: NavItem[] = [
   { label: "Command", href: "/command", icon: Compass },
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Strategy", href: "/strategy", icon: TrendingUp },
+  { label: "Tracker", href: "/leads", icon: Crosshair },
+  { label: "Clients", href: "/clients", icon: Package },
+  { label: "Finance", href: "/finance", icon: Landmark },
+  { label: "Outreach", href: "/outreach", icon: MessageSquare },
+  { label: "Tasks", href: "/tasks", icon: Zap },
   { label: "AI", href: "/ai", icon: Sparkles },
   {
-    label: "Pipeline",
-    icon: Crosshair,
+    label: "More",
+    icon: Settings,
     children: [
-      { label: "Leads", href: "/leads" },
-      { label: "Clients", href: "/clients" },
+      { label: "Dashboard (legacy)", href: "/dashboard" },
+      { label: "Strategy", href: "/strategy" },
       { label: "Proposals", href: "/proposals" },
       { label: "Contracts", href: "/contracts" },
-    ],
-  },
-  {
-    label: "Operations",
-    icon: Zap,
-    children: [
       { label: "Sprints", href: "/sprints" },
-      { label: "Tasks", href: "/tasks" },
       { label: "Time", href: "/time" },
       { label: "Rocks", href: "/rocks" },
       { label: "Meetings", href: "/meetings" },
       { label: "Scorecard", href: "/scorecard" },
-    ],
-  },
-  {
-    label: "Portfolio",
-    icon: Package,
-    children: [
       { label: "Products", href: "/products" },
       { label: "Projects", href: "/projects" },
       { label: "Services", href: "/services" },
       { label: "Domains", href: "/domains" },
-    ],
-  },
-  {
-    label: "Finance",
-    icon: Landmark,
-    children: [
-      { label: "Overview", href: "/finance" },
       { label: "Cash Calendar", href: "/finance/calendar" },
       { label: "Venture P&L", href: "/finance/ventures" },
       { label: "Pay Schedules", href: "/finance/engagements" },
@@ -91,32 +73,13 @@ const NAV_ITEMS: NavItem[] = [
       { label: "Invoices", href: "/invoices" },
       { label: "Costs", href: "/costs" },
       { label: "Forecast", href: "/forecast" },
-    ],
-  },
-  {
-    label: "Comms",
-    icon: MessageSquare,
-    children: [
       { label: "Messages", href: "/messages" },
       { label: "Email", href: "/email" },
-      { label: "Outreach", href: "/outreach" },
       { label: "NPS", href: "/nps" },
-    ],
-  },
-  {
-    label: "Knowledge",
-    icon: BookOpen,
-    children: [
-      { label: "Library", href: "/knowledge" },
+      { label: "Knowledge", href: "/knowledge" },
       { label: "Documents", href: "/documents" },
       { label: "Analytics", href: "/analytics" },
       { label: "Intelligence", href: "/intelligence" },
-    ],
-  },
-  {
-    label: "System",
-    icon: Settings,
-    children: [
       { label: "Team", href: "/team" },
       { label: "Alerts", href: "/alerts" },
       { label: "Vault", href: "/vault" },
