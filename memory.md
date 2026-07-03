@@ -1,6 +1,13 @@
 # AM Collective Portal - Memory
 
 > Updated 2026-07-02 after CRM-refresh Phases 1–3 (PRD ingest → One Page → agent layer).
+>
+> **FROZEN FOR CRM WORK (2026-07-02, Adam's call):** Adam's actual daily CRM is
+> `crm.amcollectivecapital.com` = repo `adamwolfe2/am-collective-os`
+> (`/Users/adamwolfe/am-collective-os`). The whole CRM refresh below was built
+> in THIS repo by mistake — the PRD data + clients-first redesign have been
+> ported to am-collective-os (commit a1b7b2f there). Do not build CRM features
+> here. This repo stays as the back-office portal only.
 
 ## Jul 2 — CRM Refresh Phase 2+3 (One Page + agent layer)
 
