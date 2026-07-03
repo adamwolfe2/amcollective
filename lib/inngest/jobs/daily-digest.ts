@@ -163,6 +163,27 @@ export const dailyDigest = inngest.createFunction(
           .limit(1),
       ]);
 
+      // Portfolio tracker rows (2026-07 CRM refresh) — AR, rot, P0s, blockers
+      const trackerRows = await db
+        .select({
+          id: schema.leads.id,
+          contactName: schema.leads.contactName,
+          companyName: schema.leads.companyName,
+          stage: schema.leads.stage,
+          priority: schema.leads.priority,
+          payStatus: schema.leads.payStatus,
+          totalValue: schema.leads.totalValue,
+          collected: schema.leads.collected,
+          nextStep: schema.leads.nextStep,
+          lastStepDate: schema.leads.lastStepDate,
+          lastContactedAt: schema.leads.lastContactedAt,
+          ipOrLegalFlag: schema.leads.ipOrLegalFlag,
+          tags: schema.leads.tags,
+        })
+        .from(schema.leads)
+        .where(eq(schema.leads.isArchived, false))
+        .catch(() => [] as never[]);
+
       const currentMrr = mrrResult.success ? (mrrResult.data?.mrr ?? 0) / 100 : 0;
       const prevMrr = yesterdaySnapshot[0]?.mrr;
       const mrrChange = prevMrr ? currentMrr - prevMrr / 100 : null;
@@ -222,12 +243,76 @@ export const dailyDigest = inngest.createFunction(
         });
       }
 
+      // ── Portfolio tracker priorities (CASH IN · rot · P0 · blockers) ──
+      const realRows = trackerRows.filter(
+        (r) => !(Array.isArray(r.tags) && (r.tags.includes("backlog") || r.tags.includes("internal")))
+      );
+      const remainingOf = (r: (typeof realRows)[number]) =>
+        Math.max((r.totalValue ?? 0) - (r.collected ?? 0), 0);
+
+      const arQueue = realRows
+        .filter((r) => remainingOf(r) > 0)
+        .sort((a, b) => remainingOf(b) - remainingOf(a));
+      const arTotal = arQueue.reduce((s, r) => s + remainingOf(r), 0);
+      for (const r of arQueue.slice(0, 3)) {
+        priorities.push({
+          type: "collections",
+          label: `Collect $${(remainingOf(r) / 100).toLocaleString()} — ${r.companyName ?? r.contactName}`,
+          subtext: `pay status: ${r.payStatus ?? "pending"} · total AR $${(arTotal / 100).toLocaleString()}`,
+          urgency: r.payStatus === "overdue" ? "critical" : "high",
+        });
+      }
+
+      const STALE_DAYS: Record<string, number> = {
+        active: 7, prospect: 10, proposal: 5, nurture: 21,
+      };
+      const rotting = realRows.filter((r) => {
+        const threshold = STALE_DAYS[r.stage];
+        if (!threshold) return false;
+        const last = r.lastStepDate
+          ? new Date(r.lastStepDate)
+          : r.lastContactedAt
+            ? new Date(r.lastContactedAt)
+            : null;
+        if (!last) return true;
+        return (now.getTime() - last.getTime()) / 86_400_000 > threshold;
+      });
+      if (rotting.length > 0) {
+        priorities.push({
+          type: "followup",
+          label: `${rotting.length} follow-up(s) rotting past threshold`,
+          subtext: rotting.slice(0, 3).map((r) => r.companyName ?? r.contactName).join(", "),
+          urgency: "high",
+        });
+      }
+
+      const topP0 = realRows.find(
+        (r) => r.priority === "P0" && r.nextStep && remainingOf(r) === 0
+      );
+      if (topP0) {
+        priorities.push({
+          type: "p0",
+          label: `P0: ${topP0.companyName ?? topP0.contactName}`,
+          subtext: (topP0.nextStep ?? "").slice(0, 120),
+          urgency: "high",
+        });
+      }
+
+      if (realRows.some((r) => r.ipOrLegalFlag) || trackerRows.some((r) => r.ipOrLegalFlag)) {
+        priorities.push({
+          type: "blocker",
+          label: "LeaseStack IP/ownership unresolved",
+          subtext: "Top internal blocker — sits under Trig, SG RE, LBA, Guardian",
+          urgency: "critical",
+        });
+      }
+
       return {
         mrr: currentMrr,
         mrrChange,
         activeClients: Number(activeClientsResult[0]?.value ?? 0),
         activeProjects: Number(activeProjectsResult[0]?.value ?? 0),
-        priorities: priorities.slice(0, 5),
+        priorities: priorities.slice(0, 9),
         recentActivity: recentActivity.map((a) => ({
           action: a.action,
           entityType: a.entityType,

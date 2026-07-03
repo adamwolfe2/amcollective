@@ -62,6 +62,9 @@ import {
   dunningSequence,
   coldEmailResearchLoop,
   replyOutcomeClassifier,
+  collectionsDunning,
+  pipelineHygiene,
+  prospectFromReply,
 } from "@/lib/inngest/jobs";
 
 export const { GET, POST, PUT } = serve({
@@ -121,5 +124,8 @@ export const { GET, POST, PUT } = serve({
     dunningSequence,
     coldEmailResearchLoop,
     replyOutcomeClassifier,
+    collectionsDunning,
+    pipelineHygiene,
+    prospectFromReply,
   ],
 });

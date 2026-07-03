@@ -54,3 +54,6 @@ export { connectorFreshnessAlert } from "./connector-freshness-alert";
 export { dunningSequence } from "./dunning-sequence";
 export { coldEmailResearchLoop } from "./cold-email-research-loop";
 export { replyOutcomeClassifier } from "./reply-outcome-classifier";
+export { collectionsDunning } from "./collections-dunning";
+export { pipelineHygiene } from "./pipeline-hygiene";
+export { prospectFromReply } from "./prospect-from-reply";

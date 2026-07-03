@@ -1,7 +1,58 @@
 # AM Collective Portal - Memory
 
-> Updated 2026-05-26 (afternoon) after cost-allocation + Mercury-recurring +
-> weekly action items shipped.
+> Updated 2026-07-02 after CRM-refresh Phases 1–3 (PRD ingest → One Page → agent layer).
+
+## Jul 2 — CRM Refresh Phase 2+3 (One Page + agent layer)
+
+- Phase 2 (commit 276a53f): /command is the one-page landing — clients grid,
+  cash/MRR/AR/burn/runway strip, CASH-IN + BUILD/PARTNER boards, top-3
+  actions. Nav pruned 45→7 flat items (admin-shell.tsx); demoted pages live
+  behind Settings, nothing deleted. /leads renders the full tracker grid
+  (priority, pay_status, $ columns, staleness, data_confidence, ip/legal).
+- Phase 3 (this commit): 6-agent push layer complete —
+  · sync-mercury: pagination FIXED (>200 txns/day no longer dropped) +
+    txn→lead matching + unlogged-revenue flag + runway<30d alert
+  · collections-dunning NEW: weekday 10 AM CT, AR aging buckets
+    (0-15/16-30/31-60/60+), AI drafts → email_drafts one-click send
+  · lead-followup-reminder: follow-up-rot upgrade — thresholds Active 7d /
+    Prospect 10d / Nurture 21d / Proposal 5d off last_step_date, AI drafts
+  · pipeline-hygiene NEW: Monday sweep — Active/Proposal rows missing
+    next_step/date/owner + stale high-value ($10K+) flags
+  · prospect-from-reply NEW: hourly — interested EmailBison reply with no
+    tracker match auto-creates prospect row + Slack ping
+  · daily-digest: rewired to the grid — follow-ups due, AR by aging bucket,
+    top-3 priorities, LeaseStack IP blocker line
+  All 3 new jobs registered (jobs/index.ts + api/inngest/route.ts +
+  registry.ts). tsc clean, build clean.
+- NEXT: verify jobs appear in Inngest dashboard after deploy; Adam to reauth
+  Mercury/HubSpot/n8n/supabase MCPs in claude.ai connectors; scope Trackr +
+  Wholesail placeholder rows.
+
+## Jul 2 — CRM Refresh Phase 1 (commit 9c331a1)
+
+Littlebird PRD ingested. Spec + full audit findings:
+`.claude/specs/2026-07-02-crm-refresh.md` — READ IT FIRST next session.
+
+- **Principle: zero-login CRM — the digest is the interface.** Push > pages.
+- Migration 0016 applied (Neon prod): company_tag += campusgtm/reseller,
+  lead_stage += prospect/active/proposal, data_confidence enum, 11 tracker
+  columns on `leads` (priority, next_step, last_step_date, pay_status,
+  total_value/mrr/collected cents, ip_or_legal_flag, correct_email,
+  owner_secondary, data_confidence).
+- `leads` = THE single tracker grid now. 38 PRD entities seeded
+  (scripts/seed-prd-2026-07-02.ts, idempotent); 9 dupes/excluded archived
+  (incl. Kreg AI/Caleb — PRD removed-list; distinct from Cadel/"Keto AI").
+- Contradictions preserved as [CONFLICT]/[VERIFY] in notes — never flatten:
+  Mentor126 contract version, SG RE deposit, DevSwarm balance, LeaseStack IP
+  (internal blocker row, ip_or_legal_flag on Trig/SG/LBA/Guardian).
+- NEXT (Phase 2): One Page — /command becomes landing, nav ≤7 flat items
+  (admin-shell.tsx NAV_ITEMS), /leads renders new columns, CASH-IN +
+  BUILD/PARTNER boards. (Phase 3): upgrade existing jobs — sync-mercury
+  pagination BUG (>200 txns/24h dropped), collections/rot AI drafts via
+  email_drafts one-click flow, digest rewire. All inputs in the spec.
+- Mercury MCP unauth'd in claude.ai connectors (repo's direct MERCURY_API_KEY
+  connector is primary). Pre-existing tsc errors in untracked
+  scripts/deploy-*.ts (SpintaxValidation) — not mine, not blocking.
 
 ## May 26 Session B — COGS Visibility Loop Closed (4 commits)
 

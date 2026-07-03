@@ -1,7 +1,7 @@
 /**
  * AM Collective — Inngest Job Registry
  *
- * Static manifest of all 41 registered Inngest functions.
+ * Static manifest of all registered Inngest functions.
  * Used by the /admin/jobs dashboard to show all jobs even before any
  * have executed (so newly deployed jobs are immediately visible).
  *
@@ -66,4 +66,7 @@ export const JOB_REGISTRY: JobRegistration[] = [
   { id: "dunning-sequence",             name: "Dunning Email Sequence",        cron: null,               events: ["stripe/invoice.payment_failed"] },
   { id: "cold-email-research-loop",     name: "Cold Email Research Loop (Bison)", cron: "0 13 * * *",     events: ["cold-email/research.run"] },
   { id: "reply-outcome-classifier",     name: "Reply Outcome Classifier (Bison Learning)", cron: "0 14 * * *", events: ["reply-learning/outcome.classify"] },
+  { id: "collections-dunning",          name: "Collections Agent (AR dunning)",   cron: "0 15 * * 1-5",   events: [] },
+  { id: "pipeline-hygiene",             name: "Pipeline Hygiene Agent",           cron: "0 16 * * 1",     events: [] },
+  { id: "prospect-from-reply",          name: "Prospecting Agent (warm replies → tracker)", cron: "30 * * * *", events: [] },
 ];
