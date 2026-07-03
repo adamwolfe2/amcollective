@@ -137,8 +137,8 @@ export default function RootLayout({
     return (
       <ClerkProvider
         appearance={clerkAppearance}
-        signInForceRedirectUrl="/dashboard"
-        signUpForceRedirectUrl="/dashboard"
+        signInForceRedirectUrl="/command"
+        signUpForceRedirectUrl="/command"
       >
         {content}
       </ClerkProvider>
