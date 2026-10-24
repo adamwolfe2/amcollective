@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { AdminShell } from "./admin-shell";
 import { CommandPalette } from "@/components/command-palette";
 import { CompanyProvider } from "@/components/company-context";
-import { PresenceHeartbeat } from "@/components/presence-heartbeat";
 import { Toaster } from "@/components/ui/sonner";
 
 // Auth-gated pages can't be statically generated during build.
@@ -28,7 +27,6 @@ export default async function AdminLayout({
       <AdminShell>
         {children}
         <CommandPalette />
-        <PresenceHeartbeat />
         <Toaster position="bottom-right" richColors />
       </AdminShell>
     </CompanyProvider>
